@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>web-scanner-lib Demo</title>
+  <style>
+    #reader { width: 360px; margin: 10px auto; }
+    #panel { max-width: 600px; margin: 10px auto; }
+    pre { background:#f4f4f4; padding:10px; }
+  </style>
+  <!-- html5-qrcode CDN -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <h2 style="text-align:center">web-scanner-lib Demo</h2>
+  <div id="reader"></div>
+
+  <div id="panel">
+    <p>识别到: <span id="detected">--</span></p>
+    <label>操作:
+      <select id="action"><option value="IN">IN</option><option value="OUT">OUT</option><option value="MATCH" selected>MATCH</option></select>
+    </label>
+    数量: <input id="qty" type="number" value="1" min="1">
+    <button id="saveBtn">保存记录</button>
+    <button id="exportBtn">导出 JSON</button>
+    <button id="backupBtn">备份到 Gist</button>
+    <button id="stopBtn">停止</button>
+    <button id="startBtn">开始</button>
+
+    <h3>最近记录</h3>
+    <div id="records"></div>
+  </div>
+
+  <script type="module">
+    import createWebScannerLib from '../src/index.js';
+    const lib = createWebScannerLib();
+    lib.init({ elementId: 'reader', fps: 10, qrbox: 250 });
+
+    const detectedEl = document.getElementById('detected');
+    const recordsEl = document.getElementById('records');
+
+    lib.onDetected((code) => {
+      detectedEl.innerText = code;
+    });
+
+    document.getElementById('saveBtn').onclick = () => {
+      const code = detectedEl.innerText;
+      if (!code || code === '--') return alert('未识别到二维码/条码');
+      const action = document.getElementById('action').value;
+      const qty = Number(document.getElementById('qty').value) || 1;
+      const rec = lib.saveRecord({ code, action, qty });
+      renderRecords();
+      alert('保存成功: ' + rec.id);
+    };
+
+    document.getElementById('exportBtn').onclick = () => lib.exportJSON();
+
+    document.getElementById('backupBtn').onclick = async () => {
+      const token = prompt('请粘贴你的 GitHub Personal Access Token（需要 gist 权限）');
+      if (!token) return;
+      try {
+        const data = await lib.syncToGist(token, { description: 'Scanner backup', isPublic: false });
+        alert('备份成功: ' + data.html_url);
+      } catch (e) {
+        alert('备份失败: ' + e.message);
+      }
+    };
+
+    document.getElementById('stopBtn').onclick = () => lib.stop();
+    document.getElementById('startBtn').onclick = () => lib.start();
+
+    function renderRecords() {
+      const arr = lib.getRecords(50);
+      recordsEl.innerHTML = arr.map(r => `<pre>${r.timestamp} | ${r.action} | ${r.code} | qty:${r.qty} | ${r.note||''}</pre>`).join('');
+    }
+
+    // 自动启动
+    lib.start().then(()=>console.log('scanner started')).catch(e=>console.error(e));
+    renderRecords();
+  </script>
+</body>
+</html>
