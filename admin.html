@@ -233,20 +233,14 @@
 </div>
 
 <!-- ========== 引入 C-Lodop ========== -->
-<!-- 优先尝试本地相对路径（需要您将 CLodopFuncs.js 放到同目录下） -->
 <script src="CLodopFuncs.js" onerror="console.warn('本地CLodopFuncs.js加载失败，尝试远程...')"></script>
-<!-- 如果本地不存在，再尝试远程 HTTPS（需要浏览器信任证书） -->
 <script>
-    // 如果本地加载失败，动态加载远程
     (function() {
-        // 检查是否已加载
         if (typeof getLodop === 'function') {
             console.log('C-Lodop 已从本地加载');
             updateLodopStatus(true);
             return;
         }
-
-        // 尝试远程 HTTPS（自签名证书，需手动信任）
         const isHttps = window.location.protocol === 'https:';
         const remoteUrl = isHttps ? 'https://localhost.lodop.net:8443/CLodopFuncs.js' : 'http://localhost:8000/CLodopFuncs.js';
         const script = document.createElement('script');
@@ -263,20 +257,15 @@
         script.onerror = function() {
             console.error('远程 C-Lodop 加载失败: ' + remoteUrl);
             updateLodopStatus(false);
-            // 提示用户手动处理
             alert('无法加载 C-Lodop 打印服务。\n' +
                   '请确保已安装 C-Lodop 并运行。\n' +
                   '如果网站是 HTTPS，请先手动信任证书：\n' +
                   '在浏览器中打开 ' + remoteUrl + ' 并点击"高级"->"继续前往"。');
         };
         document.head.appendChild(script);
-
-        // 延迟检测（因为加载可能较慢）
         setTimeout(function() {
             if (typeof getLodop === 'function') {
                 updateLodopStatus(true);
-            } else {
-                // 不重复提示，因为 onerror 已经提示
             }
         }, 3000);
     })();
@@ -294,7 +283,6 @@
         }
     }
 
-    // 检测 getLodop 是否可用（延迟检测）
     function waitForLodop(callback, retries) {
         retries = retries || 10;
         if (typeof getLodop === 'function') {
@@ -310,7 +298,6 @@
         }, 500);
     }
 
-    // 页面加载完成后检测一次
     window.addEventListener('load', function() {
         waitForLodop(function(ok) {
             updateLodopStatus(ok);
@@ -320,9 +307,6 @@
 
 <!-- ========== 主脚本 ========== -->
 <script>
-    // ============================================================
-    // GitHub Gist 操作
-    // ============================================================
     const STORAGE_KEYS = {
         TOKEN: 'github_token',
         GIST_ID: 'gist_id',
@@ -334,7 +318,6 @@
     let currentGistId = 'f13d97c430522e4851afbf3cd2331e14';
     let currentFilename = 'data.json';
 
-    // DOM references
     const loginOverlay = document.getElementById('login-overlay');
     const loginToken = document.getElementById('login-token');
     const loginGistId = document.getElementById('login-gistid');
@@ -352,7 +335,6 @@
     const refreshBtn = document.getElementById('refresh-btn');
     const logoutBtn = document.getElementById('logout-btn');
 
-    // Node Modal
     const modalNodeOverlay = document.getElementById('modal-node-overlay');
     const modalNodeTitle = document.getElementById('modal-node-title');
     const modalNodeCode = document.getElementById('modal-node-code');
@@ -370,7 +352,6 @@
     const modalNodeSave = document.getElementById('modal-node-save');
     const modalNodeCancel = document.getElementById('modal-node-cancel');
 
-    // Item Modal
     const modalItemOverlay = document.getElementById('modal-item-overlay');
     const modalItemTitle = document.getElementById('modal-item-title');
     const modalItemCode = document.getElementById('modal-item-code');
@@ -386,7 +367,6 @@
     const modalItemSave = document.getElementById('modal-item-save');
     const modalItemCancel = document.getElementById('modal-item-cancel');
 
-    // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
         const url = `https://api.github.com/gists/${gistId}`;
         const resp = await fetch(url, {
@@ -430,7 +410,6 @@
         return await resp.json();
     }
 
-    // ---------- 数据加载与保存 ----------
     async function loadData() {
         try {
             const data = await getGistContent(currentToken, currentGistId, currentFilename);
@@ -456,7 +435,6 @@
         }
     }
 
-    // ---------- 辅助查找函数 ----------
     function findNodeByCode(code, obj) {
         if (!obj) obj = gistData.products;
         if (obj[code]) return obj[code];
@@ -505,7 +483,6 @@
         return null;
     }
 
-    // ---------- 编码生成 ----------
     function generateRootCode() {
         const products = gistData.products;
         const keys = Object.keys(products).filter(k => /^A\d{3}$/.test(k));
@@ -553,7 +530,6 @@
         return parentCode + '/' + String(next).padStart(3, '0');
     }
 
-    // ---------- 树形渲染 ----------
     function statusColor(status) {
         if (status === '待售') return '#f59e0b';
         if (status === '在售') return '#22c55e';
@@ -700,7 +676,6 @@
         });
     }
 
-    // ---------- 节点操作 ----------
     function openNodeModal(mode, code, parentCode) {
         if (mode === 'add') {
             modalNodeMode.value = 'add';
@@ -717,7 +692,7 @@
             modalNodeQrlinks.value = '';
             modalNodeRemark.value = '';
             modalNodeOriginalCode.value = '';
-        } else { // edit
+        } else {
             const node = findNodeByCode(code);
             if (!node) { alert('节点不存在'); return; }
             modalNodeMode.value = 'edit';
@@ -850,7 +825,6 @@
     modalNodeSave.addEventListener('click', saveNode);
     modalNodeCancel.addEventListener('click', () => modalNodeOverlay.classList.remove('active'));
 
-    // ---------- 库存操作 ----------
     function openItemModal(mode, parentCode, itemCode) {
         modalItemParentCode.value = parentCode;
         if (mode === 'add') {
@@ -950,7 +924,6 @@
     modalItemSave.addEventListener('click', saveItem);
     modalItemCancel.addEventListener('click', () => modalItemOverlay.classList.remove('active'));
 
-    // ---------- 搜索和过滤 ----------
     searchBtn.addEventListener('click', renderTree);
     clearSearchBtn.addEventListener('click', function() {
         searchInput.value = '';
@@ -959,7 +932,6 @@
     searchInput.addEventListener('keyup', e => { if (e.key === 'Enter') renderTree(); });
     filterSelect.addEventListener('change', renderTree);
 
-    // ---------- 登录/登出 ----------
     async function performLogin() {
         const token = loginToken.value.trim();
         const gistId = loginGistId.value.trim();
@@ -1029,11 +1001,7 @@
     }
     autoLogin();
 
-    // ============================================================
-    // ========== 标签打印功能（使用预设模板） ==========
-    // ============================================================
-
-    // ---------- 预设模板定义（修正条码类型为数字 10） ----------
+    // ========== 标签打印功能 ==========
     const PRESET_TEMPLATE = {
         name: '商品标签（50×30）',
         paperWidth: 50,
@@ -1042,7 +1010,7 @@
             {
                 type: 'text',
                 field: 'code',
-                x: 0,          // 居中使用相对定位，实际打印时计算居中
+                x: 0,
                 y: 3.5,
                 width: 50,
                 height: 6,
@@ -1068,22 +1036,20 @@
             {
                 type: 'barcode',
                 field: 'code',
-                x: (50 - 43) / 2,   // 居中：宽度43mm，左边距 (50-43)/2
+                x: (50 - 43) / 2,
                 y: 15.3,
                 width: 43,
                 height: 10,
-                barcodeType: 10,    // 修正为数字 10（Lodop 的 PDF417 类型码）
+                barcodeType: 8,    // 修改为 8（PDF417）
                 align: 'center'
             }
         ]
     };
 
-    // ---------- 获取LODOP实例（带重试） ----------
     function getLodopInstance() {
         if (typeof getLodop === 'function') {
             return getLodop();
         } else {
-            // 尝试从全局变量获取
             if (window.LODOP) return window.LODOP;
             if (window.getLodop) return window.getLodop;
             alert('打印服务未加载，请确保已安装 C-Lodop 并刷新页面。\n' +
@@ -1093,38 +1059,27 @@
         }
     }
 
-    // ---------- 根据模板和数据生成打印任务 ----------
     function printWithTemplate(template, data) {
         const LODOP = getLodopInstance();
         if (!LODOP) return;
 
         try {
-            // 初始化打印任务
             LODOP.PRINT_INIT(template.name || '标签打印');
-
-            // 设置纸张大小（单位：0.1毫米，所以需要乘以10）
             LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
 
-            // 遍历元素生成打印命令
             template.elements.forEach((el, idx) => {
                 let value = '';
-                // 获取数据
                 if (el.field === 'static') {
                     value = el.text || '';
                 } else {
                     value = data[el.field] !== undefined ? data[el.field] : '';
                 }
-
-                // 添加前缀
                 if (el.prefix && value) {
                     value = el.prefix + value;
                 }
 
-                // 根据类型生成
                 if (el.type === 'text') {
-                    // 文本：Top, Left, Width, Height, Content
                     LODOP.ADD_PRINT_TEXT(el.y, el.x, el.width, el.height, value);
-                    // 样式索引通常从1开始，所以使用 idx + 1
                     if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx + 1, "FontSize", el.fontSize);
                     if (el.fontName) LODOP.SET_PRINT_STYLEA(idx + 1, "FontName", el.fontName);
                     if (el.bold) LODOP.SET_PRINT_STYLEA(idx + 1, "Bold", 1);
@@ -1132,14 +1087,10 @@
                         LODOP.SET_PRINT_STYLEA(idx + 1, "Alignment", 2);
                     }
                 } else if (el.type === 'barcode') {
-                    // 条码：Top, Left, Width, Height, CodeType, CodeValue
                     LODOP.ADD_PRINT_BARCODE(el.y, el.x, el.width, el.height, el.barcodeType, value);
-                    // 可设置条码属性，例如不显示条码下方文字
-                    // LODOP.SET_PRINT_STYLEA(idx + 1, "BarCodeText", 0);
                 }
             });
 
-            // 预览（也可使用 PRINT 直接打印）
             LODOP.PREVIEW();
         } catch (e) {
             alert('打印出错: ' + e.message);
@@ -1147,7 +1098,6 @@
         }
     }
 
-    // ---------- 打印节点标签 ----------
     window.printNodeLabel = function(code) {
         const node = findNodeByCode(code);
         if (!node) { alert('节点不存在'); return; }
@@ -1162,7 +1112,6 @@
         printWithTemplate(PRESET_TEMPLATE, data);
     };
 
-    // ---------- 打印库存标签 ----------
     window.printItemLabel = function(parentCode, itemCode) {
         const parent = findNodeByCode(parentCode);
         if (!parent) { alert('父节点不存在'); return; }
