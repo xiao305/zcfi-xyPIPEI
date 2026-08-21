@@ -1033,7 +1033,7 @@
     // ========== 标签打印功能（使用预设模板） ==========
     // ============================================================
 
-    // ---------- 预设模板定义 ----------
+    // ---------- 预设模板定义（修正条码类型为数字 10） ----------
     const PRESET_TEMPLATE = {
         name: '商品标签（50×30）',
         paperWidth: 50,
@@ -1071,8 +1071,8 @@
                 x: (50 - 43) / 2,   // 居中：宽度43mm，左边距 (50-43)/2
                 y: 15.3,
                 width: 43,
-                height: 10,          // 足够高度显示PDF417
-                barcodeType: 'PDF417',
+                height: 10,
+                barcodeType: 10,    // 修正为数字 10（Lodop 的 PDF417 类型码）
                 align: 'center'
             }
         ]
@@ -1083,10 +1083,9 @@
         if (typeof getLodop === 'function') {
             return getLodop();
         } else {
-            // 尝试从全局变量获取（某些版本可能放在 window 下）
+            // 尝试从全局变量获取
             if (window.LODOP) return window.LODOP;
             if (window.getLodop) return window.getLodop;
-            // 如果仍未获取，提示用户
             alert('打印服务未加载，请确保已安装 C-Lodop 并刷新页面。\n' +
                   '如果已安装，请检查服务是否运行（访问 http://localhost:8000/CLodopFuncs.js 测试）。\n' +
                   '如果网站是 HTTPS，请先手动信任证书：在浏览器中打开 https://localhost.lodop.net:8443/CLodopFuncs.js 并点击"高级"->"继续前往"。');
@@ -1113,7 +1112,6 @@
                 if (el.field === 'static') {
                     value = el.text || '';
                 } else {
-                    // 支持 'code' 或其他字段
                     value = data[el.field] !== undefined ? data[el.field] : '';
                 }
 
@@ -1124,17 +1122,18 @@
 
                 // 根据类型生成
                 if (el.type === 'text') {
+                    // 文本：x, y, width, height, value
                     LODOP.ADD_PRINT_TEXT(el.x, el.y, el.width, el.height, value);
                     if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx, "FontSize", el.fontSize);
                     if (el.fontName) LODOP.SET_PRINT_STYLEA(idx, "FontName", el.fontName);
                     if (el.bold) LODOP.SET_PRINT_STYLEA(idx, "Bold", 1);
-                    if (el.color) LODOP.SET_PRINT_STYLEA(idx, "Color", el.color);
                     if (el.align === 'center') {
                         LODOP.SET_PRINT_STYLEA(idx, "Alignment", 2);
                     }
                 } else if (el.type === 'barcode') {
-                    // 条码类型，PDF417 使用 "PDF417"
-                    LODOP.ADD_PRINT_BARCODE(el.x, el.y, el.barcodeType || 'PDF417', el.width, el.height, value);
+                    // 条码：参数顺序 Top, Left, CodeType, CodeValue, Width, Height
+                    // 注意：CodeType 现在为数字 10
+                    LODOP.ADD_PRINT_BARCODE(el.y, el.x, el.barcodeType, value, el.width, el.height);
                     // 可设置条码属性，例如不显示条码下方文字
                     // LODOP.SET_PRINT_STYLEA(idx, "BarCodeText", 0);
                 }
@@ -1144,6 +1143,7 @@
             LODOP.PREVIEW();
         } catch (e) {
             alert('打印出错: ' + e.message);
+            console.error(e);
         }
     }
 
@@ -1151,7 +1151,6 @@
     window.printNodeLabel = function(code) {
         const node = findNodeByCode(code);
         if (!node) { alert('节点不存在'); return; }
-        // 准备数据：需要 'code' 字段
         const data = {
             code: code,
             name: node.name || '',
@@ -1169,7 +1168,6 @@
         if (!parent) { alert('父节点不存在'); return; }
         const item = parent.items ? parent.items.find(it => it.code === itemCode) : null;
         if (!item) { alert('库存项不存在'); return; }
-        // 准备数据
         const data = {
             code: itemCode,
             name: item.name || parent.name || '',
