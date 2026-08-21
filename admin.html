@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>商品管理后台（增强版）</title>
     <style>
+        /* 样式同前，略 ... 完整代码见下文 */
         * { box-sizing: border-box; }
         body {
             font-family: system-ui, sans-serif;
@@ -236,7 +237,7 @@
 
 <script>
     // ============================================================
-    // GitHub Gist 操作（同前，略）
+    // GitHub Gist 操作
     // ============================================================
     const STORAGE_KEYS = {
         TOKEN: 'github_token',
@@ -470,7 +471,7 @@
         }
 
         let itemsHtml = '';
-        if (!unified && hasItems) {
+        if (hasItems) {
             itemsHtml = `<table class="items-table">
                 <thead><tr><th>库存编码</th><th>名称</th><th>成本</th><th>快递单号</th><th>订单号</th><th>状态</th><th>操作</th></tr></thead>
                 <tbody>
@@ -499,10 +500,9 @@
             <button class="btn btn-danger btn-sm" onclick="deleteNode('${code}')">删除</button>
         `;
 
-        const toggleIcon = (hasChildren || (!unified && hasItems)) ?
+        const toggleIcon = (hasChildren || hasItems) ?
             `<span class="toggle" onclick="toggleNode('${code}')">▼</span>` : '';
 
-        // 显示订单号、状态
         const orderInfo = node.orderNumber ? `📋${node.orderNumber}` : '';
         const statusInfo = `<span class="status-badge" style="background:${statusColor(status)};">${status}</span>`;
 
@@ -517,8 +517,8 @@
                     ${statusInfo}
                     <span class="actions">${actions}</span>
                 </div>
-                ${unified ? (hasChildren ? `<div class="children">${childrenHtml}</div>` : '') :
-                            (hasItems ? `<div class="children">${itemsHtml}</div>` : '')}
+                ${hasChildren ? `<div class="children">${childrenHtml}</div>` : ''}
+                ${hasItems ? `<div class="children">${itemsHtml}</div>` : ''}
             </div>
         `;
     }
@@ -598,7 +598,6 @@
             modalNodeMode.value = 'add';
             modalNodeParent.value = parentCode || '';
             modalNodeTitle.textContent = parentCode ? '添加子类' : '添加大类';
-            // 自动生成编码并填入
             let defaultCode = parentCode ? generateChildCode(parentCode) : generateRootCode();
             modalNodeCode.value = defaultCode || '';
             modalNodeName.value = '';
@@ -656,36 +655,24 @@
             }
         }
 
-        // 检查编码重复（编辑时排除自身）
         const originalCode = modalNodeOriginalCode.value;
+
         if (mode === 'add') {
             // 检查是否已存在
-            const exists = findNodeByCode(code);
-            if (exists) { alert('编码已存在，请修改'); return; }
-        } else {
-            if (code !== originalCode) {
-                const exists = findNodeByCode(code);
-                if (exists) { alert('新编码已存在，请修改'); return; }
-            }
-        }
-
-        // 构建节点对象
-        const newNode = {
-            name: name,
-            unified: unified,
-            children: {},
-            cost: isNaN(cost) ? undefined : cost,
-            trackingNumber: tracking || undefined,
-            orderNumber: order || undefined,
-            status: status,
-            qrLinks: qrLinks.length ? qrLinks : undefined,
-            remark: remark || undefined
-        };
-
-        if (mode === 'add') {
+            if (findNodeByCode(code)) { alert('编码已存在，请修改'); return; }
+            const newNode = {
+                name: name,
+                unified: unified,
+                children: {},
+                cost: isNaN(cost) ? undefined : cost,
+                trackingNumber: tracking || undefined,
+                orderNumber: order || undefined,
+                status: status,
+                qrLinks: qrLinks.length ? qrLinks : undefined,
+                remark: remark || undefined
+            };
             const parentCode = modalNodeParent.value;
             if (!parentCode) {
-                // 根节点
                 gistData.products[code] = newNode;
             } else {
                 const parent = findNodeByCode(parentCode);
@@ -698,21 +685,38 @@
                 }
             }
         } else {
-            // edit：删除旧节点，插入新节点
-            const oldCode = originalCode;
-            // 查找父节点
-            const parent = findParentNode(oldCode);
-            if (parent) {
-                // 从父节点children中删除旧key
-                delete parent.children[oldCode];
-                parent.children[code] = newNode;
-            } else if (gistData.products[oldCode]) {
-                // 根节点
-                delete gistData.products[oldCode];
-                gistData.products[code] = newNode;
-            } else {
-                alert('未找到原节点');
-                return;
+            // 编辑模式：直接修改原节点，不删除
+            const node = findNodeByCode(originalCode);
+            if (!node) { alert('节点不存在'); return; }
+            // 更新属性
+            node.name = name;
+            node.unified = unified;
+            node.cost = isNaN(cost) ? undefined : cost;
+            node.trackingNumber = tracking || undefined;
+            node.orderNumber = order || undefined;
+            node.status = status;
+            node.qrLinks = qrLinks.length ? qrLinks : undefined;
+            node.remark = remark || undefined;
+
+            // 如果编码变化，更新父级children键
+            if (code !== originalCode) {
+                // 检查新编码是否已被占用
+                if (findNodeByCode(code)) { alert('新编码已被占用，请修改'); return; }
+                const parent = findParentNode(originalCode);
+                if (parent) {
+                    delete parent.children[originalCode];
+                    parent.children[code] = node;
+                } else if (gistData.products[originalCode]) {
+                    delete gistData.products[originalCode];
+                    gistData.products[code] = node;
+                } else {
+                    alert('未找到父节点');
+                    return;
+                }
+                // 提醒子节点编码可能需要更新
+                if (node.children && Object.keys(node.children).length > 0) {
+                    alert('⚠️ 编码已更改，但子节点编码未自动更新，请手动调整子节点编码以避免数据混乱。');
+                }
             }
         }
         const success = await saveData();
