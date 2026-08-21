@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品管理后台（支持库存）</title>
+    <style>
+        /* 样式沿用之前，增加库存相关 */
+        * { box-sizing: border-box; }
+        body {
+            font-family: system-ui, sans-serif;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 20px;
+            color: #0f172a;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .top-bar {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+            justify-content: space-between; background: white; padding: 12px 20px;
+            border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 8px 16px; border: none; border-radius: 8px; font-weight: 600;
+            cursor: pointer; font-size: 14px;
+        }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-success:hover { background: #16a34a; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-sm { padding: 2px 8px; font-size: 12px; }
+        .card {
+            background: white; border-radius: 12px; padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px;
+        }
+        .tree-container { padding: 10px 0; overflow-x: auto; }
+        .tree-node {
+            margin-left: 20px; padding-left: 10px; border-left: 2px solid #e2e8f0;
+        }
+        .tree-node .node-content {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 0;
+        }
+        .tree-node .node-content .name {
+            font-weight: 600; cursor: pointer;
+        }
+        .tree-node .node-content .code {
+            color: #64748b; font-size: 12px; background: #f1f5f9; padding: 0 8px; border-radius: 4px;
+        }
+        .tree-node .node-content .badge {
+            font-size: 11px; background: #dbeafe; color: #1e40af; padding: 0 6px; border-radius: 12px;
+        }
+        .tree-node .node-content .actions {
+            display: flex; gap: 4px; flex-wrap: wrap;
+        }
+        .tree-node .node-content .actions .btn { padding: 2px 8px; font-size: 12px; }
+        .tree-node .children { display: none; }
+        .tree-node.expanded > .children { display: block; }
+        .filter-bar {
+            display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px;
+        }
+        .filter-bar select, .filter-bar input {
+            padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;
+        }
+        .items-table {
+            width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px;
+        }
+        .items-table th {
+            background: #f8fafc; text-align: left; padding: 6px 8px; border-bottom: 2px solid #e2e8f0;
+        }
+        .items-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; word-break: break-all; }
+        .items-table .actions { display: flex; gap: 4px; }
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            align-items: center; justify-content: center; z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white; border-radius: 16px; padding: 24px; max-width: 550px;
+            width: 90%; max-height: 90vh; overflow-y: auto;
+        }
+        .modal h3 { margin-top: 0; }
+        .modal label {
+            display: block; margin-top: 12px; font-weight: 600; font-size: 14px;
+        }
+        .modal input, .modal textarea, .modal select {
+            width: 100%; padding: 8px 12px; border: 1px solid #d1d5db;
+            border-radius: 8px; font-size: 14px; margin-top: 4px;
+        }
+        .modal .btn-group { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+        .modal .inline-group { display: flex; gap: 10px; align-items: center; }
+        .modal .inline-group label { margin-top: 0; }
+        /* Login overlay */
+        #login-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            align-items: center; justify-content: center; z-index: 9999;
+        }
+        #login-overlay.active { display: flex; }
+        .login-box {
+            background: white; border-radius: 16px; padding: 30px; max-width: 400px; width: 90%;
+        }
+        .login-box h2 { margin-top: 0; }
+        .login-box label { display: block; margin-top: 12px; font-weight: 600; }
+        .login-box input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; margin-top: 4px; }
+        #login-error { color: #ef4444; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<!-- Login Overlay -->
+<div id="login-overlay" class="active">
+    <div class="login-box">
+        <h2>🔐 登录</h2>
+        <p style="color: #64748b; font-size: 14px;">请输入 GitHub 凭证</p>
+        <label>GitHub Token</label>
+        <input type="password" id="login-token" placeholder="ghp_xxxx" />
+        <label>Gist ID</label>
+        <input type="text" id="login-gistid" value="f13d97c430522e4851afbf3cd2331e14" />
+        <label>文件名</label>
+        <input type="text" id="login-filename" value="data.json" />
+        <div class="btn-group" style="margin-top:20px; justify-content:flex-end;">
+            <button class="btn btn-primary" id="login-btn">登录</button>
+        </div>
+        <div id="login-error"></div>
+    </div>
+</div>
+
+<!-- Main App -->
+<div id="app-container" style="display:none;">
+    <div class="container">
+        <div class="top-bar">
+            <div>
+                <h1 style="margin:0;">📦 商品管理</h1>
+                <span style="font-size:14px; color:#475569;">已登录: <span id="user-status">...</span></span>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-success" id="add-root-btn">＋ 添加大类</button>
+                <button class="btn btn-secondary" id="refresh-btn">🔄 刷新</button>
+                <button class="btn btn-danger" id="logout-btn">退出</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="filter-bar">
+                <select id="filter-select"><option value="all">全部展开</option></select>
+                <input type="text" id="search-input" placeholder="搜索编码或名称..." />
+                <button class="btn btn-secondary" id="search-btn">搜索</button>
+                <button class="btn btn-secondary" id="clear-search-btn">清除</button>
+            </div>
+            <div class="tree-container" id="tree-container">
+                <p style="color:#94a3b8;">加载中...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 节点编辑/添加 Modal -->
+<div class="modal-overlay" id="modal-node-overlay">
+    <div class="modal">
+        <h3 id="modal-node-title">编辑节点</h3>
+        <label>名称 *</label>
+        <input type="text" id="modal-node-name" />
+        <label>统一条码</label>
+        <select id="modal-node-unified">
+            <option value="true">是（统一）</option>
+            <option value="false">否（不统一，可添加库存）</option>
+        </select>
+        <label>成本（仅统一节点有效）</label>
+        <input type="number" id="modal-node-cost" step="0.01" />
+        <label>快递单号（仅统一节点有效）</label>
+        <input type="text" id="modal-node-tracking" />
+        <label>QR关联链接（仅统一节点有效）</label>
+        <input type="text" id="modal-node-qr" placeholder="https://..." />
+        <label>备注（仅统一节点有效）</label>
+        <textarea id="modal-node-remark" rows="2"></textarea>
+        <div class="btn-group">
+            <button class="btn btn-secondary" id="modal-node-cancel">取消</button>
+            <button class="btn btn-primary" id="modal-node-save">保存</button>
+        </div>
+        <input type="hidden" id="modal-node-code" />
+        <input type="hidden" id="modal-node-parent" />
+        <input type="hidden" id="modal-node-mode" /> <!-- add/edit -->
+    </div>
+</div>
+
+<!-- 库存项编辑/添加 Modal -->
+<div class="modal-overlay" id="modal-item-overlay">
+    <div class="modal">
+        <h3 id="modal-item-title">添加库存</h3>
+        <label>库存编码</label>
+        <div class="inline-group">
+            <input type="text" id="modal-item-code" placeholder="自定义编码或留空系统生成" style="flex:1;" />
+            <button class="btn btn-secondary" id="modal-item-auto-code">生成</button>
+        </div>
+        <label>名称（可选）</label>
+        <input type="text" id="modal-item-name" placeholder="可留空，默认使用节点名称" />
+        <label>成本</label>
+        <input type="number" id="modal-item-cost" step="0.01" />
+        <label>快递单号</label>
+        <input type="text" id="modal-item-tracking" />
+        <label>QR关联链接</label>
+        <input type="text" id="modal-item-qr" placeholder="https://..." />
+        <label>备注</label>
+        <textarea id="modal-item-remark" rows="2"></textarea>
+        <div class="btn-group">
+            <button class="btn btn-secondary" id="modal-item-cancel">取消</button>
+            <button class="btn btn-primary" id="modal-item-save">保存</button>
+        </div>
+        <input type="hidden" id="modal-item-parent-code" />
+        <input type="hidden" id="modal-item-edit-original-code" />
+    </div>
+</div>
+
+<script>
+    // ============================================================
+    // GitHub Gist 操作
+    // ============================================================
+    const STORAGE_KEYS = {
+        TOKEN: 'github_token',
+        GIST_ID: 'gist_id',
+        FILENAME: 'gist_filename'
+    };
+
+    let gistData = { products: {} };
+    let currentToken = '';
+    let currentGistId = 'f13d97c430522e4851afbf3cd2331e14';
+    let currentFilename = 'data.json';
+
+    // DOM references
+    const loginOverlay = document.getElementById('login-overlay');
+    const loginToken = document.getElementById('login-token');
+    const loginGistId = document.getElementById('login-gistid');
+    const loginFilename = document.getElementById('login-filename');
+    const loginBtn = document.getElementById('login-btn');
+    const loginError = document.getElementById('login-error');
+    const appContainer = document.getElementById('app-container');
+    const userStatus = document.getElementById('user-status');
+    const treeContainer = document.getElementById('tree-container');
+    const filterSelect = document.getElementById('filter-select');
+    const searchInput = document.getElementById('search-input');
+    const searchBtn = document.getElementById('search-btn');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+    const addRootBtn = document.getElementById('add-root-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    // Node Modal
+    const modalNodeOverlay = document.getElementById('modal-node-overlay');
+    const modalNodeTitle = document.getElementById('modal-node-title');
+    const modalNodeName = document.getElementById('modal-node-name');
+    const modalNodeUnified = document.getElementById('modal-node-unified');
+    const modalNodeCost = document.getElementById('modal-node-cost');
+    const modalNodeTracking = document.getElementById('modal-node-tracking');
+    const modalNodeQr = document.getElementById('modal-node-qr');
+    const modalNodeRemark = document.getElementById('modal-node-remark');
+    const modalNodeCode = document.getElementById('modal-node-code');
+    const modalNodeParent = document.getElementById('modal-node-parent');
+    const modalNodeMode = document.getElementById('modal-node-mode');
+    const modalNodeSave = document.getElementById('modal-node-save');
+    const modalNodeCancel = document.getElementById('modal-node-cancel');
+
+    // Item Modal
+    const modalItemOverlay = document.getElementById('modal-item-overlay');
+    const modalItemTitle = document.getElementById('modal-item-title');
+    const modalItemCode = document.getElementById('modal-item-code');
+    const modalItemName = document.getElementById('modal-item-name');
+    const modalItemCost = document.getElementById('modal-item-cost');
+    const modalItemTracking = document.getElementById('modal-item-tracking');
+    const modalItemQr = document.getElementById('modal-item-qr');
+    const modalItemRemark = document.getElementById('modal-item-remark');
+    const modalItemParentCode = document.getElementById('modal-item-parent-code');
+    const modalItemEditOriginalCode = document.getElementById('modal-item-edit-original-code');
+    const modalItemAutoCode = document.getElementById('modal-item-auto-code');
+    const modalItemSave = document.getElementById('modal-item-save');
+    const modalItemCancel = document.getElementById('modal-item-cancel');
+
+    // ---------- GitHub API ----------
+    async function getGistContent(token, gistId, filename) {
+        const url = `https://api.github.com/gists/${gistId}`;
+        const resp = await fetch(url, {
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(`GitHub API 错误: ${err.message || resp.statusText}`);
+        }
+        const data = await resp.json();
+        const files = data.files;
+        if (!files || !files[filename]) return {};
+        try { return JSON.parse(files[filename].content); }
+        catch { return {}; }
+    }
+
+    async function updateGistContent(token, gistId, filename, content) {
+        const contentStr = JSON.stringify(content, null, 2);
+        const url = `https://api.github.com/gists/${gistId}`;
+        const payload = {
+            files: {
+                [filename]: { content: contentStr }
+            }
+        };
+        const resp = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(`更新失败: ${err.message || resp.statusText}`);
+        }
+        return await resp.json();
+    }
+
+    // ---------- 数据加载与保存 ----------
+    async function loadData() {
+        try {
+            const data = await getGistContent(currentToken, currentGistId, currentFilename);
+            if (!data.products) data.products = {};
+            gistData = data;
+            renderTree();
+            populateFilter();
+            userStatus.textContent = `已连接 (${currentGistId})`;
+            return true;
+        } catch (e) {
+            alert(`加载数据失败: ${e.message}`);
+            return false;
+        }
+    }
+
+    async function saveData() {
+        try {
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+            return true;
+        } catch (e) {
+            alert(`保存失败: ${e.message}`);
+            return false;
+        }
+    }
+
+    // ---------- 辅助查找函数 ----------
+    function findNodeByCode(code, obj) {
+        if (!obj) obj = gistData.products;
+        if (obj[code]) return obj[code];
+        for (let key in obj) {
+            if (obj[key].children) {
+                const found = findNodeByCode(code, obj[key].children);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    function findParentNode(code, parentObj) {
+        if (!parentObj) parentObj = gistData.products;
+        for (let key in parentObj) {
+            if (parentObj[key].children && parentObj[key].children[code]) {
+                return parentObj[key];
+            }
+            if (parentObj[key].children) {
+                const found = findParentNode(code, parentObj[key].children);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    // ---------- 编码生成 ----------
+    function generateRootCode() {
+        const products = gistData.products;
+        const keys = Object.keys(products).filter(k => k.match(/^A\d{3}$/));
+        let maxNum = 0;
+        keys.forEach(k => {
+            const num = parseInt(k.substring(1));
+            if (num > maxNum) maxNum = num;
+        });
+        const next = maxNum + 1;
+        if (next > 999) { alert('已达到最大编码数 (A999)'); return null; }
+        return 'A' + String(next).padStart(3, '0');
+    }
+
+    function generateChildCode(parentCode) {
+        const parent = findNodeByCode(parentCode);
+        if (!parent) return null;
+        if (!parent.children) parent.children = {};
+        const children = parent.children;
+        const keys = Object.keys(children).filter(k => k.startsWith(parentCode + '/B'));
+        let maxNum = 0;
+        keys.forEach(k => {
+            const parts = k.split('/');
+            const last = parts[parts.length - 1];
+            if (last.startsWith('B')) {
+                const num = parseInt(last.substring(1));
+                if (num > maxNum) maxNum = num;
+            }
+        });
+        const next = maxNum + 1;
+        if (next > 999) { alert('子编码超过 B999'); return null; }
+        return parentCode + '/B' + String(next).padStart(3, '0');
+    }
+
+    // 生成库存编码（在节点下）
+    function generateItemCode(parentCode) {
+        const parent = findNodeByCode(parentCode);
+        if (!parent) return null;
+        if (!parent.items) parent.items = [];
+        const items = parent.items;
+        // 提取现有编码中的数字后缀（假设格式为 parentCode/xxx）
+        let maxNum = 0;
+        items.forEach(item => {
+            const parts = item.code.split('/');
+            const last = parts[parts.length - 1];
+            const num = parseInt(last);
+            if (!isNaN(num) && num > maxNum) maxNum = num;
+        });
+        const next = maxNum + 1;
+        if (next > 999) { alert('库存编码超过 999'); return null; }
+        return parentCode + '/' + String(next).padStart(3, '0');
+    }
+
+    // ---------- 树形渲染（包含库存） ----------
+    function renderNode(code, node, depth) {
+        const hasChildren = node.children && Object.keys(node.children).length > 0;
+        const hasItems = node.items && node.items.length > 0;
+        const unified = node.unified !== false; // 默认统一
+        const badge = unified ? '统一' : '不统一';
+        const badgeColor = unified ? '#dbeafe' : '#fef3c7';
+
+        let childrenHtml = '';
+        if (hasChildren) {
+            const childKeys = Object.keys(node.children).sort();
+            childrenHtml = childKeys.map(c => renderNode(c, node.children[c], depth + 1)).join('');
+        }
+
+        let itemsHtml = '';
+        if (!unified && hasItems) {
+            itemsHtml = `<table class="items-table">
+                <thead><tr><th>库存编码</th><th>名称</th><th>成本</th><th>快递单号</th><th>操作</th></tr></thead>
+                <tbody>
+                    ${node.items.map((item, idx) => `
+                        <tr>
+                            <td>${item.code}</td>
+                            <td>${item.name || ''}</td>
+                            <td>${item.cost !== undefined ? item.cost : ''}</td>
+                            <td>${item.trackingNumber || ''}</td>
+                            <td class="actions">
+                                <button class="btn btn-primary btn-sm" onclick="editItem('${code}','${item.code}')">编辑</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteItem('${code}','${item.code}')">删除</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+        }
+
+        const actions = `
+            <button class="btn btn-secondary btn-sm" onclick="openNodeModal('edit','${code}')">编辑</button>
+            ${unified ? `<button class="btn btn-secondary btn-sm" onclick="openNodeModal('add','','${code}')">添加子类</button>` :
+                        `<button class="btn btn-success btn-sm" onclick="openItemModal('add','${code}')">添加库存</button>`}
+            <button class="btn btn-danger btn-sm" onclick="deleteNode('${code}')">删除</button>
+        `;
+
+        const toggleIcon = (hasChildren || (!unified && hasItems)) ?
+            `<span class="toggle" onclick="toggleNode('${code}')">▼</span>` : '';
+
+        return `
+            <div class="tree-node" data-code="${code}" data-depth="${depth}">
+                <div class="node-content">
+                    ${toggleIcon}
+                    <span class="name" onclick="toggleNode('${code}')">${node.name || code}</span>
+                    <span class="code">${code}</span>
+                    <span class="badge" style="background:${badgeColor};">${badge}</span>
+                    <span class="actions">${actions}</span>
+                </div>
+                ${unified ? (hasChildren ? `<div class="children">${childrenHtml}</div>` : '') :
+                            (hasItems ? `<div class="children">${itemsHtml}</div>` : '')}
+            </div>
+        `;
+    }
+
+    function buildTreeHtml() {
+        const products = gistData.products || {};
+        const codes = Object.keys(products).sort();
+        if (codes.length === 0) return '<p style="color:#94a3b8;">暂无商品，请添加大类</p>';
+        return codes.map(code => renderNode(code, products[code], 0)).join('');
+    }
+
+    function renderTree() {
+        const filter = filterSelect.value;
+        const searchTerm = searchInput.value.trim().toLowerCase();
+        let fullHtml = buildTreeHtml();
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = fullHtml;
+        // 过滤
+        if (filter !== 'all') {
+            const rootNodes = tempDiv.querySelectorAll('.tree-node[data-depth="0"]');
+            rootNodes.forEach(node => {
+                const code = node.dataset.code;
+                if (code !== filter) {
+                    node.style.display = 'none';
+                } else {
+                    node.classList.add('expanded');
+                    const allChildren = node.querySelectorAll('.tree-node');
+                    allChildren.forEach(c => c.style.display = '');
+                    allChildren.forEach(c => c.classList.add('expanded'));
+                }
+            });
+        } else {
+            tempDiv.querySelectorAll('.tree-node').forEach(n => n.classList.add('expanded'));
+        }
+        // 搜索
+        if (searchTerm) {
+            const allNodes = tempDiv.querySelectorAll('.tree-node');
+            allNodes.forEach(node => {
+                const name = node.querySelector('.name')?.textContent?.toLowerCase() || '';
+                const code = node.dataset.code?.toLowerCase() || '';
+                if (name.includes(searchTerm) || code.includes(searchTerm)) {
+                    node.style.display = '';
+                    let parent = node.parentElement.closest('.tree-node');
+                    while (parent) {
+                        parent.classList.add('expanded');
+                        parent.style.display = '';
+                        parent = parent.parentElement.closest('.tree-node');
+                    }
+                } else {
+                    const hasMatch = node.querySelector('.tree-node') &&
+                        Array.from(node.querySelectorAll('.tree-node')).some(child => child.style.display !== 'none');
+                    if (!hasMatch) {
+                        node.style.display = 'none';
+                    }
+                }
+            });
+        }
+        treeContainer.innerHTML = tempDiv.innerHTML;
+    }
+
+    window.toggleNode = function(code) {
+        const el = document.querySelector(`.tree-node[data-code="${code}"]`);
+        if (el) el.classList.toggle('expanded');
+    };
+
+    function populateFilter() {
+        const products = gistData.products || {};
+        const codes = Object.keys(products).sort();
+        filterSelect.innerHTML = '<option value="all">全部展开</option>';
+        codes.forEach(code => {
+            const name = products[code].name || code;
+            filterSelect.innerHTML += `<option value="${code}">${name} (${code})</option>`;
+        });
+    }
+
+    // ---------- 节点操作 ----------
+    function openNodeModal(mode, code, parentCode) {
+        if (mode === 'add') {
+            modalNodeMode.value = 'add';
+            modalNodeParent.value = parentCode || '';
+            modalNodeTitle.textContent = parentCode ? '添加子类' : '添加大类';
+            modalNodeName.value = '';
+            modalNodeUnified.value = 'true';
+            modalNodeCost.value = '';
+            modalNodeTracking.value = '';
+            modalNodeQr.value = '';
+            modalNodeRemark.value = '';
+            modalNodeCode.value = '';
+        } else { // edit
+            const node = findNodeByCode(code);
+            if (!node) { alert('节点不存在'); return; }
+            modalNodeMode.value = 'edit';
+            modalNodeCode.value = code;
+            modalNodeParent.value = '';
+            modalNodeTitle.textContent = '编辑节点';
+            modalNodeName.value = node.name || '';
+            modalNodeUnified.value = node.unified !== false ? 'true' : 'false';
+            // 如果统一，显示成本等；如果不统一，这些字段在节点上无意义，但保留填充
+            modalNodeCost.value = node.cost !== undefined ? node.cost : '';
+            modalNodeTracking.value = node.trackingNumber || '';
+            modalNodeQr.value = node.qrCode || '';
+            modalNodeRemark.value = node.remark || '';
+        }
+        modalNodeOverlay.classList.add('active');
+    }
+
+    async function saveNode() {
+        const mode = modalNodeMode.value;
+        const name = modalNodeName.value.trim();
+        if (!name) { alert('名称不能为空'); return; }
+        const unified = modalNodeUnified.value === 'true';
+        const cost = parseFloat(modalNodeCost.value);
+        const tracking = modalNodeTracking.value.trim();
+        const qr = modalNodeQr.value.trim();
+        const remark = modalNodeRemark.value.trim();
+
+        if (mode === 'add') {
+            const parentCode = modalNodeParent.value;
+            let newCode;
+            if (!parentCode) {
+                newCode = generateRootCode();
+            } else {
+                newCode = generateChildCode(parentCode);
+            }
+            if (!newCode) { alert('编码生成失败'); return; }
+            const newNode = {
+                name: name,
+                unified: unified,
+                children: {},
+                cost: isNaN(cost) ? undefined : cost,
+                trackingNumber: tracking || undefined,
+                qrCode: qr || undefined,
+                remark: remark || undefined
+            };
+            if (unified) {
+                // 统一节点可以有children，但初始为空
+            } else {
+                // 不统一节点初始无children，但可能有items
+                newNode.items = [];
+            }
+            if (!parentCode) {
+                gistData.products[newCode] = newNode;
+            } else {
+                const parent = findNodeByCode(parentCode);
+                if (parent) {
+                    if (!parent.children) parent.children = {};
+                    parent.children[newCode] = newNode;
+                } else {
+                    alert('父节点不存在');
+                    return;
+                }
+            }
+        } else {
+            // edit
+            const code = modalNodeCode.value;
+            const node = findNodeByCode(code);
+            if (!node) { alert('节点不存在'); return; }
+            // 如果改变 unified，需要处理子节点或库存
+            const oldUnified = node.unified !== false;
+            if (oldUnified !== unified) {
+                if (unified) {
+                    // 从不统一变为统一：检查是否有库存，如果有则警告并阻止
+                    if (node.items && node.items.length > 0) {
+                        if (!confirm('切换为统一将删除所有库存项，确定继续？')) return;
+                        node.items = [];
+                    }
+                    if (node.children && Object.keys(node.children).length > 0) {
+                        if (!confirm('切换为统一将删除所有子节点，确定继续？')) return;
+                        node.children = {};
+                    }
+                } else {
+                    // 从统一变为不统一：检查是否有子节点
+                    if (node.children && Object.keys(node.children).length > 0) {
+                        if (!confirm('切换为不统一将删除所有子节点，确定继续？')) return;
+                        node.children = {};
+                    }
+                    if (!node.items) node.items = [];
+                }
+            }
+            node.name = name;
+            node.unified = unified;
+            node.cost = isNaN(cost) ? undefined : cost;
+            node.trackingNumber = tracking || undefined;
+            node.qrCode = qr || undefined;
+            node.remark = remark || undefined;
+        }
+        const success = await saveData();
+        if (success) {
+            modalNodeOverlay.classList.remove('active');
+            renderTree();
+            populateFilter();
+        }
+    }
+
+    async function deleteNode(code) {
+        if (!confirm(`确定删除节点 "${code}" 及其所有子项/库存吗？`)) return;
+        const products = gistData.products;
+        if (products[code]) {
+            delete products[code];
+        } else {
+            const parent = findParentNode(code);
+            if (parent) {
+                delete parent.children[code];
+            } else {
+                alert('未找到节点');
+                return;
+            }
+        }
+        const success = await saveData();
+        if (success) {
+            renderTree();
+            populateFilter();
+        }
+    }
+
+    // 暴露全局
+    window.openNodeModal = openNodeModal;
+    window.deleteNode = deleteNode;
+    modalNodeSave.addEventListener('click', saveNode);
+    modalNodeCancel.addEventListener('click', () => modalNodeOverlay.classList.remove('active'));
+
+    // ---------- 库存操作 ----------
+    function openItemModal(mode, parentCode, itemCode) {
+        modalItemParentCode.value = parentCode;
+        if (mode === 'add') {
+            modalItemTitle.textContent = '添加库存';
+            modalItemCode.value = '';
+            modalItemName.value = '';
+            modalItemCost.value = '';
+            modalItemTracking.value = '';
+            modalItemQr.value = '';
+            modalItemRemark.value = '';
+            modalItemEditOriginalCode.value = '';
+            // 自动生成编码
+            const autoCode = generateItemCode(parentCode);
+            if (autoCode) modalItemCode.value = autoCode;
+            else modalItemCode.value = '';
+        } else { // edit
+            const parent = findNodeByCode(parentCode);
+            if (!parent || !parent.items) { alert('库存不存在'); return; }
+            const item = parent.items.find(it => it.code === itemCode);
+            if (!item) { alert('库存项不存在'); return; }
+            modalItemTitle.textContent = '编辑库存';
+            modalItemCode.value = item.code;
+            modalItemName.value = item.name || '';
+            modalItemCost.value = item.cost !== undefined ? item.cost : '';
+            modalItemTracking.value = item.trackingNumber || '';
+            modalItemQr.value = item.qrCode || '';
+            modalItemRemark.value = item.remark || '';
+            modalItemEditOriginalCode.value = itemCode;
+        }
+        modalItemOverlay.classList.add('active');
+    }
+
+    modalItemAutoCode.addEventListener('click', function() {
+        const parentCode = modalItemParentCode.value;
+        const auto = generateItemCode(parentCode);
+        if (auto) modalItemCode.value = auto;
+        else alert('无法生成编码');
+    });
+
+    async function saveItem() {
+        const parentCode = modalItemParentCode.value;
+        const parent = findNodeByCode(parentCode);
+        if (!parent) { alert('父节点不存在'); return; }
+        if (!parent.items) parent.items = [];
+
+        const code = modalItemCode.value.trim();
+        if (!code) { alert('请输入库存编码或点击生成'); return; }
+        // 检查重复（编辑时排除自身）
+        const originalCode = modalItemEditOriginalCode.value;
+        const exists = parent.items.some(it => it.code === code && it.code !== originalCode);
+        if (exists) { alert('该编码已存在'); return; }
+
+        const name = modalItemName.value.trim();
+        const cost = parseFloat(modalItemCost.value);
+        const tracking = modalItemTracking.value.trim();
+        const qr = modalItemQr.value.trim();
+        const remark = modalItemRemark.value.trim();
+
+        if (originalCode) {
+            // 编辑
+            const index = parent.items.findIndex(it => it.code === originalCode);
+            if (index === -1) { alert('库存项不存在'); return; }
+            parent.items[index] = {
+                code: code,
+                name: name || undefined,
+                cost: isNaN(cost) ? undefined : cost,
+                trackingNumber: tracking || undefined,
+                qrCode: qr || undefined,
+                remark: remark || undefined
+            };
+        } else {
+            // 新增
+            parent.items.push({
+                code: code,
+                name: name || undefined,
+                cost: isNaN(cost) ? undefined : cost,
+                trackingNumber: tracking || undefined,
+                qrCode: qr || undefined,
+                remark: remark || undefined
+            });
+        }
+        const success = await saveData();
+        if (success) {
+            modalItemOverlay.classList.remove('active');
+            renderTree();
+        }
+    }
+
+    async function deleteItem(parentCode, itemCode) {
+        if (!confirm(`确定删除库存 "${itemCode}" 吗？`)) return;
+        const parent = findNodeByCode(parentCode);
+        if (!parent || !parent.items) { alert('库存不存在'); return; }
+        const idx = parent.items.findIndex(it => it.code === itemCode);
+        if (idx === -1) { alert('库存项不存在'); return; }
+        parent.items.splice(idx, 1);
+        const success = await saveData();
+        if (success) renderTree();
+    }
+
+    window.openItemModal = openItemModal;
+    window.editItem = function(parentCode, itemCode) {
+        openItemModal('edit', parentCode, itemCode);
+    };
+    window.deleteItem = deleteItem;
+
+    modalItemSave.addEventListener('click', saveItem);
+    modalItemCancel.addEventListener('click', () => modalItemOverlay.classList.remove('active'));
+
+    // ---------- 搜索和过滤 ----------
+    searchBtn.addEventListener('click', renderTree);
+    clearSearchBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        renderTree();
+    });
+    searchInput.addEventListener('keyup', e => { if (e.key === 'Enter') renderTree(); });
+    filterSelect.addEventListener('change', renderTree);
+
+    // ---------- 登录/登出 ----------
+    async function performLogin() {
+        const token = loginToken.value.trim();
+        const gistId = loginGistId.value.trim();
+        const filename = loginFilename.value.trim() || 'data.json';
+        if (!token || !gistId) {
+            loginError.textContent = '请填写 Token 和 Gist ID';
+            return;
+        }
+        loginError.textContent = '';
+        try {
+            const data = await getGistContent(token, gistId, filename);
+            if (!data.products) data.products = {};
+            localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+            localStorage.setItem(STORAGE_KEYS.GIST_ID, gistId);
+            localStorage.setItem(STORAGE_KEYS.FILENAME, filename);
+            currentToken = token;
+            currentGistId = gistId;
+            currentFilename = filename;
+            gistData = data;
+            loginOverlay.classList.remove('active');
+            appContainer.style.display = 'block';
+            userStatus.textContent = `已连接 (${gistId})`;
+            renderTree();
+            populateFilter();
+        } catch (e) {
+            loginError.textContent = `登录失败: ${e.message}`;
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
+        localStorage.removeItem(STORAGE_KEYS.GIST_ID);
+        localStorage.removeItem(STORAGE_KEYS.FILENAME);
+        currentToken = '';
+        currentGistId = '';
+        currentFilename = 'data.json';
+        gistData = { products: {} };
+        appContainer.style.display = 'none';
+        loginOverlay.classList.add('active');
+        loginError.textContent = '';
+        loginToken.value = '';
+        loginGistId.value = 'f13d97c430522e4851afbf3cd2331e14';
+        loginFilename.value = 'data.json';
+    }
+
+    loginBtn.addEventListener('click', performLogin);
+    document.querySelectorAll('#login-token, #login-gistid, #login-filename').forEach(el => {
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') performLogin(); });
+    });
+    logoutBtn.addEventListener('click', logout);
+    refreshBtn.addEventListener('click', loadData);
+    addRootBtn.addEventListener('click', () => openNodeModal('add', '', ''));
+
+    // 自动登录
+    function autoLogin() {
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+        const gistId = localStorage.getItem(STORAGE_KEYS.GIST_ID);
+        const filename = localStorage.getItem(STORAGE_KEYS.FILENAME) || 'data.json';
+        if (token && gistId) {
+            loginToken.value = token;
+            loginGistId.value = gistId;
+            loginFilename.value = filename;
+            performLogin();
+        } else {
+            loginOverlay.classList.add('active');
+            appContainer.style.display = 'none';
+        }
+    }
+    autoLogin();
+
+    console.log('管理后台已加载（支持库存）');
+</script>
+</body>
+</html>
