@@ -999,19 +999,19 @@
     }
     autoLogin();
 
-    // ========== 标签打印功能（使用字符串单位，样式索引从0开始） ==========
+    // ========== 标签打印功能（参考示例修正） ==========
     const PRESET_TEMPLATE = {
         name: '商品标签（50×30）',
-        paperWidth: 50,   // mm
-        paperHeight: 30,  // mm
+        paperWidth: 50,
+        paperHeight: 30,
         elements: [
             {
                 type: 'text',
                 field: 'code',
-                x: 2,          // mm
-                y: 2,          // mm
-                width: 46,     // mm
-                height: 6,     // mm
+                x: 2,
+                y: 2,
+                width: 46,
+                height: 6,
                 fontSize: 14,
                 fontName: '黑体',
                 bold: true,
@@ -1038,7 +1038,7 @@
                 y: 14,
                 width: 46,
                 height: 13,
-                barcodeType: 'PDF417',   // 使用 PDF417
+                barcodeType: 'PDF417',
                 align: 'center'
             }
         ]
@@ -1067,8 +1067,6 @@
 
         try {
             LODOP.PRINT_INIT(template.name || '标签打印');
-
-            // 纸张大小：单位0.1mm，乘以10（或使用字符串 "50mm","30mm"）
             LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
 
             template.elements.forEach((el, idx) => {
@@ -1082,7 +1080,7 @@
                     value = el.prefix + value;
                 }
 
-                // 使用字符串单位，直接传入 mm 字符串，避免换算错误
+                // 使用字符串单位
                 const x = el.x + 'mm';
                 const y = el.y + 'mm';
                 const width = el.width + 'mm';
@@ -1090,15 +1088,17 @@
 
                 if (el.type === 'text') {
                     LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
-                    // 样式索引使用 idx（0 表示最新添加项）
-                    if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx, "FontSize", el.fontSize);
-                    if (el.fontName) LODOP.SET_PRINT_STYLEA(idx, "FontName", el.fontName);
-                    if (el.bold) LODOP.SET_PRINT_STYLEA(idx, "Bold", 1);
+                    // 立即设置样式，索引0表示刚添加的对象
+                    if (el.fontSize) LODOP.SET_PRINT_STYLEA(0, "FontSize", el.fontSize);
+                    if (el.fontName) LODOP.SET_PRINT_STYLEA(0, "FontName", el.fontName);
+                    if (el.bold) LODOP.SET_PRINT_STYLEA(0, "Bold", 1);
                     if (el.align === 'center') {
-                        LODOP.SET_PRINT_STYLEA(idx, "Alignment", 2);
+                        LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
                     }
                 } else if (el.type === 'barcode') {
                     LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, value);
+                    // 尝试设置条码居中（可能无效但无害）
+                    LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
                 }
             });
 
