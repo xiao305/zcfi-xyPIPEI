@@ -246,8 +246,12 @@
         const script = document.createElement('script');
         script.src = remoteUrl;
         script.onload = function() {
+            // 远程脚本加载成功，但可能 getLodop 未定义（某些版本将对象挂载到 window.LODOP）
             if (typeof getLodop === 'function') {
                 console.log('C-Lodop 从远程加载成功: ' + remoteUrl);
+                updateLodopStatus(true);
+            } else if (window.LODOP) {
+                console.log('远程脚本已加载，使用 window.LODOP');
                 updateLodopStatus(true);
             } else {
                 console.warn('远程加载成功但 getLodop 未定义');
@@ -264,7 +268,8 @@
         };
         document.head.appendChild(script);
         setTimeout(function() {
-            if (typeof getLodop === 'function') {
+            // 延迟检测
+            if (typeof getLodop === 'function' || window.LODOP) {
                 updateLodopStatus(true);
             }
         }, 3000);
@@ -285,7 +290,7 @@
 
     function waitForLodop(callback, retries) {
         retries = retries || 10;
-        if (typeof getLodop === 'function') {
+        if (typeof getLodop === 'function' || window.LODOP) {
             callback(true);
             return;
         }
@@ -1001,19 +1006,19 @@
     }
     autoLogin();
 
-    // ========== 标签打印功能 ==========
+    // ========== 标签打印功能（单位统一为0.1mm） ==========
     const PRESET_TEMPLATE = {
         name: '商品标签（50×30）',
-        paperWidth: 50,
-        paperHeight: 30,
+        paperWidth: 50,   // mm
+        paperHeight: 30,  // mm
         elements: [
             {
                 type: 'text',
                 field: 'code',
-                x: 0,
-                y: 3.5,
-                width: 50,
-                height: 6,
+                x: 0,          // mm
+                y: 3.5,        // mm
+                width: 50,     // mm
+                height: 6,     // mm
                 fontSize: 12,
                 fontName: '黑体',
                 bold: true,
@@ -1036,11 +1041,11 @@
             {
                 type: 'barcode',
                 field: 'code',
-                x: (50 - 43) / 2,
+                x: (50 - 43) / 2,  // mm
                 y: 15.3,
                 width: 43,
                 height: 10,
-                barcodeType: 'PDF417',   // 使用字符串形式
+                barcodeType: 'PDF417',   // 字符串形式
                 align: 'center'
             }
         ]
@@ -1049,9 +1054,11 @@
     function getLodopInstance() {
         if (typeof getLodop === 'function') {
             return getLodop();
+        } else if (window.LODOP) {
+            return window.LODOP;
+        } else if (window.getLodop) {
+            return window.getLodop();
         } else {
-            if (window.LODOP) return window.LODOP;
-            if (window.getLodop) return window.getLodop;
             alert('打印服务未加载，请确保已安装 C-Lodop 并刷新页面。\n' +
                   '如果已安装，请检查服务是否运行（访问 http://localhost:8000/CLodopFuncs.js 测试）。\n' +
                   '如果网站是 HTTPS，请先手动信任证书：在浏览器中打开 https://localhost.lodop.net:8443/CLodopFuncs.js 并点击"高级"->"继续前往"。');
@@ -1065,6 +1072,8 @@
 
         try {
             LODOP.PRINT_INIT(template.name || '标签打印');
+
+            // 纸张大小：单位0.1mm，因此乘以10
             LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
 
             template.elements.forEach((el, idx) => {
@@ -1078,8 +1087,14 @@
                     value = el.prefix + value;
                 }
 
+                // 坐标和尺寸同样乘以10，保持单位一致
+                const x = el.x * 10;
+                const y = el.y * 10;
+                const width = el.width * 10;
+                const height = el.height * 10;
+
                 if (el.type === 'text') {
-                    LODOP.ADD_PRINT_TEXT(el.y, el.x, el.width, el.height, value);
+                    LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
                     if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx + 1, "FontSize", el.fontSize);
                     if (el.fontName) LODOP.SET_PRINT_STYLEA(idx + 1, "FontName", el.fontName);
                     if (el.bold) LODOP.SET_PRINT_STYLEA(idx + 1, "Bold", 1);
@@ -1087,7 +1102,7 @@
                         LODOP.SET_PRINT_STYLEA(idx + 1, "Alignment", 2);
                     }
                 } else if (el.type === 'barcode') {
-                    LODOP.ADD_PRINT_BARCODE(el.y, el.x, el.width, el.height, el.barcodeType, value);
+                    LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, value);
                 }
             });
 
