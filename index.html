@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>扫码测试 - 增强版 (ZXing引擎)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>浏览器原生扫码测试 (Barcode Detection API)</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -21,7 +21,7 @@
             margin-bottom: 16px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
-        #reader-container {
+        #video-container {
             width: 100%;
             aspect-ratio: 1 / 1;
             background: #0f172a;
@@ -32,7 +32,7 @@
             align-items: center;
             justify-content: center;
         }
-        #reader-container video {
+        #video-container video {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -64,17 +64,11 @@
         .btn-primary { background: #2563eb; }
         .btn-primary:hover { background: #1d4ed8; }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        
         .btn-danger { background: #dc2626; }
         .btn-danger:hover { background: #b91c1c; }
         .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
-        
         .btn-secondary { background: #64748b; }
         .btn-secondary:hover { background: #475569; }
-        
-        .btn-success { background: #16a34a; }
-        .btn-success:hover { background: #15803d; }
-
         #file-input { display: none; }
 
         .result-box {
@@ -113,22 +107,27 @@
             border-radius: 20px;
             font-size: 12px;
         }
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
     </style>
 </head>
 <body>
 
-    <h1>📸 增强扫码测试</h1>
+    <h1>📸 浏览器原生扫码测试</h1>
 
     <div class="card">
-        <div id="reader-container">
-            <div class="placeholder-text">点击下方「开始扫码」<br>支持模糊二维码 &amp; 条形码</div>
+        <div id="video-container">
+            <div class="placeholder-text" id="placeholder">点击「开始扫码」<br>使用 Barcode Detection API</div>
+            <video id="video" autoplay playsinline style="display:none;"></video>
         </div>
         <div class="btn-group">
             <button id="start-btn" class="btn btn-primary">▶ 开始扫码</button>
             <button id="stop-btn" class="btn btn-danger" disabled>⏹ 停止</button>
         </div>
         <div class="status-tip">
-            <span class="badge">引擎</span> ZXing (解码能力更强)
+            <span class="badge" id="support-badge">检测中...</span>
         </div>
     </div>
 
@@ -137,7 +136,7 @@
             <button id="upload-btn" class="btn btn-secondary">🖼 从相册解码</button>
             <input type="file" id="file-input" accept="image/*" />
         </div>
-        <div class="status-tip">支持条码、模糊截图（点击后选图片）</div>
+        <div class="status-tip">选择包含二维码或条形码的图片进行测试</div>
     </div>
 
     <div class="card">
@@ -147,199 +146,287 @@
         </div>
     </div>
 
-    <!-- 使用 ES Module 方式引入 ZXing 库 (利用 esm.sh 解决依赖) -->
-    <script type="importmap">
-        {
-            "imports": {
-                "@zxing/browser": "https://esm.sh/@zxing/browser@0.1.1",
-                "@zxing/library": "https://esm.sh/@zxing/library@0.20.0"
+    <script>
+        (function() {
+            // --- DOM 引用 ---
+            const video = document.getElementById('video');
+            const container = document.getElementById('video-container');
+            const placeholder = document.getElementById('placeholder');
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const uploadBtn = document.getElementById('upload-btn');
+            const fileInput = document.getElementById('file-input');
+            const resultDiv = document.getElementById('result-content');
+            const supportBadge = document.getElementById('support-badge');
+
+            let stream = null;          // 摄像头视频流
+            let isScanning = false;
+            let scanTimer = null;       // 用于 requestAnimationFrame 或 setTimeout
+            let detector = null;        // BarcodeDetector 实例
+
+            // --- 显示结果 ---
+            function showResult(text) {
+                resultDiv.textContent = text || '（未识别到内容）';
             }
-        }
-    </script>
 
-    <script type="module">
-        // 导入 ZXing 的浏览器端读取器
-        import { BrowserMultiFormatReader } from '@zxing/browser';
+            // --- 检查浏览器是否支持 Barcode Detection API ---
+            function checkSupport() {
+                if ('BarcodeDetector' in window) {
+                    supportBadge.textContent = '✅ 支持 Barcode Detection API';
+                    supportBadge.className = 'badge';
+                    return true;
+                } else {
+                    supportBadge.textContent = '❌ 当前浏览器不支持此 API';
+                    supportBadge.className = 'badge badge-warning';
+                    startBtn.disabled = true;
+                    showResult('⚠️ 当前浏览器不支持 Barcode Detection API，请使用第三方库方案');
+                    return false;
+                }
+            }
 
-        // --- DOM 引用 ---
-        const container = document.getElementById('reader-container');
-        const startBtn = document.getElementById('start-btn');
-        const stopBtn = document.getElementById('stop-btn');
-        const uploadBtn = document.getElementById('upload-btn');
-        const fileInput = document.getElementById('file-input');
-        const resultDiv = document.getElementById('result-content');
+            // --- 停止扫码（释放资源） ---
+            function stopScan() {
+                // 停止扫描循环
+                if (scanTimer) {
+                    cancelAnimationFrame(scanTimer);
+                    scanTimer = null;
+                }
 
-        let reader = null;          // ZXing 读取器实例
-        let isScanning = false;
+                // 停止所有视频轨道
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
 
-        // --- 显示结果 ---
-        function showResult(text) {
-            resultDiv.textContent = text || '（未识别到内容）';
-        }
+                // 隐藏视频，显示占位
+                video.style.display = 'none';
+                video.srcObject = null;
+                placeholder.style.display = 'block';
 
-        // --- 清理旧实例 ---
-        function resetReader() {
-            if (reader) {
+                isScanning = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                showResult('扫码已停止');
+                console.log('扫码已停止');
+            }
+
+            // --- 核心：扫描一帧 ---
+            function scanFrame() {
+                if (!isScanning || !detector || !video.readyState) {
+                    // 如果不在扫描状态，停止循环
+                    if (!isScanning) return;
+                    scanTimer = requestAnimationFrame(scanFrame);
+                    return;
+                }
+
+                detector.detect(video)
+                    .then(barcodes => {
+                        if (barcodes && barcodes.length > 0) {
+                            // 取第一个识别结果
+                            const barcode = barcodes[0];
+                            const text = barcode.rawValue;
+                            const format = barcode.format;
+                            console.log(`✅ 识别成功 [${format}]:`, text);
+                            showResult(`[${format}] ${text}`);
+                            
+                            // 🎯 识别成功后自动停止（避免重复触发）
+                            // 如果你希望连续扫码，可以注释掉下面这行
+                            stopScan();
+                            return; // 停止后不再继续循环
+                        }
+                        // 未识别到，继续下一帧
+                        if (isScanning) {
+                            scanTimer = requestAnimationFrame(scanFrame);
+                        }
+                    })
+                    .catch(err => {
+                        // 识别出错时通常是因为视频帧数据问题，继续下一帧
+                        // console.warn('扫码出错:', err);
+                        if (isScanning) {
+                            scanTimer = requestAnimationFrame(scanFrame);
+                        }
+                    });
+            }
+
+            // --- 启动摄像头扫码 ---
+            async function startScan() {
+                if (isScanning) return;
+
+                // 再次检查 API 是否可用
+                if (!('BarcodeDetector' in window)) {
+                    alert('当前浏览器不支持 Barcode Detection API');
+                    return;
+                }
+
+                // 创建检测器，指定要识别的格式（可提高性能）
                 try {
-                    reader.stop();
-                } catch (e) { /* ignore */ }
+                    detector = new BarcodeDetector({
+                        formats: [
+                            'qr_code',
+                            'ean_13',
+                            'ean_8',
+                            'code_128',
+                            'code_39',
+                            'upc_a',
+                            'upc_e',
+                            'itf',
+                            'pdf417',
+                            'aztec',
+                            'data_matrix'
+                        ]
+                    });
+                    // 可选：查看当前浏览器实际支持哪些格式
+                    // const supported = await BarcodeDetector.getSupportedFormats();
+                    // console.log('本浏览器支持的格式:', supported);
+                } catch (err) {
+                    console.error('创建 BarcodeDetector 失败:', err);
+                    alert('创建扫码器失败：' + err.message);
+                    return;
+                }
+
+                // 获取摄像头（使用后置，如果可用）
                 try {
-                    reader.reset();
-                } catch (e) { /* ignore */ }
-                reader = null;
-            }
-            isScanning = false;
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            // 移除可能残留的 video 元素 (ZXing 会挂在容器里)
-            const videos = container.querySelectorAll('video');
-            videos.forEach(v => v.remove());
-            // 如果容器内没有内容，显示占位
-            if (!container.querySelector('video')) {
-                container.innerHTML = `<div class="placeholder-text">点击「开始扫码」<br>支持模糊二维码 &amp; 条形码</div>`;
-            }
-        }
+                    const constraints = {
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: false
+                    };
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (err) {
+                    console.error('获取摄像头失败:', err);
+                    alert('无法访问摄像头：' + err.name + ' - ' + err.message + '\n请确认：\n1. 使用 HTTPS 访问\n2. 已授予摄像头权限');
+                    return;
+                }
 
-        // --- 启动摄像头扫码 ---
-        async function startScan() {
-            if (isScanning) return;
+                // 将视频流绑定到 video 元素
+                video.srcObject = stream;
+                video.style.display = 'block';
+                placeholder.style.display = 'none';
 
-            // 重置并创建新实例
-            resetReader();
-            reader = new BrowserMultiFormatReader();
+                // 等待视频开始播放
+                try {
+                    await video.play();
+                } catch (err) {
+                    console.error('视频播放失败:', err);
+                    stopScan();
+                    alert('视频播放失败：' + err.message);
+                    return;
+                }
 
-            // 设置较高的摄像头分辨率以提升识别效果
-            const constraints = {
-                video: {
-                    facingMode: 'environment', // 后置摄像头
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    aspectRatio: { ideal: 1.333 } // 4:3 通常对扫码更友好
-                },
-                audio: false
-            };
-
-            // 占位提示
-            container.innerHTML = `<div style="color:white;padding:20px;text-align:center;">⏳ 正在请求摄像头...</div>`;
-
-            try {
-                // 开始从摄像头解码（连续模式）
-                await reader.decodeFromConstraints(constraints, container, (result, error) => {
-                    if (result) {
-                        // 成功识别到码
-                        const text = result.getText();
-                        console.log('识别成功:', text);
-                        showResult(text);
-                        // 识别成功后自动停止（如需要连续识别，可注释下面这行）
-                        // stopScan(); 
-                    }
-                    // 如果 error 存在且不是常见的 "NotFound" 错误，可打印
-                    // 大多数情况是没扫到，忽略即可
-                });
-
+                // 更新 UI 状态
                 isScanning = true;
                 startBtn.disabled = true;
                 stopBtn.disabled = false;
-                showResult('扫码中，请对准二维码或条形码...');
+                showResult('🔍 扫码中，请将码对准摄像头...');
 
-            } catch (err) {
-                console.error('启动失败:', err);
-                alert('启动摄像头失败：' + (err.message || '未知错误') + '\n请确认：\n1. 使用 HTTPS 访问\n2. 已允许摄像头权限');
-                resetReader();
-                container.innerHTML = `<div class="placeholder-text">❌ 启动失败，请重试</div>`;
-            }
-        }
-
-        // --- 停止扫码 ---
-        function stopScan() {
-            if (reader) {
-                try {
-                    reader.stop();
-                } catch (e) { /* ignore */ }
-                try {
-                    reader.reset();
-                } catch (e) { /* ignore */ }
-                reader = null;
-            }
-            isScanning = false;
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            // 清空视频画面，显示占位
-            container.innerHTML = `<div class="placeholder-text">已停止扫码</div>`;
-            showResult('扫码已停止');
-        }
-
-        // --- 从图片解码（关键：ZXing 处理图片能力很强） ---
-        function decodeImage(file) {
-            if (!file) return;
-            if (!file.type.startsWith('image/')) {
-                alert('请选择图片文件');
-                return;
+                // 开始扫描循环
+                // 使用 requestAnimationFrame 进行逐帧扫描
+                scanTimer = requestAnimationFrame(scanFrame);
+                console.log('扫码已启动 (Barcode Detection API)');
             }
 
-            // 如果正在扫码则先停止
-            if (isScanning) stopScan();
-
-            showResult('⏳ 正在解码图片，请稍候...');
-
-            // 创建一个临时的读取器实例
-            const tempReader = new BrowserMultiFormatReader();
-            
-            // 将图片转为可识别的数据
-            const readerFile = new FileReader();
-            readerFile.onload = async (e) => {
-                const imgData = e.target.result;
-                try {
-                    // 使用 ZXing 解码图片
-                    const result = await tempReader.decodeFromImage(undefined, imgData);
-                    const text = result.getText();
-                    showResult(text);
-                    console.log('图片解码成功:', text);
-                } catch (err) {
-                    console.error('图片解码失败:', err);
-                    showResult('❌ 解码失败：图片中未找到清晰的二维码或条形码');
-                } finally {
-                    // 重置文件选择器
-                    fileInput.value = '';
-                    // 释放临时 reader
-                    try { tempReader.reset(); } catch (e) {}
+            // --- 从图片解码 ---
+            function decodeImage(file) {
+                if (!file) return;
+                if (!file.type.startsWith('image/')) {
+                    alert('请选择图片文件');
+                    return;
                 }
-            };
-            readerFile.onerror = () => {
-                showResult('❌ 读取图片失败');
-                fileInput.value = '';
-            };
-            readerFile.readAsDataURL(file);
-        }
 
-        // --- 绑定事件 ---
-        startBtn.addEventListener('click', startScan);
-        stopBtn.addEventListener('click', stopScan);
+                // 如果正在扫码则先停止
+                if (isScanning) stopScan();
 
-        uploadBtn.addEventListener('click', () => fileInput.click());
+                // 检查 API 是否可用
+                if (!('BarcodeDetector' in window)) {
+                    showResult('❌ 当前浏览器不支持 Barcode Detection API');
+                    alert('当前浏览器不支持 Barcode Detection API');
+                    fileInput.value = '';
+                    return;
+                }
 
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files.length > 0) {
-                decodeImage(e.target.files[0]);
+                showResult('⏳ 正在解码图片，请稍候...');
+
+                // 创建临时检测器
+                let tempDetector;
+                try {
+                    tempDetector = new BarcodeDetector({
+                        formats: ['qr_code', 'ean_13', 'code_128', 'upc_a', 'pdf417', 'aztec', 'data_matrix']
+                    });
+                } catch (err) {
+                    showResult('❌ 创建解码器失败：' + err.message);
+                    fileInput.value = '';
+                    return;
+                }
+
+                // 读取图片为 ImageBitmap
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const img = new Image();
+                        img.src = e.target.result;
+                        await img.decode(); // 等待图片加载完成
+
+                        // 使用 BarcodeDetector 检测
+                        const barcodes = await tempDetector.detect(img);
+                        if (barcodes && barcodes.length > 0) {
+                            const barcode = barcodes[0];
+                            showResult(`[${barcode.format}] ${barcode.rawValue}`);
+                            console.log('图片解码成功:', barcode.rawValue);
+                        } else {
+                            showResult('❌ 未在图片中识别到二维码或条形码');
+                        }
+                    } catch (err) {
+                        console.error('图片解码失败:', err);
+                        showResult('❌ 解码失败：' + err.message);
+                    } finally {
+                        fileInput.value = '';
+                    }
+                };
+                reader.onerror = () => {
+                    showResult('❌ 读取图片失败');
+                    fileInput.value = '';
+                };
+                reader.readAsDataURL(file);
             }
-        });
 
-        // --- 页面关闭时释放资源 ---
-        window.addEventListener('beforeunload', () => {
-            if (reader) {
-                try { reader.stop(); } catch (e) {}
-                try { reader.reset(); } catch (e) {}
+            // --- 事件绑定 ---
+            startBtn.addEventListener('click', startScan);
+
+            stopBtn.addEventListener('click', stopScan);
+
+            uploadBtn.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    decodeImage(e.target.files[0]);
+                }
+            });
+
+            // --- 页面关闭时释放资源 ---
+            window.addEventListener('beforeunload', () => {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                if (scanTimer) {
+                    cancelAnimationFrame(scanTimer);
+                }
+            });
+
+            // --- 初始化检测 ---
+            checkSupport();
+
+            // 额外检测摄像头是否可用
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                startBtn.disabled = true;
+                showResult('⚠️ 当前浏览器不支持摄像头 API');
+                container.innerHTML = `<div class="placeholder-text">⚠️ 不支持摄像头</div>`;
             }
-        });
 
-        // --- 兼容性检测 ---
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            startBtn.disabled = true;
-            showResult('⚠️ 当前浏览器不支持摄像头，请使用「从相册解码」');
-            container.innerHTML = `<div class="placeholder-text">⚠️ 不支持摄像头</div>`;
-        }
-
-        console.log('增强版扫码已加载 (ZXing 引擎)');
+            console.log('Barcode Detection API 测试页面已加载');
+        })();
     </script>
 </body>
 </html>
