@@ -6,10 +6,9 @@
     <title>智能扫码</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
-        /* 样式同前 */
         * { box-sizing: border-box; }
         body {
-            font-family: system-ui, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background: #f1f5f9;
             margin: 0;
             padding: 16px;
@@ -32,6 +31,7 @@
             cursor: pointer;
             font-size: 16px;
             color: white;
+            transition: background 0.2s;
         }
         .btn-primary { background: #2563eb; }
         .btn-primary:hover { background: #1d4ed8; }
@@ -67,7 +67,14 @@
         .btn-group { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
         .btn-group .btn { flex: 1; min-width: 80px; }
         .search-box { display: flex; gap: 8px; margin-top: 12px; }
-        .search-box input { flex:1; padding:10px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; }
+        .search-box input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 16px;
+            background: white;
+        }
         .result-area {
             margin-top: 12px;
             padding: 12px;
@@ -75,14 +82,24 @@
             border-radius: 10px;
             min-height: 60px;
             border-left: 4px solid #94a3b8;
+            max-height: 400px;
+            overflow-y: auto;
         }
-        .result-area .label { font-weight: 600; color: #475569; font-size: 14px; }
+        .result-area .label {
+            font-weight: 600;
+            color: #475569;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
         .result-item {
             border-bottom: 1px solid #e2e8f0;
             padding: 8px 0;
         }
         .result-item:last-child { border-bottom: none; }
-        .result-item .timestamp { font-size: 12px; color: #94a3b8; }
+        .result-item .timestamp {
+            font-size: 12px;
+            color: #94a3b8;
+        }
         .result-item .type-badge {
             display: inline-block;
             background: #dbeafe;
@@ -95,28 +112,59 @@
             font-size: 15px;
             word-break: break-all;
             margin-top: 4px;
+            white-space: pre-wrap;
         }
         .found { border-left-color: #22c55e; background: #f0fdf4; }
         .not-found { border-left-color: #ef4444; background: #fef2f2; }
+        .debug-info {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+            border-top: 1px dashed #d1d5db;
+            padding-top: 4px;
+        }
         #login-overlay {
-            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-            align-items: center; justify-content: center; z-index: 9999;
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
         }
         #login-overlay.active { display: flex; }
         .login-box {
-            background: white; border-radius: 16px; padding: 24px;
-            max-width: 400px; width: 90%;
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
         }
         .login-box h2 { margin-top: 0; }
-        .login-box label { display: block; margin-top: 12px; font-weight: 600; }
-        .login-box input { width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; margin-top:4px; }
-        #login-error { color:#ef4444; margin-top:10px; }
-        .status-tip { font-size:14px; color:#64748b; margin-top:8px; text-align:center; }
-        .clear-btn { margin-top:8px; }
+        .login-box label {
+            display: block;
+            margin-top: 12px;
+            font-weight: 600;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            margin-top: 4px;
+        }
+        #login-error { color: #ef4444; margin-top: 10px; }
+        .status-tip {
+            font-size: 14px;
+            color: #64748b;
+            margin-top: 8px;
+            text-align: center;
+        }
+        .clear-btn { margin-top: 8px; }
     </style>
 </head>
 <body>
-<!-- Login -->
+<!-- 登录遮罩 -->
 <div id="login-overlay" class="active">
     <div class="login-box">
         <h2>🔐 登录</h2>
@@ -134,7 +182,7 @@
     </div>
 </div>
 
-<!-- Main -->
+<!-- 主界面 -->
 <div id="app-container" style="display:none;">
     <div class="container">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -156,13 +204,13 @@
         </div>
         <div class="card">
             <div class="search-box">
-                <input type="text" id="manual-input" placeholder="手动输入编码/订单号/快递单号" />
+                <input type="text" id="manual-input" placeholder="手动输入编码 / 订单号 / 快递单号" />
                 <button class="btn btn-primary" id="manual-btn">查询</button>
             </div>
         </div>
         <div class="card">
             <div id="result-area" class="result-area">
-                <div class="label">扫码历史</div>
+                <div class="label">📋 扫码历史</div>
                 <div id="result-content" style="margin-top:4px; color:#64748b;">等待扫码或输入...</div>
             </div>
         </div>
@@ -170,7 +218,26 @@
 </div>
 
 <script>
-    // ---------- 与后台共享的存储逻辑 ----------
+    // ============================================================
+    // 可配置的快递单号规则（前缀 + 长度范围）
+    // ============================================================
+    const COURIER_RULES = [
+        { prefix: 'SF', minLen: 12, maxLen: 12 },   // 顺丰
+        { prefix: 'YT', minLen: 10, maxLen: 13 },   // 圆通
+        { prefix: 'YTO', minLen: 10, maxLen: 13 },  // 圆通
+        { prefix: 'ZTO', minLen: 10, maxLen: 13 },  // 中通
+        { prefix: 'STO', minLen: 10, maxLen: 13 },  // 申通
+        { prefix: 'HT', minLen: 10, maxLen: 13 },   // 汇通
+        { prefix: 'JD', minLen: 10, maxLen: 15 },   // 京东
+        { prefix: 'EMS', minLen: 13, maxLen: 13 },  // EMS
+        { prefix: 'UB', minLen: 10, maxLen: 12 },   // 优速
+        { prefix: 'DB', minLen: 10, maxLen: 12 },   // 德邦
+        // 可继续添加更多规则
+    ];
+
+    // ============================================================
+    // 存储与全局状态
+    // ============================================================
     const STORAGE_KEYS = {
         TOKEN: 'github_token',
         GIST_ID: 'gist_id',
@@ -179,7 +246,7 @@
     let gistData = { products: {} };
     let currentToken = '', currentGistId = '', currentFilename = 'data.json';
 
-    // DOM
+    // DOM 引用
     const loginOverlay = document.getElementById('login-overlay');
     const loginToken = document.getElementById('login-token');
     const loginGistId = document.getElementById('login-gistid');
@@ -205,7 +272,10 @@
     async function getGistContent(token, gistId, filename) {
         const url = `https://api.github.com/gists/${gistId}`;
         const resp = await fetch(url, {
-            headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+            headers: {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
         });
         if (!resp.ok) {
             const err = await resp.json();
@@ -214,15 +284,19 @@
         const data = await resp.json();
         const files = data.files;
         if (!files || !files[filename]) return {};
-        try { return JSON.parse(files[filename].content); } catch { return {}; }
+        try { return JSON.parse(files[filename].content); }
+        catch { return {}; }
     }
 
-    // ---------- 登录 ----------
+    // ---------- 登录/登出 ----------
     async function performLogin() {
         const token = loginToken.value.trim();
         const gistId = loginGistId.value.trim();
         const filename = loginFilename.value.trim() || 'data.json';
-        if (!token || !gistId) { loginError.textContent = '请填写 Token 和 Gist ID'; return; }
+        if (!token || !gistId) {
+            loginError.textContent = '请填写 Token 和 Gist ID';
+            return;
+        }
         loginError.textContent = '';
         try {
             const data = await getGistContent(token, gistId, filename);
@@ -230,7 +304,9 @@
             localStorage.setItem(STORAGE_KEYS.TOKEN, token);
             localStorage.setItem(STORAGE_KEYS.GIST_ID, gistId);
             localStorage.setItem(STORAGE_KEYS.FILENAME, filename);
-            currentToken = token; currentGistId = gistId; currentFilename = filename;
+            currentToken = token;
+            currentGistId = gistId;
+            currentFilename = filename;
             gistData = data;
             loginOverlay.classList.remove('active');
             appContainer.style.display = 'block';
@@ -245,7 +321,9 @@
         localStorage.removeItem(STORAGE_KEYS.TOKEN);
         localStorage.removeItem(STORAGE_KEYS.GIST_ID);
         localStorage.removeItem(STORAGE_KEYS.FILENAME);
-        currentToken = ''; currentGistId = ''; currentFilename = 'data.json';
+        currentToken = '';
+        currentGistId = '';
+        currentFilename = 'data.json';
         gistData = { products: {} };
         appContainer.style.display = 'none';
         loginOverlay.classList.add('active');
@@ -269,7 +347,9 @@
         const gistId = localStorage.getItem(STORAGE_KEYS.GIST_ID);
         const filename = localStorage.getItem(STORAGE_KEYS.FILENAME) || 'data.json';
         if (token && gistId) {
-            loginToken.value = token; loginGistId.value = gistId; loginFilename.value = filename;
+            loginToken.value = token;
+            loginGistId.value = gistId;
+            loginFilename.value = filename;
             performLogin();
         } else {
             loginOverlay.classList.add('active');
@@ -277,32 +357,42 @@
         }
     })();
 
-    // ---------- 智能识别类型 ----------
-    function detectType(text) {
-        text = text.trim();
-        if (text.startsWith('http://') || text.startsWith('https://')) {
-            return { type: 'link', label: '🔗 链接' };
-        }
-        if (/^\d{10,}$/.test(text)) {
-            return { type: 'order', label: '📋 订单号' };
-        }
-        if (text.length >= 10 && /[a-zA-Z]/.test(text) && /\d/.test(text)) {
-            return { type: 'tracking', label: '📦 快递单号' };
-        }
-        return { type: 'code', label: '🔖 编码' };
+    // ---------- 工具函数：清洗文本 ----------
+    function cleanText(text) {
+        if (typeof text !== 'string') return '';
+        // 去除首尾所有空白字符（包括 \r, \n, \t, 空格等）
+        return text.replace(/^[\s\r\n\t]+|[\s\r\n\t]+$/g, '');
     }
 
-    // ---------- 查找商品 ----------
+    // ---------- 快递单号识别 ----------
+    function detectCourier(text) {
+        const upper = text.toUpperCase();
+        for (let rule of COURIER_RULES) {
+            const prefix = rule.prefix.toUpperCase();
+            if (upper.startsWith(prefix)) {
+                const len = text.length;
+                if (len >= rule.minLen && len <= rule.maxLen) {
+                    return { matched: true, prefix: rule.prefix, name: rule.name || prefix };
+                }
+            }
+        }
+        return { matched: false };
+    }
+
+    // ---------- 查找商品（支持编码、订单号、快递单号、链接） ----------
     function findProductByAny(query) {
         const products = gistData.products || {};
         let results = [];
 
-        function searchNode(obj, path) {
+        // 递归遍历树
+        function traverse(obj, path) {
             for (let key in obj) {
                 const node = obj[key];
+                // 1. 匹配节点编码
                 if (key === query) {
                     results.push({ type: 'node', code: key, node: node, path: path + '/' + key });
                 }
+                // 2. 匹配节点其他字段
                 if (node.orderNumber === query) {
                     results.push({ type: 'node', code: key, node: node, path: path + '/' + key, matchField: 'orderNumber' });
                 }
@@ -312,6 +402,8 @@
                 if (node.qrLinks && node.qrLinks.includes(query)) {
                     results.push({ type: 'node', code: key, node: node, path: path + '/' + key, matchField: 'qrLink' });
                 }
+
+                // 3. 库存项
                 if (node.items) {
                     node.items.forEach(item => {
                         if (item.code === query) {
@@ -328,12 +420,15 @@
                         }
                     });
                 }
+
+                // 递归子节点
                 if (node.children) {
-                    searchNode(node.children, path + '/' + key);
+                    traverse(node.children, path + '/' + key);
                 }
             }
         }
-        searchNode(products, '');
+
+        traverse(products, '');
         return results;
     }
 
@@ -354,6 +449,7 @@
                     <span class="type-badge">${typeLabel}</span>
                 </div>
                 <div class="content">${item.detail || item.content}</div>
+                ${item.debug ? `<div class="debug-info">🔍 ${item.debug}</div>` : ''}
             </div>`;
         });
         resultContent.innerHTML = html;
@@ -361,22 +457,29 @@
         resultArea.scrollTop = resultArea.scrollHeight;
     }
 
-    // ---------- 处理扫码结果 ----------
-    function handleScanResult(decodedText) {
-        const query = decodedText.trim();
-        if (!query) {
-            alert('无效内容');
+    // ---------- 核心：处理查询 ----------
+    function handleScanResult(rawText) {
+        // 1. 清洗文本
+        const cleaned = cleanText(rawText);
+        if (!cleaned) {
+            alert('无效内容（为空或仅含空白字符）');
             return;
         }
 
-        const detected = detectType(query);
-        let typeLabel = detected.label;
-        let detail = query;
+        // 2. 准备显示
+        let typeLabel = '🔖 编码';
+        let detail = `原始: ${rawText}\n清洗后: ${cleaned}`;
+        let debugInfo = '';
 
-        const matches = findProductByAny(query);
+        // 3. 优先精确匹配编码（节点或库存）
+        const exactMatches = findProductByAny(cleaned);
         let foundInfo = '';
-        if (matches.length > 0) {
-            const match = matches[0];
+        let matched = false;
+
+        if (exactMatches.length > 0) {
+            // 取第一个匹配
+            const match = exactMatches[0];
+            matched = true;
             if (match.type === 'node') {
                 const node = match.node;
                 const name = node.name || match.code;
@@ -386,6 +489,8 @@
                 if (node.trackingNumber) foundInfo += ` 快递: ${node.trackingNumber}`;
                 if (node.orderNumber) foundInfo += ` 订单: ${node.orderNumber}`;
                 if (node.qrLinks && node.qrLinks.length) foundInfo += ` 链接数: ${node.qrLinks.length}`;
+                if (match.matchField) foundInfo += ` (匹配${match.matchField})`;
+                typeLabel = '📦 商品';
             } else if (match.type === 'item') {
                 const item = match.item;
                 const parentNode = findNodeByCode(match.parentCode);
@@ -397,23 +502,66 @@
                 if (item.trackingNumber) foundInfo += ` 快递: ${item.trackingNumber}`;
                 if (item.orderNumber) foundInfo += ` 订单: ${item.orderNumber}`;
                 if (item.qrLinks && item.qrLinks.length) foundInfo += ` 链接数: ${item.qrLinks.length}`;
+                if (match.matchField) foundInfo += ` (匹配${match.matchField})`;
+                typeLabel = '📦 库存';
             }
-            if (match.matchField) {
-                foundInfo += ` (匹配${match.matchField})`;
-            }
-            detail += `\n${foundInfo}`;
+            detail = foundInfo;
+            debugInfo = `匹配类型: 精确匹配`;
         } else {
-            detail += `\n（未找到关联商品）`;
+            // 未精确匹配，尝试其他类型识别
+            // 检测是否为链接
+            if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+                typeLabel = '🔗 链接';
+                detail = `链接内容: ${cleaned}`;
+                debugInfo = '未关联到任何商品';
+            } else {
+                // 检测是否为快递单号
+                const courier = detectCourier(cleaned);
+                if (courier.matched) {
+                    typeLabel = '📦 快递单号';
+                    detail = `快递单号: ${cleaned} (${courier.prefix})`;
+                    debugInfo = '未关联到任何商品';
+                } else {
+                    // 检测是否为订单号（纯数字≥10位）
+                    if (/^\d{10,}$/.test(cleaned)) {
+                        typeLabel = '📋 订单号';
+                        detail = `订单号: ${cleaned}`;
+                        debugInfo = '未关联到任何商品';
+                    } else {
+                        // 普通编码但未找到
+                        typeLabel = '🔖 编码';
+                        detail = `编码: ${cleaned}`;
+                        debugInfo = '未找到关联商品';
+                    }
+                }
+            }
         }
 
+        // 4. 加入历史
         history.push({
             time: new Date(),
             typeLabel: typeLabel,
-            content: query,
-            detail: detail
+            content: cleaned,
+            detail: detail,
+            debug: debugInfo
         });
         renderHistory();
-        stopScan(); // 扫码成功后自动停止（连续扫码可注释此行）
+
+        // 5. 停止扫码（单次扫描后停止，若需连续扫描可注释掉）
+        stopScan();
+    }
+
+    // 辅助：查找节点（用于渲染）
+    function findNodeByCode(code, obj) {
+        if (!obj) obj = gistData.products;
+        if (obj[code]) return obj[code];
+        for (let key in obj) {
+            if (obj[key].children) {
+                const found = findNodeByCode(code, obj[key].children);
+                if (found) return found;
+            }
+        }
+        return null;
     }
 
     // ---------- 扫码功能 ----------
@@ -426,7 +574,10 @@
         if (isScanning) return;
         if (html5QrCode) { html5QrCode.clear(); html5QrCode = null; }
         html5QrCode = new Html5Qrcode("reader-container");
-        const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+        const config = {
+            fps: 15,
+            qrbox: { width: 250, height: 250 }
+        };
         html5QrCode.start(
             { facingMode: "environment" },
             config,
@@ -470,17 +621,21 @@
 
     // ---------- 手动查询 ----------
     function manualQuery() {
-        const val = manualInput.value.trim();
-        if (!val) {
+        const raw = manualInput.value;
+        if (!raw || raw.trim() === '') {
             alert('请输入内容');
             return;
         }
-        handleScanResult(val);
-        manualInput.value = '';
+        handleScanResult(raw);
+        manualInput.value = ''; // 清空输入框
     }
 
     manualBtn.addEventListener('click', manualQuery);
-    manualInput.addEventListener('keyup', e => { if (e.key === 'Enter') manualQuery(); });
+    manualInput.addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') {
+            manualQuery();
+        }
+    });
 
     // ---------- 清空历史 ----------
     clearHistoryBtn.addEventListener('click', function() {
@@ -488,7 +643,7 @@
         renderHistory();
     });
 
-    console.log('智能扫码页面已加载');
+    console.log('智能扫码页面已加载（修复版）');
 </script>
 </body>
 </html>
