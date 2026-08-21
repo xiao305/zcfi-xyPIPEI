@@ -1102,8 +1102,8 @@
             // 初始化打印任务
             LODOP.PRINT_INIT(template.name || '标签打印');
 
-            // 设置纸张大小（单位：毫米）
-            LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth, template.paperHeight, '');
+            // 设置纸张大小（单位：0.1毫米，所以需要乘以10）
+            LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
 
             // 遍历元素生成打印命令
             template.elements.forEach((el, idx) => {
@@ -1122,20 +1122,20 @@
 
                 // 根据类型生成
                 if (el.type === 'text') {
-                    // 文本：x, y, width, height, value
-                    LODOP.ADD_PRINT_TEXT(el.x, el.y, el.width, el.height, value);
-                    if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx, "FontSize", el.fontSize);
-                    if (el.fontName) LODOP.SET_PRINT_STYLEA(idx, "FontName", el.fontName);
-                    if (el.bold) LODOP.SET_PRINT_STYLEA(idx, "Bold", 1);
+                    // 文本：Top, Left, Width, Height, Content
+                    LODOP.ADD_PRINT_TEXT(el.y, el.x, el.width, el.height, value);
+                    // 样式索引通常从1开始，所以使用 idx + 1
+                    if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx + 1, "FontSize", el.fontSize);
+                    if (el.fontName) LODOP.SET_PRINT_STYLEA(idx + 1, "FontName", el.fontName);
+                    if (el.bold) LODOP.SET_PRINT_STYLEA(idx + 1, "Bold", 1);
                     if (el.align === 'center') {
-                        LODOP.SET_PRINT_STYLEA(idx, "Alignment", 2);
+                        LODOP.SET_PRINT_STYLEA(idx + 1, "Alignment", 2);
                     }
                 } else if (el.type === 'barcode') {
-                    // 条码：参数顺序 Top, Left, CodeType, CodeValue, Width, Height
-                    // 注意：CodeType 现在为数字 10
-                    LODOP.ADD_PRINT_BARCODE(el.y, el.x, el.barcodeType, value, el.width, el.height);
+                    // 条码：Top, Left, Width, Height, CodeType, CodeValue
+                    LODOP.ADD_PRINT_BARCODE(el.y, el.x, el.width, el.height, el.barcodeType, value);
                     // 可设置条码属性，例如不显示条码下方文字
-                    // LODOP.SET_PRINT_STYLEA(idx, "BarCodeText", 0);
+                    // LODOP.SET_PRINT_STYLEA(idx + 1, "BarCodeText", 0);
                 }
             });
 
