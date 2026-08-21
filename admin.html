@@ -108,6 +108,22 @@
         }
         .lodop-status.error { background: #fee2e2; color: #b91c1c; }
         .lodop-status.success { background: #dcfce7; color: #166534; }
+
+        /* 打印预览模态框 */
+        #print-preview-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            align-items: center; justify-content: center; z-index: 1100;
+        }
+        #print-preview-overlay.active { display: flex; }
+        .print-preview-box {
+            background: white; border-radius: 16px; padding: 24px; max-width: 600px;
+            width: 90%; max-height: 90vh; overflow-y: auto;
+        }
+        .print-preview-content { display: flex; gap: 20px; flex-wrap: wrap; }
+        .print-preview-canvas { flex: 1 1 250px; border: 1px solid #ccc; }
+        .print-settings { flex: 1 1 250px; }
+        .print-settings label { display: block; margin-top: 12px; font-weight: 600; }
+        .print-settings select, .print-settings input { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -232,6 +248,28 @@
     </div>
 </div>
 
+<!-- 打印预览模态框 -->
+<div id="print-preview-overlay">
+    <div class="print-preview-box">
+        <h3>打印标签</h3>
+        <div class="print-preview-content">
+            <div class="print-preview-canvas">
+                <canvas id="print-canvas" width="500" height="300" style="width:100%; max-width:400px;"></canvas>
+            </div>
+            <div class="print-settings">
+                <label>选择打印机</label>
+                <select id="printer-select"></select>
+                <label>打印份数</label>
+                <input type="number" id="print-copies" value="1" min="1" max="100" />
+                <div class="btn-group" style="margin-top:20px; justify-content:flex-end;">
+                    <button class="btn btn-secondary" id="print-preview-cancel">取消</button>
+                    <button class="btn btn-primary" id="print-execute">打印</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ========== 引入 C-Lodop ========== -->
 <script src="CLodopFuncs.js" onerror="console.warn('本地CLodopFuncs.js加载失败，尝试远程...')"></script>
 <script>
@@ -316,6 +354,7 @@
     let currentGistId = 'f13d97c430522e4851afbf3cd2331e14';
     let currentFilename = 'data.json';
 
+    // DOM references
     const loginOverlay = document.getElementById('login-overlay');
     const loginToken = document.getElementById('login-token');
     const loginGistId = document.getElementById('login-gistid');
@@ -365,6 +404,15 @@
     const modalItemSave = document.getElementById('modal-item-save');
     const modalItemCancel = document.getElementById('modal-item-cancel');
 
+    // 打印预览相关
+    const printPreviewOverlay = document.getElementById('print-preview-overlay');
+    const printCanvas = document.getElementById('print-canvas');
+    const printerSelect = document.getElementById('printer-select');
+    const printCopiesInput = document.getElementById('print-copies');
+    const printPreviewCancel = document.getElementById('print-preview-cancel');
+    const printExecute = document.getElementById('print-execute');
+
+    // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
         const url = `https://api.github.com/gists/${gistId}`;
         const resp = await fetch(url, {
@@ -408,6 +456,7 @@
         return await resp.json();
     }
 
+    // ---------- 数据加载与保存 ----------
     async function loadData() {
         try {
             const data = await getGistContent(currentToken, currentGistId, currentFilename);
@@ -433,6 +482,7 @@
         }
     }
 
+    // ---------- 辅助查找函数 ----------
     function findNodeByCode(code, obj) {
         if (!obj) obj = gistData.products;
         if (obj[code]) return obj[code];
@@ -481,6 +531,7 @@
         return null;
     }
 
+    // ---------- 编码生成 ----------
     function generateRootCode() {
         const products = gistData.products;
         const keys = Object.keys(products).filter(k => /^A\d{3}$/.test(k));
@@ -528,6 +579,7 @@
         return parentCode + '/' + String(next).padStart(3, '0');
     }
 
+    // ---------- 树形渲染 ----------
     function statusColor(status) {
         if (status === '待售') return '#f59e0b';
         if (status === '在售') return '#22c55e';
@@ -674,6 +726,7 @@
         });
     }
 
+    // ---------- 节点操作 ----------
     function openNodeModal(mode, code, parentCode) {
         if (mode === 'add') {
             modalNodeMode.value = 'add';
@@ -823,6 +876,7 @@
     modalNodeSave.addEventListener('click', saveNode);
     modalNodeCancel.addEventListener('click', () => modalNodeOverlay.classList.remove('active'));
 
+    // ---------- 库存操作 ----------
     function openItemModal(mode, parentCode, itemCode) {
         modalItemParentCode.value = parentCode;
         if (mode === 'add') {
@@ -922,6 +976,7 @@
     modalItemSave.addEventListener('click', saveItem);
     modalItemCancel.addEventListener('click', () => modalItemOverlay.classList.remove('active'));
 
+    // ---------- 搜索和过滤 ----------
     searchBtn.addEventListener('click', renderTree);
     clearSearchBtn.addEventListener('click', function() {
         searchInput.value = '';
@@ -930,6 +985,7 @@
     searchInput.addEventListener('keyup', e => { if (e.key === 'Enter') renderTree(); });
     filterSelect.addEventListener('change', renderTree);
 
+    // ---------- 登录/登出 ----------
     async function performLogin() {
         const token = loginToken.value.trim();
         const gistId = loginGistId.value.trim();
@@ -999,7 +1055,7 @@
     }
     autoLogin();
 
-    // ========== 标签打印功能（条码居中修正） ==========
+    // ========== 打印相关（自定义预览和打印） ==========
     const PRESET_TEMPLATE = {
         name: '商品标签（50×30）',
         paperWidth: 50,
@@ -1034,7 +1090,7 @@
             {
                 type: 'barcode',
                 field: 'code',
-                x: 3.5,   // (50-43)/2 = 3.5，物理居中
+                x: 3.5,   // 物理居中
                 y: 14,
                 width: 43,
                 height: 13,
@@ -1059,57 +1115,155 @@
         }
     }
 
-    function printWithTemplate(template, data) {
+    // 获取打印机列表
+    function getPrinterList() {
         const LODOP = getLodopInstance();
-        if (!LODOP) return;
-
-        updateLodopStatus(true);
-
+        if (!LODOP) return [];
         try {
-            LODOP.PRINT_INIT(template.name || '标签打印');
-            LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
-
-            template.elements.forEach((el, idx) => {
-                let value = '';
-                if (el.field === 'static') {
-                    value = el.text || '';
-                } else {
-                    value = data[el.field] !== undefined ? data[el.field] : '';
-                }
-                if (el.prefix && value) {
-                    value = el.prefix + value;
-                }
-
-                // 使用字符串单位
-                const x = el.x + 'mm';
-                const y = el.y + 'mm';
-                const width = el.width + 'mm';
-                const height = el.height + 'mm';
-
-                if (el.type === 'text') {
-                    LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
-                    if (el.fontSize) LODOP.SET_PRINT_STYLEA(0, "FontSize", el.fontSize);
-                    if (el.fontName) LODOP.SET_PRINT_STYLEA(0, "FontName", el.fontName);
-                    if (el.bold) LODOP.SET_PRINT_STYLEA(0, "Bold", 1);
-                    if (el.align === 'center') {
-                        LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
-                    }
-                } else if (el.type === 'barcode') {
-                    LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, value);
-                    // 尝试设置水平居中（部分版本支持）
-                    LODOP.SET_PRINT_STYLEA(0, "Horient", 2);
-                    // 也可设置 Alignment
-                    LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
-                }
-            });
-
-            LODOP.PREVIEW();
+            const count = LODOP.GET_PRINTER_COUNT();
+            const printers = [];
+            for (let i = 0; i < count; i++) {
+                printers.push(LODOP.GET_PRINTER_NAME(i));
+            }
+            return printers;
         } catch (e) {
-            alert('打印出错: ' + e.message);
-            console.error(e);
+            console.error('获取打印机列表失败:', e);
+            return [];
         }
     }
 
+    // 绘制预览
+    function drawPreview(data) {
+        const canvas = printCanvas;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 背景白色
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 绘制标签边框
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+
+        // 比例：canvas 500x300 对应 50mm x 30mm，1mm = 10px
+        const scale = 10;
+
+        // 绘制文本
+        const text1 = '内部编码: ' + (data.code || '');
+        ctx.font = 'bold ' + (14 * scale) + 'px SimHei, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#000000';
+        ctx.fillText(text1, (2 + 46/2) * scale, (2 + 3) * scale);
+
+        ctx.font = 'bold ' + (13 * scale) + 'px SimHei, sans-serif';
+        ctx.fillText('仅供内部查询使用', (2 + 46/2) * scale, (9 + 2.5) * scale);
+
+        // 绘制条码占位框
+        ctx.fillStyle = '#dddddd';
+        ctx.fillRect(3.5 * scale, 14 * scale, 43 * scale, 13 * scale);
+        ctx.fillStyle = '#333333';
+        ctx.font = (10 * scale) + 'px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('PDF417 条码', (3.5 + 43/2) * scale, (14 + 6.5) * scale);
+    }
+
+    // 打开打印预览弹窗
+    function openPrintPreview(data) {
+        drawPreview(data);
+        printPreviewOverlay.classList.add('active');
+
+        // 加载打印机列表
+        const printers = getPrinterList();
+        printerSelect.innerHTML = '';
+        if (printers.length === 0) {
+            const option = document.createElement('option');
+            option.textContent = '未检测到打印机';
+            option.disabled = true;
+            printerSelect.appendChild(option);
+        } else {
+            printers.forEach((name, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = name;
+                printerSelect.appendChild(option);
+            });
+        }
+
+        // 设置默认份数
+        printCopiesInput.value = 1;
+
+        // 存储当前打印数据，供打印时使用
+        window.currentPrintData = data;
+    }
+
+    // 执行打印
+    function executePrint() {
+        const LODOP = getLodopInstance();
+        if (!LODOP) return;
+
+        const data = window.currentPrintData;
+        if (!data) return;
+
+        const printerIndex = parseInt(printerSelect.value);
+        const copies = parseInt(printCopiesInput.value) || 1;
+
+        if (isNaN(printerIndex)) {
+            alert('请选择打印机');
+            return;
+        }
+
+        // 设置打印机
+        LODOP.SET_PRINTER_INDEX(printerIndex);
+
+        // 设置打印份数
+        LODOP.SET_PRINT_COPIES(copies);
+
+        // 构建打印内容
+        const template = PRESET_TEMPLATE;
+        LODOP.PRINT_INIT(template.name || '标签打印');
+        LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
+
+        template.elements.forEach((el, idx) => {
+            let value = '';
+            if (el.field === 'static') {
+                value = el.text || '';
+            } else {
+                value = data[el.field] !== undefined ? data[el.field] : '';
+            }
+            if (el.prefix && value) {
+                value = el.prefix + value;
+            }
+
+            const x = el.x + 'mm';
+            const y = el.y + 'mm';
+            const width = el.width + 'mm';
+            const height = el.height + 'mm';
+
+            if (el.type === 'text') {
+                LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
+                if (el.fontSize) LODOP.SET_PRINT_STYLEA(0, "FontSize", el.fontSize);
+                if (el.fontName) LODOP.SET_PRINT_STYLEA(0, "FontName", el.fontName);
+                if (el.bold) LODOP.SET_PRINT_STYLEA(0, "Bold", 1);
+                if (el.align === 'center') {
+                    LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
+                }
+            } else if (el.type === 'barcode') {
+                LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, value);
+                LODOP.SET_PRINT_STYLEA(0, "Horient", 2);
+                LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
+            }
+        });
+
+        // 直接打印
+        LODOP.PRINT();
+
+        // 关闭预览弹窗
+        printPreviewOverlay.classList.remove('active');
+    }
+
+    // 打印节点标签（打开预览）
     window.printNodeLabel = function(code) {
         const node = findNodeByCode(code);
         if (!node) { alert('节点不存在'); return; }
@@ -1121,9 +1275,10 @@
             trackingNumber: node.trackingNumber,
             qrLinks: node.qrLinks
         };
-        printWithTemplate(PRESET_TEMPLATE, data);
+        openPrintPreview(data);
     };
 
+    // 打印库存标签（打开预览）
     window.printItemLabel = function(parentCode, itemCode) {
         const parent = findNodeByCode(parentCode);
         if (!parent) { alert('父节点不存在'); return; }
@@ -1137,8 +1292,14 @@
             trackingNumber: item.trackingNumber,
             qrLinks: item.qrLinks
         };
-        printWithTemplate(PRESET_TEMPLATE, data);
+        openPrintPreview(data);
     };
+
+    // 打印预览弹窗事件
+    printPreviewCancel.addEventListener('click', () => {
+        printPreviewOverlay.classList.remove('active');
+    });
+    printExecute.addEventListener('click', executePrint);
 
     console.log('管理后台已加载（带标签打印）');
 </script>
