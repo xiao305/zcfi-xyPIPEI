@@ -95,6 +95,19 @@
         .login-box input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; margin-top: 4px; }
         #login-error { color: #ef4444; margin-top: 10px; }
         .hint { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+        /* 打印状态提示 */
+        .lodop-status {
+            font-size: 12px;
+            color: #475569;
+            margin-top: 6px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: #f1f5f9;
+            display: inline-block;
+        }
+        .lodop-status.error { background: #fee2e2; color: #b91c1c; }
+        .lodop-status.success { background: #dcfce7; color: #166534; }
     </style>
 </head>
 <body>
@@ -124,6 +137,7 @@
             <div>
                 <h1 style="margin:0;">📦 商品管理</h1>
                 <span style="font-size:14px; color:#475569;">已登录: <span id="user-status">...</span></span>
+                <span id="lodop-status" class="lodop-status">⏳ 检测打印服务...</span>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button class="btn btn-success" id="add-root-btn">＋ 添加大类</button>
@@ -218,11 +232,93 @@
     </div>
 </div>
 
-<!-- ========== 引入 C-Lodop ========== -->
-<script src="http://localhost:8000/CLodopFuncs.js"></script>
-<!-- 若端口不同或使用HTTPS，请修改上面的URL -->
-<!-- 也可将 CLodopFuncs.js 下载到本地引用 -->
+<!-- ========== 引入 C-Lodop（混合部署，自动适配HTTP/HTTPS） ========== -->
+<script>
+    // 动态加载 C-Lodop 脚本，支持 HTTPS
+    (function() {
+        // 判断当前协议
+        const isHttps = window.location.protocol === 'https:';
+        // 尝试多个可能的地址
+        const urls = isHttps ? [
+            'https://localhost.lodop.net:8443/CLodopFuncs.js',
+            'https://localhost:8443/CLodopFuncs.js'
+        ] : [
+            'http://localhost:8000/CLodopFuncs.js'
+        ];
 
+        let loaded = false;
+        urls.forEach(function(url) {
+            if (loaded) return;
+            try {
+                const script = document.createElement('script');
+                script.src = url;
+                script.onload = function() {
+                    loaded = true;
+                    console.log('C-Lodop 加载成功: ' + url);
+                    updateLodopStatus(true);
+                };
+                script.onerror = function() {
+                    console.warn('C-Lodop 加载失败: ' + url);
+                };
+                document.head.appendChild(script);
+            } catch (e) {
+                console.warn('加载 C-Lodop 出错:', e);
+            }
+        });
+
+        // 超时检测
+        setTimeout(function() {
+            if (!loaded) {
+                // 如果仍未加载，尝试用传统方式引入（有些浏览器可能需要）
+                const script = document.createElement('script');
+                script.src = isHttps ? 'https://localhost.lodop.net:8443/CLodopFuncs.js' : 'http://localhost:8000/CLodopFuncs.js';
+                script.onload = function() {
+                    loaded = true;
+                    updateLodopStatus(true);
+                };
+                document.head.appendChild(script);
+            }
+        }, 3000);
+    })();
+
+    function updateLodopStatus(ok) {
+        const el = document.getElementById('lodop-status');
+        if (el) {
+            if (ok) {
+                el.textContent = '✅ 打印服务已就绪';
+                el.className = 'lodop-status success';
+            } else {
+                el.textContent = '❌ 打印服务未连接，请安装 C-Lodop';
+                el.className = 'lodop-status error';
+            }
+        }
+    }
+
+    // 检测 getLodop 是否可用（延迟检测）
+    function waitForLodop(callback, retries) {
+        retries = retries || 10;
+        if (typeof getLodop === 'function') {
+            callback(true);
+            return;
+        }
+        if (retries <= 0) {
+            callback(false);
+            return;
+        }
+        setTimeout(function() {
+            waitForLodop(callback, retries - 1);
+        }, 500);
+    }
+
+    // 页面加载完成后检测一次
+    window.addEventListener('load', function() {
+        waitForLodop(function(ok) {
+            updateLodopStatus(ok);
+        });
+    });
+</script>
+
+<!-- ========== 主脚本 ========== -->
 <script>
     // ============================================================
     // GitHub Gist 操作
@@ -982,12 +1078,17 @@
         ]
     };
 
-    // ---------- 获取LODOP实例 ----------
+    // ---------- 获取LODOP实例（带重试） ----------
     function getLodopInstance() {
         if (typeof getLodop === 'function') {
             return getLodop();
         } else {
-            alert('请确保已正确引入 C-Lodop 客户端库 (CLodopFuncs.js)');
+            // 尝试从全局变量获取（某些版本可能放在 window 下）
+            if (window.LODOP) return window.LODOP;
+            if (window.getLodop) return window.getLodop();
+            // 如果仍未获取，提示用户
+            alert('打印服务未加载，请确保已安装 C-Lodop 并刷新页面。\n' +
+                  '如果已安装，请检查服务是否运行（访问 http://localhost:8000/CLodopFuncs.js 测试）。');
             return null;
         }
     }
@@ -997,48 +1098,52 @@
         const LODOP = getLodopInstance();
         if (!LODOP) return;
 
-        // 初始化打印任务
-        LODOP.PRINT_INIT(template.name || '标签打印');
+        try {
+            // 初始化打印任务
+            LODOP.PRINT_INIT(template.name || '标签打印');
 
-        // 设置纸张大小（单位：毫米）
-        LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth, template.paperHeight, '');
+            // 设置纸张大小（单位：毫米）
+            LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth, template.paperHeight, '');
 
-        // 遍历元素生成打印命令
-        template.elements.forEach((el, idx) => {
-            let value = '';
-            // 获取数据
-            if (el.field === 'static') {
-                value = el.text || '';
-            } else {
-                // 支持 'code' 或其他字段
-                value = data[el.field] !== undefined ? data[el.field] : '';
-            }
-
-            // 添加前缀
-            if (el.prefix && value) {
-                value = el.prefix + value;
-            }
-
-            // 根据类型生成
-            if (el.type === 'text') {
-                LODOP.ADD_PRINT_TEXT(el.x, el.y, el.width, el.height, value);
-                if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx, "FontSize", el.fontSize);
-                if (el.fontName) LODOP.SET_PRINT_STYLEA(idx, "FontName", el.fontName);
-                if (el.bold) LODOP.SET_PRINT_STYLEA(idx, "Bold", 1);
-                if (el.color) LODOP.SET_PRINT_STYLEA(idx, "Color", el.color);
-                if (el.align === 'center') {
-                    LODOP.SET_PRINT_STYLEA(idx, "Alignment", 2);
+            // 遍历元素生成打印命令
+            template.elements.forEach((el, idx) => {
+                let value = '';
+                // 获取数据
+                if (el.field === 'static') {
+                    value = el.text || '';
+                } else {
+                    // 支持 'code' 或其他字段
+                    value = data[el.field] !== undefined ? data[el.field] : '';
                 }
-            } else if (el.type === 'barcode') {
-                // 条码类型，PDF417 使用 "PDF417" 或 "QRCode"
-                LODOP.ADD_PRINT_BARCODE(el.x, el.y, el.barcodeType || 'QRCode', el.width, el.height, value);
-                // 可设置条码属性，例如是否显示文本等
-                // LODOP.SET_PRINT_STYLEA(idx, "BarCodeText", 0); // 不显示条码下方文字
-            }
-        });
 
-        // 预览（也可使用 PRINT 直接打印）
-        LODOP.PREVIEW();
+                // 添加前缀
+                if (el.prefix && value) {
+                    value = el.prefix + value;
+                }
+
+                // 根据类型生成
+                if (el.type === 'text') {
+                    LODOP.ADD_PRINT_TEXT(el.x, el.y, el.width, el.height, value);
+                    if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx, "FontSize", el.fontSize);
+                    if (el.fontName) LODOP.SET_PRINT_STYLEA(idx, "FontName", el.fontName);
+                    if (el.bold) LODOP.SET_PRINT_STYLEA(idx, "Bold", 1);
+                    if (el.color) LODOP.SET_PRINT_STYLEA(idx, "Color", el.color);
+                    if (el.align === 'center') {
+                        LODOP.SET_PRINT_STYLEA(idx, "Alignment", 2);
+                    }
+                } else if (el.type === 'barcode') {
+                    // 条码类型，PDF417 使用 "PDF417"
+                    LODOP.ADD_PRINT_BARCODE(el.x, el.y, el.barcodeType || 'PDF417', el.width, el.height, value);
+                    // 可设置条码属性，例如不显示条码下方文字
+                    // LODOP.SET_PRINT_STYLEA(idx, "BarCodeText", 0);
+                }
+            });
+
+            // 预览（也可使用 PRINT 直接打印）
+            LODOP.PREVIEW();
+        } catch (e) {
+            alert('打印出错: ' + e.message);
+        }
     }
 
     // ---------- 打印节点标签 ----------
