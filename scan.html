@@ -6,6 +6,7 @@
     <title>智能扫码</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
+        /* 样式同前 */
         * { box-sizing: border-box; }
         body {
             font-family: system-ui, sans-serif;
@@ -198,7 +199,7 @@
 
     let html5QrCode = null;
     let isScanning = false;
-    let history = []; // 存储 { time, type, content, detail }
+    let history = [];
 
     // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
@@ -282,20 +283,16 @@
         if (text.startsWith('http://') || text.startsWith('https://')) {
             return { type: 'link', label: '🔗 链接' };
         }
-        // 订单号：纯数字且长度>=10（可调整）
         if (/^\d{10,}$/.test(text)) {
             return { type: 'order', label: '📋 订单号' };
         }
-        // 快递单号：包含字母数字组合，常见格式如SF1234567890, YT1234567890等
-        // 简单：长度>=10且含有字母（非纯数字）
         if (text.length >= 10 && /[a-zA-Z]/.test(text) && /\d/.test(text)) {
             return { type: 'tracking', label: '📦 快递单号' };
         }
-        // 其他情况视为编码
         return { type: 'code', label: '🔖 编码' };
     }
 
-    // ---------- 查找商品（支持编码、订单号、快递单号、链接） ----------
+    // ---------- 查找商品 ----------
     function findProductByAny(query) {
         const products = gistData.products || {};
         let results = [];
@@ -303,11 +300,9 @@
         function searchNode(obj, path) {
             for (let key in obj) {
                 const node = obj[key];
-                // 匹配编码
                 if (key === query) {
                     results.push({ type: 'node', code: key, node: node, path: path + '/' + key });
                 }
-                // 匹配订单号、快递单号、链接
                 if (node.orderNumber === query) {
                     results.push({ type: 'node', code: key, node: node, path: path + '/' + key, matchField: 'orderNumber' });
                 }
@@ -317,7 +312,6 @@
                 if (node.qrLinks && node.qrLinks.includes(query)) {
                     results.push({ type: 'node', code: key, node: node, path: path + '/' + key, matchField: 'qrLink' });
                 }
-                // 库存项
                 if (node.items) {
                     node.items.forEach(item => {
                         if (item.code === query) {
@@ -334,7 +328,6 @@
                         }
                     });
                 }
-                // 递归子节点
                 if (node.children) {
                     searchNode(node.children, path + '/' + key);
                 }
@@ -352,7 +345,7 @@
             return;
         }
         let html = '';
-        history.forEach((item, idx) => {
+        history.forEach((item) => {
             const time = item.time.toLocaleTimeString();
             const typeLabel = item.typeLabel || '📌';
             html += `<div class="result-item">
@@ -365,21 +358,21 @@
         });
         resultContent.innerHTML = html;
         resultArea.className = 'result-area found';
-        // 自动滚动到底部
         resultArea.scrollTop = resultArea.scrollHeight;
     }
 
     // ---------- 处理扫码结果 ----------
     function handleScanResult(decodedText) {
         const query = decodedText.trim();
-        if (!query) return;
+        if (!query) {
+            alert('无效内容');
+            return;
+        }
 
-        // 智能识别类型
         const detected = detectType(query);
         let typeLabel = detected.label;
         let detail = query;
 
-        // 查找商品
         const matches = findProductByAny(query);
         let foundInfo = '';
         if (matches.length > 0) {
@@ -395,7 +388,8 @@
                 if (node.qrLinks && node.qrLinks.length) foundInfo += ` 链接数: ${node.qrLinks.length}`;
             } else if (match.type === 'item') {
                 const item = match.item;
-                const parentName = findNodeByCode(match.parentCode)?.name || match.parentCode;
+                const parentNode = findNodeByCode(match.parentCode);
+                const parentName = parentNode?.name || match.parentCode;
                 const name = item.name || parentName;
                 const status = item.status || '在售';
                 foundInfo = `📦 库存: ${name} (${item.code}) 父级: ${parentName} 状态: ${status}`;
@@ -404,18 +398,14 @@
                 if (item.orderNumber) foundInfo += ` 订单: ${item.orderNumber}`;
                 if (item.qrLinks && item.qrLinks.length) foundInfo += ` 链接数: ${item.qrLinks.length}`;
             }
-            // 如果是通过订单号/快递单号/链接匹配，显示匹配字段
             if (match.matchField) {
                 foundInfo += ` (匹配${match.matchField})`;
             }
             detail += `\n${foundInfo}`;
         } else {
-            // 未找到商品
             detail += `\n（未找到关联商品）`;
-            // 但若类型是链接或订单号，仍显示识别类型
         }
 
-        // 加入历史
         history.push({
             time: new Date(),
             typeLabel: typeLabel,
@@ -423,8 +413,7 @@
             detail: detail
         });
         renderHistory();
-        // 停止扫码（如果需要连续扫码，可注释掉 stopScan）
-        stopScan();
+        stopScan(); // 扫码成功后自动停止（连续扫码可注释此行）
     }
 
     // ---------- 扫码功能 ----------
@@ -482,7 +471,10 @@
     // ---------- 手动查询 ----------
     function manualQuery() {
         const val = manualInput.value.trim();
-        if (!val) { alert('请输入内容'); return; }
+        if (!val) {
+            alert('请输入内容');
+            return;
+        }
         handleScanResult(val);
         manualInput.value = '';
     }
