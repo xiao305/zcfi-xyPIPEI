@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>扫码查商品</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        /* 样式同之前，略 */
+        * { box-sizing: border-box; }
+        body {
+            font-family: system-ui, sans-serif;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 16px;
+            color: #0f172a;
+        }
+        .container { max-width: 500px; margin: 0 auto; }
+        h1 { font-size: 22px; margin-top: 0; }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            margin-bottom: 16px;
+        }
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 16px;
+            color: white;
+        }
+        .btn-primary { background: #2563eb; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-danger { background: #ef4444; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: #e2e8f0; color: #1e293b; }
+        .btn-secondary:hover { background: #cbd5e1; }
+        #reader-container {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: #0f172a;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #reader-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .placeholder-text {
+            color: #94a3b8;
+            font-size: 14px;
+            text-align: center;
+            padding: 20px;
+        }
+        .btn-group { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+        .btn-group .btn { flex: 1; min-width: 80px; }
+        .search-box { display: flex; gap: 8px; margin-top: 12px; }
+        .search-box input { flex:1; padding:10px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; }
+        .result-area {
+            margin-top: 12px;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 10px;
+            min-height: 60px;
+            border-left: 4px solid #94a3b8;
+        }
+        .result-area .label { font-weight: 600; color: #475569; font-size: 14px; }
+        .result-area .value { font-size: 18px; margin-top: 4px; word-break: break-all; }
+        .result-area .value a { color: #2563eb; text-decoration: none; }
+        .found { border-left-color: #22c55e; background: #f0fdf4; }
+        .not-found { border-left-color: #ef4444; background: #fef2f2; }
+        /* Login overlay */
+        #login-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            align-items: center; justify-content: center; z-index: 9999;
+        }
+        #login-overlay.active { display: flex; }
+        .login-box {
+            background: white; border-radius: 16px; padding: 24px;
+            max-width: 400px; width: 90%;
+        }
+        .login-box h2 { margin-top: 0; }
+        .login-box label { display: block; margin-top: 12px; font-weight: 600; }
+        .login-box input { width:100%; padding:10px; border:1px solid #d1d5db; border-radius:8px; margin-top:4px; }
+        #login-error { color:#ef4444; margin-top:10px; }
+        .status-tip { font-size:14px; color:#64748b; margin-top:8px; text-align:center; }
+    </style>
+</head>
+<body>
+<!-- Login -->
+<div id="login-overlay" class="active">
+    <div class="login-box">
+        <h2>🔐 登录</h2>
+        <p style="color:#64748b; font-size:14px;">请输入 GitHub 凭证</p>
+        <label>GitHub Token</label>
+        <input type="password" id="login-token" placeholder="ghp_xxxx" />
+        <label>Gist ID</label>
+        <input type="text" id="login-gistid" value="f13d97c430522e4851afbf3cd2331e14" />
+        <label>文件名</label>
+        <input type="text" id="login-filename" value="data.json" />
+        <div class="btn-group" style="margin-top:20px; justify-content:flex-end;">
+            <button class="btn btn-primary" id="login-btn">登录</button>
+        </div>
+        <div id="login-error"></div>
+    </div>
+</div>
+
+<!-- Main -->
+<div id="app-container" style="display:none;">
+    <div class="container">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <h1>🔍 扫码查询</h1>
+            <button class="btn btn-danger" id="logout-btn" style="padding:6px 12px; font-size:14px;">退出</button>
+        </div>
+        <div class="card">
+            <div id="reader-container">
+                <div class="placeholder-text">点击「开始扫码」<br>支持二维码 / PDF417</div>
+            </div>
+            <div class="btn-group">
+                <button id="start-btn" class="btn btn-primary">▶ 开始扫码</button>
+                <button id="stop-btn" class="btn btn-secondary" disabled>⏹ 停止</button>
+            </div>
+            <div class="status-tip">请允许摄像头权限</div>
+        </div>
+        <div class="card">
+            <div class="search-box">
+                <input type="text" id="manual-input" placeholder="手动输入编码" />
+                <button class="btn btn-primary" id="manual-btn">查询</button>
+            </div>
+        </div>
+        <div class="card">
+            <div id="result-area" class="result-area">
+                <div class="label">查询结果</div>
+                <div id="result-content" style="margin-top:4px; font-size:16px; color:#64748b;">等待扫码或输入...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ---------- 与后台共享的存储逻辑 ----------
+    const STORAGE_KEYS = {
+        TOKEN: 'github_token',
+        GIST_ID: 'gist_id',
+        FILENAME: 'gist_filename'
+    };
+    let gistData = { products: {} };
+    let currentToken = '', currentGistId = '', currentFilename = 'data.json';
+
+    // DOM
+    const loginOverlay = document.getElementById('login-overlay');
+    const loginToken = document.getElementById('login-token');
+    const loginGistId = document.getElementById('login-gistid');
+    const loginFilename = document.getElementById('login-filename');
+    const loginBtn = document.getElementById('login-btn');
+    const loginError = document.getElementById('login-error');
+    const appContainer = document.getElementById('app-container');
+    const logoutBtn = document.getElementById('logout-btn');
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const manualInput = document.getElementById('manual-input');
+    const manualBtn = document.getElementById('manual-btn');
+    const resultContent = document.getElementById('result-content');
+    const resultArea = document.getElementById('result-area');
+    const readerContainer = document.getElementById('reader-container');
+
+    let html5QrCode = null;
+    let isScanning = false;
+
+    // ---------- GitHub API ----------
+    async function getGistContent(token, gistId, filename) {
+        const url = `https://api.github.com/gists/${gistId}`;
+        const resp = await fetch(url, {
+            headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(`GitHub API 错误: ${err.message || resp.statusText}`);
+        }
+        const data = await resp.json();
+        const files = data.files;
+        if (!files || !files[filename]) return {};
+        try { return JSON.parse(files[filename].content); } catch { return {}; }
+    }
+
+    // ---------- 登录 ----------
+    async function performLogin() {
+        const token = loginToken.value.trim();
+        const gistId = loginGistId.value.trim();
+        const filename = loginFilename.value.trim() || 'data.json';
+        if (!token || !gistId) { loginError.textContent = '请填写 Token 和 Gist ID'; return; }
+        loginError.textContent = '';
+        try {
+            const data = await getGistContent(token, gistId, filename);
+            if (!data.products) data.products = {};
+            localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+            localStorage.setItem(STORAGE_KEYS.GIST_ID, gistId);
+            localStorage.setItem(STORAGE_KEYS.FILENAME, filename);
+            currentToken = token; currentGistId = gistId; currentFilename = filename;
+            gistData = data;
+            loginOverlay.classList.remove('active');
+            appContainer.style.display = 'block';
+            resultContent.textContent = '已登录，请扫码或输入编码';
+            resultArea.className = 'result-area';
+        } catch (e) {
+            loginError.textContent = `登录失败: ${e.message}`;
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
+        localStorage.removeItem(STORAGE_KEYS.GIST_ID);
+        localStorage.removeItem(STORAGE_KEYS.FILENAME);
+        currentToken = ''; currentGistId = ''; currentFilename = 'data.json';
+        gistData = { products: {} };
+        appContainer.style.display = 'none';
+        loginOverlay.classList.add('active');
+        loginError.textContent = '';
+        loginToken.value = '';
+        loginGistId.value = 'f13d97c430522e4851afbf3cd2331e14';
+        loginFilename.value = 'data.json';
+        stopScan();
+    }
+
+    loginBtn.addEventListener('click', performLogin);
+    document.querySelectorAll('#login-token, #login-gistid, #login-filename').forEach(el => {
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') performLogin(); });
+    });
+    logoutBtn.addEventListener('click', logout);
+
+    // 自动登录
+    (function autoLogin() {
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+        const gistId = localStorage.getItem(STORAGE_KEYS.GIST_ID);
+        const filename = localStorage.getItem(STORAGE_KEYS.FILENAME) || 'data.json';
+        if (token && gistId) {
+            loginToken.value = token; loginGistId.value = gistId; loginFilename.value = filename;
+            performLogin();
+        } else {
+            loginOverlay.classList.add('active');
+            appContainer.style.display = 'none';
+        }
+    })();
+
+    // ---------- 扫码功能 ----------
+    function onScanSuccess(decodedText) {
+        queryProduct(decodedText);
+        stopScan();
+    }
+    function onScanError(err) {}
+
+    function startScan() {
+        if (isScanning) return;
+        if (html5QrCode) { html5QrCode.clear(); html5QrCode = null; }
+        html5QrCode = new Html5Qrcode("reader-container");
+        const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+        html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            onScanSuccess,
+            onScanError
+        ).then(() => {
+            isScanning = true;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            resultContent.textContent = '扫码中...';
+            resultArea.className = 'result-area';
+        }).catch(err => {
+            alert('启动摄像头失败: ' + (err.message || '未知错误'));
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            isScanning = false;
+            if (html5QrCode) { html5QrCode.clear(); html5QrCode = null; }
+        });
+    }
+
+    function stopScan() {
+        if (html5QrCode && isScanning) {
+            html5QrCode.stop().then(() => {
+                isScanning = false;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                html5QrCode.clear();
+                html5QrCode = null;
+            }).catch(() => {});
+        } else {
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            isScanning = false;
+        }
+    }
+
+    startBtn.addEventListener('click', startScan);
+    stopBtn.addEventListener('click', stopScan);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        startBtn.disabled = true;
+        startBtn.title = '当前浏览器不支持摄像头';
+    }
+
+    // ---------- 查询商品（支持节点和库存） ----------
+    function queryProduct(code) {
+        const products = gistData.products || {};
+        // 首先尝试作为库存项查找
+        let foundItem = null;
+        let foundParentCode = null;
+        function searchItems(obj, parentCode) {
+            for (let key in obj) {
+                const node = obj[key];
+                if (node.items) {
+                    const item = node.items.find(it => it.code === code);
+                    if (item) {
+                        foundItem = item;
+                        foundParentCode = key;
+                        return true;
+                    }
+                }
+                if (node.children) {
+                    if (searchItems(node.children, key)) return true;
+                }
+            }
+            return false;
+        }
+        if (searchItems(products, null)) {
+            // 找到了库存项
+            let html = `<div style="font-size:16px;">
+                <div><strong>📦 库存编码：</strong>${foundItem.code}</div>
+                <div><strong>📦 名称：</strong>${foundItem.name || (findNodeByCode(foundParentCode)?.name || '')}</div>
+                ${foundItem.cost !== undefined ? `<div><strong>💰 成本：</strong>${foundItem.cost}</div>` : ''}
+                ${foundItem.trackingNumber ? `<div><strong>📦 快递单号：</strong>${foundItem.trackingNumber}</div>` : ''}
+                ${foundItem.qrCode ? `<div><strong>🔗 关联链接：</strong><a href="${foundItem.qrCode}" target="_blank">打开</a></div>` : ''}
+                ${foundItem.remark ? `<div><strong>📝 备注：</strong>${foundItem.remark}</div>` : ''}
+            </div>`;
+            resultContent.innerHTML = html;
+            resultArea.className = 'result-area found';
+            return;
+        }
+
+        // 否则作为节点查找
+        const node = findNodeByCode(code);
+        if (!node) {
+            resultContent.innerHTML = `<span style="color:#ef4444;">❌ 未找到编码 "${escapeHtml(code)}"</span>`;
+            resultArea.className = 'result-area not-found';
+            return;
+        }
+        let html = `<div style="font-size:16px;">
+            <div><strong>📦 编码：</strong>${code}</div>
+            <div><strong>📦 名称：</strong>${escapeHtml(node.name || code)}</div>
+            <div><strong>📌 类型：</strong>${node.unified !== false ? '统一' : '不统一'}</div>
+            ${node.unified !== false ? `
+                ${node.cost !== undefined ? `<div><strong>💰 成本：</strong>${node.cost}</div>` : ''}
+                ${node.trackingNumber ? `<div><strong>📦 快递单号：</strong>${node.trackingNumber}</div>` : ''}
+                ${node.qrCode ? `<div><strong>🔗 关联链接：</strong><a href="${node.qrCode}" target="_blank">打开</a></div>` : ''}
+                ${node.remark ? `<div><strong>📝 备注：</strong>${node.remark}</div>` : ''}
+            ` : ''}
+        </div>`;
+        resultContent.innerHTML = html;
+        resultArea.className = 'result-area found';
+    }
+
+    function findNodeByCode(code, obj) {
+        if (!obj) obj = gistData.products;
+        if (obj[code]) return obj[code];
+        for (let key in obj) {
+            if (obj[key].children) {
+                const found = findNodeByCode(code, obj[key].children);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    manualBtn.addEventListener('click', function() {
+        const val = manualInput.value.trim();
+        if (!val) { alert('请输入编码'); return; }
+        queryProduct(val);
+    });
+    manualInput.addEventListener('keyup', e => { if (e.key === 'Enter') manualBtn.click(); });
+
+    console.log('扫码页面已加载（支持库存）');
+</script>
+</body>
+</html>
