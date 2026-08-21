@@ -236,7 +236,6 @@
 <script src="CLodopFuncs.js" onerror="console.warn('本地CLodopFuncs.js加载失败，尝试远程...')"></script>
 <script>
     (function() {
-        // 检测本地或远程加载的 C-Lodop 是否可用
         function checkLodop() {
             return (typeof getLodop === 'function') || window.LODOP || window.CLodop;
         }
@@ -366,7 +365,6 @@
     const modalItemSave = document.getElementById('modal-item-save');
     const modalItemCancel = document.getElementById('modal-item-cancel');
 
-    // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
         const url = `https://api.github.com/gists/${gistId}`;
         const resp = await fetch(url, {
@@ -410,7 +408,6 @@
         return await resp.json();
     }
 
-    // ---------- 数据加载与保存 ----------
     async function loadData() {
         try {
             const data = await getGistContent(currentToken, currentGistId, currentFilename);
@@ -436,7 +433,6 @@
         }
     }
 
-    // ---------- 辅助查找函数 ----------
     function findNodeByCode(code, obj) {
         if (!obj) obj = gistData.products;
         if (obj[code]) return obj[code];
@@ -485,7 +481,6 @@
         return null;
     }
 
-    // ---------- 编码生成 ----------
     function generateRootCode() {
         const products = gistData.products;
         const keys = Object.keys(products).filter(k => /^A\d{3}$/.test(k));
@@ -533,7 +528,6 @@
         return parentCode + '/' + String(next).padStart(3, '0');
     }
 
-    // ---------- 树形渲染 ----------
     function statusColor(status) {
         if (status === '待售') return '#f59e0b';
         if (status === '在售') return '#22c55e';
@@ -680,7 +674,6 @@
         });
     }
 
-    // ---------- 节点操作 ----------
     function openNodeModal(mode, code, parentCode) {
         if (mode === 'add') {
             modalNodeMode.value = 'add';
@@ -830,7 +823,6 @@
     modalNodeSave.addEventListener('click', saveNode);
     modalNodeCancel.addEventListener('click', () => modalNodeOverlay.classList.remove('active'));
 
-    // ---------- 库存操作 ----------
     function openItemModal(mode, parentCode, itemCode) {
         modalItemParentCode.value = parentCode;
         if (mode === 'add') {
@@ -930,7 +922,6 @@
     modalItemSave.addEventListener('click', saveItem);
     modalItemCancel.addEventListener('click', () => modalItemOverlay.classList.remove('active'));
 
-    // ---------- 搜索和过滤 ----------
     searchBtn.addEventListener('click', renderTree);
     clearSearchBtn.addEventListener('click', function() {
         searchInput.value = '';
@@ -939,7 +930,6 @@
     searchInput.addEventListener('keyup', e => { if (e.key === 'Enter') renderTree(); });
     filterSelect.addEventListener('change', renderTree);
 
-    // ---------- 登录/登出 ----------
     async function performLogin() {
         const token = loginToken.value.trim();
         const gistId = loginGistId.value.trim();
@@ -1009,9 +999,7 @@
     }
     autoLogin();
 
-    // ============================================================
-    // ========== 标签打印功能（单位统一为0.1mm，调整布局） ==========
-    // ============================================================
+    // ========== 标签打印功能（使用字符串单位，样式索引从0开始） ==========
     const PRESET_TEMPLATE = {
         name: '商品标签（50×30）',
         paperWidth: 50,   // mm
@@ -1020,11 +1008,11 @@
             {
                 type: 'text',
                 field: 'code',
-                x: 0,          // mm
-                y: 5,          // 调整纵坐标，留出边距
-                width: 50,     // mm
+                x: 2,          // mm
+                y: 2,          // mm
+                width: 46,     // mm
                 height: 6,     // mm
-                fontSize: 12,
+                fontSize: 14,
                 fontName: '黑体',
                 bold: true,
                 align: 'center',
@@ -1034,11 +1022,11 @@
                 type: 'text',
                 field: 'static',
                 text: '仅供内部查询使用',
-                x: 0,
-                y: 12,
-                width: 50,
+                x: 2,
+                y: 9,
+                width: 46,
                 height: 5,
-                fontSize: 9,
+                fontSize: 13,
                 fontName: '黑体',
                 bold: true,
                 align: 'center'
@@ -1046,17 +1034,16 @@
             {
                 type: 'barcode',
                 field: 'code',
-                x: (50 - 43) / 2,  // mm，居中
-                y: 18,
-                width: 43,
-                height: 8,
-                barcodeType: '128Auto',   // 使用通用条码类型
+                x: 2,
+                y: 14,
+                width: 46,
+                height: 13,
+                barcodeType: 'PDF417',   // 使用 PDF417
                 align: 'center'
             }
         ]
     };
 
-    // ---------- 获取LODOP实例 ----------
     function getLodopInstance() {
         if (typeof getLodop === 'function') {
             return getLodop();
@@ -1076,13 +1063,12 @@
         const LODOP = getLodopInstance();
         if (!LODOP) return;
 
-        // 更新状态为已就绪
         updateLodopStatus(true);
 
         try {
             LODOP.PRINT_INIT(template.name || '标签打印');
 
-            // 纸张大小：单位0.1mm，乘以10
+            // 纸张大小：单位0.1mm，乘以10（或使用字符串 "50mm","30mm"）
             LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
 
             template.elements.forEach((el, idx) => {
@@ -1096,25 +1082,23 @@
                     value = el.prefix + value;
                 }
 
-                // 统一单位：将毫米转换为0.1mm（乘以10）
-                const x = el.x * 10;
-                const y = el.y * 10;
-                const width = el.width * 10;
-                const height = el.height * 10;
+                // 使用字符串单位，直接传入 mm 字符串，避免换算错误
+                const x = el.x + 'mm';
+                const y = el.y + 'mm';
+                const width = el.width + 'mm';
+                const height = el.height + 'mm';
 
                 if (el.type === 'text') {
                     LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
-                    // 样式索引从1开始
-                    if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx + 1, "FontSize", el.fontSize);
-                    if (el.fontName) LODOP.SET_PRINT_STYLEA(idx + 1, "FontName", el.fontName);
-                    if (el.bold) LODOP.SET_PRINT_STYLEA(idx + 1, "Bold", 1);
+                    // 样式索引使用 idx（0 表示最新添加项）
+                    if (el.fontSize) LODOP.SET_PRINT_STYLEA(idx, "FontSize", el.fontSize);
+                    if (el.fontName) LODOP.SET_PRINT_STYLEA(idx, "FontName", el.fontName);
+                    if (el.bold) LODOP.SET_PRINT_STYLEA(idx, "Bold", 1);
                     if (el.align === 'center') {
-                        LODOP.SET_PRINT_STYLEA(idx + 1, "Alignment", 2);
+                        LODOP.SET_PRINT_STYLEA(idx, "Alignment", 2);
                     }
                 } else if (el.type === 'barcode') {
                     LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, value);
-                    // 可选：设置条码文字位置
-                    // LODOP.SET_PRINT_STYLEA(idx + 1, "ShowBarText", 0);
                 }
             });
 
@@ -1125,7 +1109,6 @@
         }
     }
 
-    // ---------- 打印节点标签 ----------
     window.printNodeLabel = function(code) {
         const node = findNodeByCode(code);
         if (!node) { alert('节点不存在'); return; }
@@ -1140,7 +1123,6 @@
         printWithTemplate(PRESET_TEMPLATE, data);
     };
 
-    // ---------- 打印库存标签 ----------
     window.printItemLabel = function(parentCode, itemCode) {
         const parent = findNodeByCode(parentCode);
         if (!parent) { alert('父节点不存在'); return; }
