@@ -999,7 +999,7 @@
     }
     autoLogin();
 
-    // ========== 标签打印功能（参考示例修正） ==========
+    // ========== 标签打印功能（条码居中修正） ==========
     const PRESET_TEMPLATE = {
         name: '商品标签（50×30）',
         paperWidth: 50,
@@ -1034,9 +1034,9 @@
             {
                 type: 'barcode',
                 field: 'code',
-                x: 2,
+                x: 3.5,   // (50-43)/2 = 3.5，物理居中
                 y: 14,
-                width: 46,
+                width: 43,
                 height: 13,
                 barcodeType: 'PDF417',
                 align: 'center'
@@ -1088,7 +1088,6 @@
 
                 if (el.type === 'text') {
                     LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
-                    // 立即设置样式，索引0表示刚添加的对象
                     if (el.fontSize) LODOP.SET_PRINT_STYLEA(0, "FontSize", el.fontSize);
                     if (el.fontName) LODOP.SET_PRINT_STYLEA(0, "FontName", el.fontName);
                     if (el.bold) LODOP.SET_PRINT_STYLEA(0, "Bold", 1);
@@ -1097,7 +1096,9 @@
                     }
                 } else if (el.type === 'barcode') {
                     LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, value);
-                    // 尝试设置条码居中（可能无效但无害）
+                    // 尝试设置水平居中（部分版本支持）
+                    LODOP.SET_PRINT_STYLEA(0, "Horient", 2);
+                    // 也可设置 Alignment
                     LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
                 }
             });
