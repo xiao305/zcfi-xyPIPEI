@@ -232,51 +232,51 @@
     </div>
 </div>
 
-<!-- ========== 引入 C-Lodop（混合部署，自动适配HTTP/HTTPS） ========== -->
+<!-- ========== 引入 C-Lodop ========== -->
+<!-- 优先尝试本地相对路径（需要您将 CLodopFuncs.js 放到同目录下） -->
+<script src="CLodopFuncs.js" onerror="console.warn('本地CLodopFuncs.js加载失败，尝试远程...')"></script>
+<!-- 如果本地不存在，再尝试远程 HTTPS（需要浏览器信任证书） -->
 <script>
-    // 动态加载 C-Lodop 脚本，支持 HTTPS
+    // 如果本地加载失败，动态加载远程
     (function() {
-        // 判断当前协议
+        // 检查是否已加载
+        if (typeof getLodop === 'function') {
+            console.log('C-Lodop 已从本地加载');
+            updateLodopStatus(true);
+            return;
+        }
+
+        // 尝试远程 HTTPS（自签名证书，需手动信任）
         const isHttps = window.location.protocol === 'https:';
-        // 尝试多个可能的地址
-        const urls = isHttps ? [
-            'https://localhost.lodop.net:8443/CLodopFuncs.js',
-            'https://localhost:8443/CLodopFuncs.js'
-        ] : [
-            'http://localhost:8000/CLodopFuncs.js'
-        ];
-
-        let loaded = false;
-        urls.forEach(function(url) {
-            if (loaded) return;
-            try {
-                const script = document.createElement('script');
-                script.src = url;
-                script.onload = function() {
-                    loaded = true;
-                    console.log('C-Lodop 加载成功: ' + url);
-                    updateLodopStatus(true);
-                };
-                script.onerror = function() {
-                    console.warn('C-Lodop 加载失败: ' + url);
-                };
-                document.head.appendChild(script);
-            } catch (e) {
-                console.warn('加载 C-Lodop 出错:', e);
+        const remoteUrl = isHttps ? 'https://localhost.lodop.net:8443/CLodopFuncs.js' : 'http://localhost:8000/CLodopFuncs.js';
+        const script = document.createElement('script');
+        script.src = remoteUrl;
+        script.onload = function() {
+            if (typeof getLodop === 'function') {
+                console.log('C-Lodop 从远程加载成功: ' + remoteUrl);
+                updateLodopStatus(true);
+            } else {
+                console.warn('远程加载成功但 getLodop 未定义');
+                updateLodopStatus(false);
             }
-        });
+        };
+        script.onerror = function() {
+            console.error('远程 C-Lodop 加载失败: ' + remoteUrl);
+            updateLodopStatus(false);
+            // 提示用户手动处理
+            alert('无法加载 C-Lodop 打印服务。\n' +
+                  '请确保已安装 C-Lodop 并运行。\n' +
+                  '如果网站是 HTTPS，请先手动信任证书：\n' +
+                  '在浏览器中打开 ' + remoteUrl + ' 并点击"高级"->"继续前往"。');
+        };
+        document.head.appendChild(script);
 
-        // 超时检测
+        // 延迟检测（因为加载可能较慢）
         setTimeout(function() {
-            if (!loaded) {
-                // 如果仍未加载，尝试用传统方式引入（有些浏览器可能需要）
-                const script = document.createElement('script');
-                script.src = isHttps ? 'https://localhost.lodop.net:8443/CLodopFuncs.js' : 'http://localhost:8000/CLodopFuncs.js';
-                script.onload = function() {
-                    loaded = true;
-                    updateLodopStatus(true);
-                };
-                document.head.appendChild(script);
+            if (typeof getLodop === 'function') {
+                updateLodopStatus(true);
+            } else {
+                // 不重复提示，因为 onerror 已经提示
             }
         }, 3000);
     })();
@@ -288,7 +288,7 @@
                 el.textContent = '✅ 打印服务已就绪';
                 el.className = 'lodop-status success';
             } else {
-                el.textContent = '❌ 打印服务未连接，请安装 C-Lodop';
+                el.textContent = '❌ 打印服务未连接，请安装 C-Lodop 并手动信任证书';
                 el.className = 'lodop-status error';
             }
         }
@@ -1085,10 +1085,11 @@
         } else {
             // 尝试从全局变量获取（某些版本可能放在 window 下）
             if (window.LODOP) return window.LODOP;
-            if (window.getLodop) return window.getLodop();
+            if (window.getLodop) return window.getLodop;
             // 如果仍未获取，提示用户
             alert('打印服务未加载，请确保已安装 C-Lodop 并刷新页面。\n' +
-                  '如果已安装，请检查服务是否运行（访问 http://localhost:8000/CLodopFuncs.js 测试）。');
+                  '如果已安装，请检查服务是否运行（访问 http://localhost:8000/CLodopFuncs.js 测试）。\n' +
+                  '如果网站是 HTTPS，请先手动信任证书：在浏览器中打开 https://localhost.lodop.net:8443/CLodopFuncs.js 并点击"高级"->"继续前往"。');
             return null;
         }
     }
