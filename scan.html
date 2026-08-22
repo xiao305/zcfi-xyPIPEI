@@ -6,7 +6,7 @@
     <title>智能扫码</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
-        /* 样式与之前相同，此处省略以节省篇幅，实际使用时保留完整样式 */
+        /* 样式保持原样，已省略以节省篇幅，实际使用请保留完整样式 */
         * { box-sizing: border-box; }
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -518,12 +518,19 @@
     }
 
     async function updateGistContent(token, gistId, filename, content) {
-        console.log('[updateGistContent] 开始更新，传入内容:', content);
+        console.log('[updateGistContent] 开始更新');
+        // 打印完整的 content 字符串（前1000字符）
         const contentStr = JSON.stringify(content, null, 2);
-        console.log('[updateGistContent] 内容字符串（前200字符）:', contentStr.substring(0, 200));
+        console.log('[updateGistContent] 完整序列化字符串（前1000字符）:', contentStr.substring(0, 1000));
+        // 检查是否包含 trackingNumber
+        if (contentStr.includes('trackingNumber')) {
+            console.log('[updateGistContent] ✅ 序列化字符串中包含 trackingNumber');
+        } else {
+            console.warn('[updateGistContent] ⚠️ 序列化字符串中未找到 trackingNumber');
+        }
         const url = `https://api.github.com/gists/${gistId}`;
         const payload = { files: { [filename]: { content: contentStr } } };
-        console.log('[updateGistContent] 请求载荷:', payload);
+        console.log('[updateGistContent] 请求载荷已构建');
         const resp = await fetch(url, {
             method: 'PATCH',
             headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
@@ -1010,7 +1017,6 @@
         // 在更新前，从 gistData 中重新获取该库存项（如果是库存项）
         let itemRef = null;
         if (targetItem) {
-            // 通过 parentCode 和 itemCode 查找
             const parent = findNodeByCode(currentProductInfo.parentCode);
             if (parent && parent.items) {
                 itemRef = parent.items.find(it => it.code === currentProductInfo.itemCode);
@@ -1035,6 +1041,9 @@
                 console.log('[confirmAssociateBtn] 链接已存在，无需添加');
             }
         }
+
+        // 打印修改后的 target 对象 JSON
+        console.log('[confirmAssociateBtn] 修改后的 target JSON:', JSON.stringify(target));
 
         // 自动状态变更
         let statusChanged = false;
@@ -1073,6 +1082,8 @@
                         console.log('[confirmAssociateBtn] ✅ 验证成功，trackingNumber 已写入:', freshItem.trackingNumber);
                     } else {
                         console.warn('[confirmAssociateBtn] ⚠️ 验证失败，trackingNumber 未写入或丢失');
+                        // 打印整个 products 结构以便检查
+                        console.log('[confirmAssociateBtn] 完整 products:', freshData.products);
                     }
                 }
                 // 更新本地数据
