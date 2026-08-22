@@ -290,21 +290,28 @@
 
 <script>
     // ============================================================
-    // 可配置的快递单号规则（前缀 + 长度范围）
+    // 快递单号识别库（正则表达式）
     // ============================================================
     const COURIER_RULES = [
-        { prefix: 'SF', minLen: 12, maxLen: 12 },
-        { prefix: 'YT', minLen: 10, maxLen: 13 },
-        { prefix: 'YTO', minLen: 10, maxLen: 13 },
-        { prefix: 'ZTO', minLen: 10, maxLen: 13 },
-        { prefix: 'STO', minLen: 10, maxLen: 13 },
-        { prefix: 'HT', minLen: 10, maxLen: 13 },
-        { prefix: 'JD', minLen: 10, maxLen: 15 },
-        { prefix: 'EMS', minLen: 13, maxLen: 13 },
-        { prefix: 'UB', minLen: 10, maxLen: 12 },
-        { prefix: 'DB', minLen: 10, maxLen: 12 },
+        // 优先匹配特定前缀（如申通7734/7720，韵达434/435）
+        { name: '申通(7734)', regex: /^7734\d{11}$/ },
+        { name: '申通(7720)', regex: /^7720\d{11}$/ },
+        { name: '韵达(434)', regex: /^434\d{12}$/ },
+        { name: '韵达(435)', regex: /^435\d{12}$/ },
+        // 通用规则
+        { name: '极兔', regex: /^JT\d{13}$/i },
+        { name: '顺丰', regex: /^SF\d{13}$/i },
+        { name: '申通', regex: /^77\d{13}$/ },          // 77开头共15位
+        { name: '中通', regex: /^790\d{11}$/ },          // 790开头共14位
+        { name: '圆通', regex: /^YT\d{13}$/i },          // YT开头+13数字
+        { name: '韵达', regex: /^43\d{13}$/ },           // 43开头共15位
+        { name: '邮政', regex: /^9\d{12}$/ },            // 13位数字，9开头
+        { name: 'EMS', regex: /^1\d{12}$/ }              // 13位数字，1开头
     ];
 
+    // ============================================================
+    // 存储与全局状态
+    // ============================================================
     const STORAGE_KEYS = {
         TOKEN: 'github_token',
         GIST_ID: 'gist_id',
@@ -345,7 +352,7 @@
     let isScanning = false;
     let history = [];
     let scanMode = 'normal'; // 'normal' 或 'associate'
-    let currentProductInfo = null; // 当前弹窗显示的商品信息
+    let currentProductInfo = null;
 
     // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
@@ -459,14 +466,10 @@
     }
 
     function detectCourier(text) {
-        const upper = text.toUpperCase();
+        const cleaned = cleanText(text);
         for (let rule of COURIER_RULES) {
-            const prefix = rule.prefix.toUpperCase();
-            if (upper.startsWith(prefix)) {
-                const len = text.length;
-                if (len >= rule.minLen && len <= rule.maxLen) {
-                    return { matched: true, prefix: rule.prefix, name: rule.name || prefix };
-                }
+            if (rule.regex.test(cleaned)) {
+                return { matched: true, name: rule.name, prefix: rule.name };
             }
         }
         return { matched: false };
@@ -588,7 +591,6 @@
         }
         detailContent.innerHTML = detailHtml;
         productDetailOverlay.classList.add('active');
-        // 记录历史
         history.push({
             time: new Date(),
             typeLabel: typeLabel,
@@ -611,7 +613,6 @@
             <p>是否关联到当前商品？</p>
         `;
         associateOverlay.classList.add('active');
-        // 临时保存关联数据
         window.associateData = { content, type, rawText };
     }
 
@@ -621,8 +622,7 @@
         if (!cleaned) return;
 
         if (scanMode === 'associate') {
-            // 关联扫描模式：识别类型
-            stopScan(); // 停止摄像头
+            stopScan();
             let type = '';
             if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
                 type = 'link';
@@ -633,7 +633,6 @@
                 } else if (/^\d{10,}$/.test(cleaned)) {
                     type = 'order';
                 } else {
-                    // 无法识别类型，提示
                     alert('无法识别的类型，请重新扫描');
                     startAssociateScan();
                     return;
@@ -641,13 +640,11 @@
             }
             showAssociatePrompt(cleaned, type, cleaned);
         } else {
-            // 普通扫描模式：查找商品
             const matches = findProductByAny(cleaned);
             if (matches.length > 0) {
                 showProductDetail(matches[0]);
                 stopScan();
             } else {
-                // 未找到，加入历史并提示
                 let typeLabel = '未匹配';
                 let detail = `编码: ${cleaned}`;
                 if (cleaned.startsWith('http')) {
@@ -679,34 +676,27 @@
         const data = window.associateData;
         if (!data || !currentProductInfo) return;
 
-        // 更新数据
         if (currentProductInfo.type === 'node') {
             const node = currentProductInfo.node;
-            if (data.type === 'tracking') {
-                node.trackingNumber = data.content;
-            } else if (data.type === 'order') {
-                node.orderNumber = data.content;
-            } else if (data.type === 'link') {
+            if (data.type === 'tracking') node.trackingNumber = data.content;
+            else if (data.type === 'order') node.orderNumber = data.content;
+            else if (data.type === 'link') {
                 if (!node.qrLinks) node.qrLinks = [];
                 if (!node.qrLinks.includes(data.content)) node.qrLinks.push(data.content);
             }
         } else if (currentProductInfo.type === 'item') {
             const item = currentProductInfo.item;
-            if (data.type === 'tracking') {
-                item.trackingNumber = data.content;
-            } else if (data.type === 'order') {
-                item.orderNumber = data.content;
-            } else if (data.type === 'link') {
+            if (data.type === 'tracking') item.trackingNumber = data.content;
+            else if (data.type === 'order') item.orderNumber = data.content;
+            else if (data.type === 'link') {
                 if (!item.qrLinks) item.qrLinks = [];
                 if (!item.qrLinks.includes(data.content)) item.qrLinks.push(data.content);
             }
         }
 
-        // 保存到 Gist
         try {
             await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
             alert('关联成功');
-            // 重新显示商品详情（更新数据）
             let match;
             if (currentProductInfo.type === 'node') {
                 match = { type: 'node', code: currentProductInfo.code, node: currentProductInfo.node };
@@ -721,21 +711,16 @@
         }
     });
 
-    // 取消关联
     cancelAssociateBtn.addEventListener('click', function() {
         associateOverlay.classList.remove('active');
-        // 返回商品详情弹窗
         productDetailOverlay.classList.add('active');
         scanMode = 'normal';
-        // 重新开启关联扫描？用户可能想继续扫描关联，但我们返回详情弹窗让用户选择
     });
 
-    // 扫描关联信息按钮
     scanAssociateBtn.addEventListener('click', function() {
         startAssociateScan();
     });
 
-    // 关闭详情弹窗
     closeDetailBtn.addEventListener('click', function() {
         productDetailOverlay.classList.remove('active');
         scanMode = 'normal';
@@ -812,7 +797,7 @@
         renderHistory();
     });
 
-    console.log('智能扫码页面已加载（关联扫描版）');
+    console.log('智能扫码页面已加载（快递规则优化版）');
 </script>
 </body>
 </html>
