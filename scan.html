@@ -123,6 +123,23 @@
             border-top: 1px dashed #d1d5db;
             padding-top: 4px;
         }
+        /* 成本隐藏相关 */
+        .cost-display {
+            font-weight: 600;
+        }
+        .cost-toggle {
+            background: none;
+            border: 1px solid #94a3b8;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 4px;
+            color: #475569;
+        }
+        .cost-toggle:hover {
+            background: #e2e8f0;
+        }
         #login-overlay {
             display: none;
             position: fixed;
@@ -167,7 +184,7 @@
 <!-- 登录遮罩 -->
 <div id="login-overlay" class="active">
     <div class="login-box">
-        <h2>🔐 登录</h2>
+        <h2>登录</h2>
         <p style="color:#64748b; font-size:14px;">请输入 GitHub 凭证</p>
         <label>GitHub Token</label>
         <input type="password" id="login-token" placeholder="ghp_xxxx" />
@@ -186,7 +203,7 @@
 <div id="app-container" style="display:none;">
     <div class="container">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <h1>🔍 智能扫码</h1>
+            <h1>智能扫码</h1>
             <div>
                 <button class="btn btn-danger" id="clear-history-btn" style="padding:6px 12px; font-size:14px;">清空历史</button>
                 <button class="btn btn-danger" id="logout-btn" style="padding:6px 12px; font-size:14px;">退出</button>
@@ -197,8 +214,8 @@
                 <div class="placeholder-text">点击「开始扫码」<br>支持二维码 / PDF417</div>
             </div>
             <div class="btn-group">
-                <button id="start-btn" class="btn btn-primary">▶ 开始扫码</button>
-                <button id="stop-btn" class="btn btn-secondary" disabled>⏹ 停止</button>
+                <button id="start-btn" class="btn btn-primary">开始扫码</button>
+                <button id="stop-btn" class="btn btn-secondary" disabled>停止</button>
             </div>
             <div class="status-tip">请允许摄像头权限</div>
         </div>
@@ -210,7 +227,7 @@
         </div>
         <div class="card">
             <div id="result-area" class="result-area">
-                <div class="label">📋 扫码历史</div>
+                <div class="label">扫码历史</div>
                 <div id="result-content" style="margin-top:4px; color:#64748b;">等待扫码或输入...</div>
             </div>
         </div>
@@ -360,7 +377,6 @@
     // ---------- 工具函数：清洗文本 ----------
     function cleanText(text) {
         if (typeof text !== 'string') return '';
-        // 去除首尾所有空白字符（包括 \r, \n, \t, 空格等）
         return text.replace(/^[\s\r\n\t]+|[\s\r\n\t]+$/g, '');
     }
 
@@ -384,15 +400,12 @@
         const products = gistData.products || {};
         let results = [];
 
-        // 递归遍历树
         function traverse(obj, path) {
             for (let key in obj) {
                 const node = obj[key];
-                // 1. 匹配节点编码
                 if (key === query) {
                     results.push({ type: 'node', code: key, node: node, path: path + '/' + key });
                 }
-                // 2. 匹配节点其他字段
                 if (node.orderNumber === query) {
                     results.push({ type: 'node', code: key, node: node, path: path + '/' + key, matchField: 'orderNumber' });
                 }
@@ -403,7 +416,6 @@
                     results.push({ type: 'node', code: key, node: node, path: path + '/' + key, matchField: 'qrLink' });
                 }
 
-                // 3. 库存项
                 if (node.items) {
                     node.items.forEach(item => {
                         if (item.code === query) {
@@ -421,7 +433,6 @@
                     });
                 }
 
-                // 递归子节点
                 if (node.children) {
                     traverse(node.children, path + '/' + key);
                 }
@@ -432,7 +443,7 @@
         return results;
     }
 
-    // ---------- 渲染历史 ----------
+    // ---------- 渲染历史（支持 HTML） ----------
     function renderHistory() {
         if (history.length === 0) {
             resultContent.innerHTML = '<div style="color:#64748b;">暂无记录</div>';
@@ -442,14 +453,14 @@
         let html = '';
         history.forEach((item) => {
             const time = item.time.toLocaleTimeString();
-            const typeLabel = item.typeLabel || '📌';
+            const typeLabel = item.typeLabel || '未知';
             html += `<div class="result-item">
                 <div>
                     <span class="timestamp">${time}</span>
                     <span class="type-badge">${typeLabel}</span>
                 </div>
                 <div class="content">${item.detail || item.content}</div>
-                ${item.debug ? `<div class="debug-info">🔍 ${item.debug}</div>` : ''}
+                ${item.debug ? `<div class="debug-info">${item.debug}</div>` : ''}
             </div>`;
         });
         resultContent.innerHTML = html;
@@ -457,101 +468,120 @@
         resultArea.scrollTop = resultArea.scrollHeight;
     }
 
+    // ---------- 成本隐藏切换函数（事件委托） ----------
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('cost-toggle')) {
+            const button = e.target;
+            const costSpan = button.previousElementSibling;
+            if (costSpan && costSpan.classList.contains('cost-display')) {
+                const actual = costSpan.dataset.cost;
+                if (costSpan.textContent === '***') {
+                    costSpan.textContent = actual;
+                    button.textContent = '隐藏';
+                } else {
+                    costSpan.textContent = '***';
+                    button.textContent = '显示';
+                }
+            }
+        }
+    });
+
     // ---------- 核心：处理查询 ----------
     function handleScanResult(rawText) {
-        // 1. 清洗文本
         const cleaned = cleanText(rawText);
         if (!cleaned) {
             alert('无效内容（为空或仅含空白字符）');
             return;
         }
 
-        // 2. 准备显示
-        let typeLabel = '🔖 编码';
-        let detail = `原始: ${rawText}\n清洗后: ${cleaned}`;
+        let typeLabel = '编码';
+        let detailHtml = '';
         let debugInfo = '';
 
-        // 3. 优先精确匹配编码（节点或库存）
         const exactMatches = findProductByAny(cleaned);
-        let foundInfo = '';
         let matched = false;
 
         if (exactMatches.length > 0) {
-            // 取第一个匹配
             const match = exactMatches[0];
             matched = true;
             if (match.type === 'node') {
                 const node = match.node;
                 const name = node.name || match.code;
                 const status = node.status || '在售';
-                foundInfo = `📦 商品: ${name} (${match.code}) 状态: ${status}`;
-                if (node.cost !== undefined) foundInfo += ` 成本: ${node.cost}`;
-                if (node.trackingNumber) foundInfo += ` 快递: ${node.trackingNumber}`;
-                if (node.orderNumber) foundInfo += ` 订单: ${node.orderNumber}`;
-                if (node.qrLinks && node.qrLinks.length) foundInfo += ` 链接数: ${node.qrLinks.length}`;
-                if (match.matchField) foundInfo += ` (匹配${match.matchField})`;
-                typeLabel = '📦 商品';
+                typeLabel = '商品';
+                let parts = [];
+                parts.push(`<div>商品: ${name} (${match.code})</div>`);
+                parts.push(`<div>状态: ${status}</div>`);
+                if (node.cost !== undefined) {
+                    const cost = Number(node.cost).toFixed(2);
+                    parts.push(`<div>成本: <span class="cost-display" data-cost="${cost}">***</span><button class="cost-toggle">显示</button></div>`);
+                }
+                if (node.trackingNumber) parts.push(`<div>快递: ${node.trackingNumber}</div>`);
+                if (node.orderNumber) parts.push(`<div>订单: ${node.orderNumber}</div>`);
+                if (node.qrLinks && node.qrLinks.length) parts.push(`<div>链接数: ${node.qrLinks.length}</div>`);
+                if (match.matchField) parts.push(`<div>匹配字段: ${match.matchField}</div>`);
+                detailHtml = parts.join('');
+                debugInfo = '匹配类型: 精确匹配';
             } else if (match.type === 'item') {
                 const item = match.item;
                 const parentNode = findNodeByCode(match.parentCode);
                 const parentName = parentNode?.name || match.parentCode;
                 const name = item.name || parentName;
                 const status = item.status || '在售';
-                foundInfo = `📦 库存: ${name} (${item.code}) 父级: ${parentName} 状态: ${status}`;
-                if (item.cost !== undefined) foundInfo += ` 成本: ${item.cost}`;
-                if (item.trackingNumber) foundInfo += ` 快递: ${item.trackingNumber}`;
-                if (item.orderNumber) foundInfo += ` 订单: ${item.orderNumber}`;
-                if (item.qrLinks && item.qrLinks.length) foundInfo += ` 链接数: ${item.qrLinks.length}`;
-                if (match.matchField) foundInfo += ` (匹配${match.matchField})`;
-                typeLabel = '📦 库存';
+                typeLabel = '库存';
+                let parts = [];
+                parts.push(`<div>库存: ${name} (${item.code})</div>`);
+                parts.push(`<div>父级: ${parentName}</div>`);
+                parts.push(`<div>状态: ${status}</div>`);
+                if (item.cost !== undefined) {
+                    const cost = Number(item.cost).toFixed(2);
+                    parts.push(`<div>成本: <span class="cost-display" data-cost="${cost}">***</span><button class="cost-toggle">显示</button></div>`);
+                }
+                if (item.trackingNumber) parts.push(`<div>快递: ${item.trackingNumber}</div>`);
+                if (item.orderNumber) parts.push(`<div>订单: ${item.orderNumber}</div>`);
+                if (item.qrLinks && item.qrLinks.length) parts.push(`<div>链接数: ${item.qrLinks.length}</div>`);
+                if (match.matchField) parts.push(`<div>匹配字段: ${match.matchField}</div>`);
+                detailHtml = parts.join('');
+                debugInfo = '匹配类型: 精确匹配';
             }
-            detail = foundInfo;
-            debugInfo = `匹配类型: 精确匹配`;
         } else {
-            // 未精确匹配，尝试其他类型识别
-            // 检测是否为链接
+            // 未匹配，处理其他类型
             if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
-                typeLabel = '🔗 链接';
-                detail = `链接内容: ${cleaned}`;
+                typeLabel = '链接';
+                detailHtml = `<div>链接: ${cleaned}</div>`;
                 debugInfo = '未关联到任何商品';
             } else {
-                // 检测是否为快递单号
                 const courier = detectCourier(cleaned);
                 if (courier.matched) {
-                    typeLabel = '📦 快递单号';
-                    detail = `快递单号: ${cleaned} (${courier.prefix})`;
+                    typeLabel = '快递单号';
+                    detailHtml = `<div>快递单号: ${cleaned} (${courier.prefix})</div>`;
                     debugInfo = '未关联到任何商品';
                 } else {
-                    // 检测是否为订单号（纯数字≥10位）
                     if (/^\d{10,}$/.test(cleaned)) {
-                        typeLabel = '📋 订单号';
-                        detail = `订单号: ${cleaned}`;
+                        typeLabel = '订单号';
+                        detailHtml = `<div>订单号: ${cleaned}</div>`;
                         debugInfo = '未关联到任何商品';
                     } else {
-                        // 普通编码但未找到
-                        typeLabel = '🔖 编码';
-                        detail = `编码: ${cleaned}`;
+                        typeLabel = '编码';
+                        detailHtml = `<div>编码: ${cleaned}</div>`;
                         debugInfo = '未找到关联商品';
                     }
                 }
             }
         }
 
-        // 4. 加入历史
         history.push({
             time: new Date(),
             typeLabel: typeLabel,
             content: cleaned,
-            detail: detail,
+            detail: detailHtml,
             debug: debugInfo
         });
         renderHistory();
-
-        // 5. 停止扫码（单次扫描后停止，若需连续扫描可注释掉）
         stopScan();
     }
 
-    // 辅助：查找节点（用于渲染）
+    // 辅助：查找节点
     function findNodeByCode(code, obj) {
         if (!obj) obj = gistData.products;
         if (obj[code]) return obj[code];
@@ -627,7 +657,7 @@
             return;
         }
         handleScanResult(raw);
-        manualInput.value = ''; // 清空输入框
+        manualInput.value = '';
     }
 
     manualBtn.addEventListener('click', manualQuery);
