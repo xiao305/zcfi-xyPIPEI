@@ -123,7 +123,7 @@
             border-top: 1px dashed #d1d5db;
             padding-top: 4px;
         }
-        /* 成本隐藏相关 */
+        /* 成本隐藏 */
         .cost-display { font-weight: 600; }
         .cost-toggle {
             background: none;
@@ -145,15 +145,15 @@
             margin-left: 6px;
             color: #1e293b;
         }
-        .courier-jt { background: #fee2e2; }    /* 浅红 */
-        .courier-jd { background: #fee2e2; }    /* 浅红 */
-        .courier-yd { background: #ffedd5; }    /* 浅橙 */
-        .courier-yz { background: #dcfce7; }    /* 浅绿 */
-        .courier-ems { background: #dbeafe; }   /* 浅蓝 */
-        .courier-zto { background: #dbeafe; }   /* 浅蓝 */
-        .courier-yt { background: #bfdbfe; }    /* 偏深蓝 */
-        .courier-sto { background: #f3d9c6; }   /* 棕色 */
-        .courier-sf { background: #e5e7eb; color: #1e293b; } /* 顺丰浅灰 */
+        .courier-jt { background: #fee2e2; }
+        .courier-jd { background: #fee2e2; }
+        .courier-yd { background: #ffedd5; }
+        .courier-yz { background: #dcfce7; }
+        .courier-ems { background: #dbeafe; }
+        .courier-zto { background: #dbeafe; }
+        .courier-yt { background: #bfdbfe; }
+        .courier-sto { background: #f3d9c6; }
+        .courier-sf { background: #e5e7eb; }
         /* 关联模式提示条 */
         #associate-mode-bar {
             display: none;
@@ -176,7 +176,6 @@
             color: #b45309;
             background: #fff7ed;
         }
-        /* 备注编辑 */
         .remark-edit-btn {
             background: none;
             border: 1px solid #94a3b8;
@@ -203,31 +202,6 @@
         .remark-edit-area .btn-group {
             margin-top: 6px;
         }
-        /* 登录遮罩 */
-        #login-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-        }
-        #login-overlay.active { display: flex; }
-        .login-box {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 400px;
-            width: 90%;
-        }
-        .login-box h2 { margin-top: 0; }
-        .login-box label { display: block; margin-top: 12px; font-weight: 600; }
-        .login-box input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; margin-top: 4px; }
-        #login-error { color: #ef4444; margin-top: 10px; }
-        .status-tip { font-size: 14px; color: #64748b; margin-top: 8px; text-align: center; }
-        .clear-btn { margin-top: 8px; }
-        /* 商品详情弹窗 */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -251,6 +225,36 @@
         .modal h3 { margin-top: 0; }
         .modal .detail-item { margin-bottom: 8px; font-size: 15px; }
         .modal .btn-group { margin-top: 16px; }
+        /* 保存动画 */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e2e8f0;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .btn-loading {
+            position: relative;
+            pointer-events: none;
+        }
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            margin: -8px 0 0 -8px;
+            border: 2px solid white;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
     </style>
 </head>
 <body>
@@ -297,7 +301,6 @@
                 <input type="text" id="manual-input" placeholder="手动输入编码 / 订单号 / 快递单号" />
                 <button class="btn btn-primary" id="manual-btn">查询</button>
             </div>
-            <!-- 关联模式提示条 -->
             <div id="associate-mode-bar">
                 <span id="associate-mode-text">正在关联商品-编码</span>
                 <button class="exit-associate-btn" id="exit-associate-btn">退出关联</button>
@@ -336,17 +339,46 @@
     </div>
 </div>
 
+<!-- 未匹配信息弹窗 -->
+<div id="not-found-overlay" class="modal-overlay">
+    <div class="modal">
+        <h3>未匹配信息</h3>
+        <div id="not-found-content"></div>
+        <div class="btn-group">
+            <button class="btn btn-primary" id="not-found-continue-btn">继续扫描</button>
+            <button class="btn btn-secondary" id="not-found-close-btn">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 关联警告弹窗（已有关联） -->
+<div id="associate-warning-overlay" class="modal-overlay">
+    <div class="modal">
+        <h3>已有关联</h3>
+        <div id="associate-warning-content"></div>
+        <div class="btn-group">
+            <button class="btn btn-danger" id="replace-associate-btn">替换</button>
+            <button class="btn btn-secondary" id="cancel-warning-btn">取消</button>
+        </div>
+        <div style="margin-top: 8px;">
+            <label for="correct-type-select">手动纠错关联类型：</label>
+            <select id="correct-type-select" style="width:100%; padding:8px; border:1px solid #d1d5db; border-radius:6px;">
+                <option value="">请选择（可选）</option>
+                <option value="tracking">快递单号</option>
+                <option value="order">订单号</option>
+                <option value="link">链接</option>
+            </select>
+        </div>
+    </div>
+</div>
+
 <script>
-    // ============================================================
-    // 快递单号识别库（正则 + 公司名称 + 颜色类）
-    // ============================================================
+    // ========== 快递单号识别库 ==========
     const COURIER_RULES = [
-        // 京东优先规则
         { company: '京东', regex: /^JDX\d{12}$/i },
         { company: '京东', regex: /^JD[A-Z]{2}\d{11}$/i },
         { company: '京东', regex: /^JD[A-Z]{3}\d{10}$/i },
         { company: '京东', regex: /^JD\d{13}$/i },
-        // 其他快递
         { company: '极兔', regex: /^JT\d{13}$/i },
         { company: '申通(7734)', regex: /^7734\d{11}$/ },
         { company: '申通(7720)', regex: /^7720\d{11}$/ },
@@ -377,9 +409,7 @@
         '顺丰': 'courier-sf'
     };
 
-    // ============================================================
-    // 存储与全局状态
-    // ============================================================
+    // ========== 存储与全局状态 ==========
     const STORAGE_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
     let gistData = { products: {} };
     let currentToken = '', currentGistId = '', currentFilename = 'data.json';
@@ -414,11 +444,22 @@
     const confirmAssociateBtn = document.getElementById('confirm-associate-btn');
     const cancelAssociateBtn = document.getElementById('cancel-associate-btn');
 
+    const notFoundOverlay = document.getElementById('not-found-overlay');
+    const notFoundContent = document.getElementById('not-found-content');
+    const notFoundContinueBtn = document.getElementById('not-found-continue-btn');
+    const notFoundCloseBtn = document.getElementById('not-found-close-btn');
+
+    const associateWarningOverlay = document.getElementById('associate-warning-overlay');
+    const associateWarningContent = document.getElementById('associate-warning-content');
+    const replaceAssociateBtn = document.getElementById('replace-associate-btn');
+    const cancelWarningBtn = document.getElementById('cancel-warning-btn');
+    const correctTypeSelect = document.getElementById('correct-type-select');
+
     let html5QrCode = null;
     let isScanning = false;
     let history = [];
-    let scanMode = 'normal'; // 'normal' 或 'associate'
-    let currentProductInfo = null; // 当前弹窗显示的商品信息
+    let scanMode = 'normal';
+    let currentProductInfo = null;
 
     // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
@@ -500,6 +541,8 @@
         renderHistory();
         productDetailOverlay.classList.remove('active');
         associateOverlay.classList.remove('active');
+        notFoundOverlay.classList.remove('active');
+        associateWarningOverlay.classList.remove('active');
         scanMode = 'normal';
         currentProductInfo = null;
         associateModeBar.style.display = 'none';
@@ -626,7 +669,6 @@
 
     // ---------- 商品详情弹窗（含备注编辑） ----------
     function showProductDetail(match) {
-        // 重新绘制详情
         renderProductDetail(match);
         productDetailOverlay.classList.add('active');
         // 记录历史
@@ -658,7 +700,6 @@
             }
             if (node.orderNumber) detailHtml += `<div class="detail-item"><strong>订单:</strong> ${node.orderNumber}</div>`;
             if (node.qrLinks && node.qrLinks.length) detailHtml += `<div class="detail-item"><strong>链接数:</strong> ${node.qrLinks.length}</div>`;
-            // 备注行（始终显示）
             const remark = node.remark || '无';
             detailHtml += `<div class="detail-item"><strong>备注:</strong> <span id="remark-text">${remark}</span><button class="remark-edit-btn" id="edit-remark-btn">编辑</button></div>`;
             if (match.matchField) detailHtml += `<div class="detail-item"><strong>匹配字段:</strong> ${match.matchField}</div>`;
@@ -693,10 +734,8 @@
         const editBtn = document.getElementById('edit-remark-btn');
         if (editBtn) {
             editBtn.addEventListener('click', function() {
-                // 显示编辑区域
                 const remarkSpan = document.getElementById('remark-text');
                 const currentRemark = (remarkSpan && remarkSpan.textContent !== '无') ? remarkSpan.textContent : '';
-                // 创建编辑UI
                 const editArea = document.createElement('div');
                 editArea.className = 'remark-edit-area active';
                 editArea.innerHTML = `
@@ -706,29 +745,33 @@
                         <button class="btn btn-secondary btn-sm" id="cancel-remark-btn">取消</button>
                     </div>
                 `;
-                // 插入到备注行之后
                 const remarkItem = remarkSpan.closest('.detail-item');
                 remarkItem.after(editArea);
-                editBtn.style.display = 'none'; // 隐藏编辑按钮
+                editBtn.style.display = 'none';
 
-                // 保存按钮
                 document.getElementById('save-remark-btn').addEventListener('click', async function() {
                     const newRemark = document.getElementById('remark-edit-input').value.trim();
-                    // 更新数据
-                    if (currentProductInfo.type === 'node') {
-                        currentProductInfo.node.remark = newRemark || undefined;
-                    } else if (currentProductInfo.type === 'item') {
-                        currentProductInfo.item.remark = newRemark || undefined;
-                    }
+                    const saveBtn = this;
+                    saveBtn.classList.add('btn-loading');
+                    saveBtn.disabled = true;
+                    saveBtn.textContent = '保存中...';
                     try {
+                        if (currentProductInfo.type === 'node') {
+                            currentProductInfo.node.remark = newRemark || undefined;
+                        } else if (currentProductInfo.type === 'item') {
+                            currentProductInfo.item.remark = newRemark || undefined;
+                        }
                         await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-                        // 重新显示详情（更新UI）
                         renderProductDetail(currentProductInfo);
                     } catch (e) {
                         alert('保存失败: ' + e.message);
+                    } finally {
+                        saveBtn.classList.remove('btn-loading');
+                        saveBtn.disabled = false;
+                        saveBtn.textContent = '保存';
                     }
                 });
-                // 取消按钮
+
                 document.getElementById('cancel-remark-btn').addEventListener('click', function() {
                     editArea.remove();
                     editBtn.style.display = 'inline-block';
@@ -737,10 +780,9 @@
         }
     }
 
-    // ---------- 关联扫描模式 ----------
+    // ---------- 关联模式 ----------
     function enterAssociateMode() {
         scanMode = 'associate';
-        // 显示提示条
         let productCode = '';
         if (currentProductInfo.type === 'node') {
             productCode = currentProductInfo.code;
@@ -749,7 +791,6 @@
         }
         associateModeText.textContent = `正在关联商品-${productCode}`;
         associateModeBar.style.display = 'flex';
-        // 关闭商品详情弹窗，开始扫描
         productDetailOverlay.classList.remove('active');
         startScan();
     }
@@ -760,23 +801,15 @@
         stopScan();
     }
 
-    // 扫描关联信息按钮
     scanAssociateBtn.addEventListener('click', enterAssociateMode);
     exitAssociateBtn.addEventListener('click', exitAssociateMode);
 
     // ---------- 关联确认弹窗 ----------
     function showAssociatePrompt(content, type, rawText) {
-        let typeName = '';
-        if (type === 'tracking') typeName = '快递单号';
-        else if (type === 'order') typeName = '订单号';
-        else if (type === 'link') typeName = '链接';
-        else typeName = '未知类型';
+        let typeName = getTypeName(type);
         let targetInfo = '';
-        if (currentProductInfo.type === 'node') {
-            targetInfo = `商品-${currentProductInfo.code}`;
-        } else if (currentProductInfo.type === 'item') {
-            targetInfo = `库存-${currentProductInfo.itemCode || currentProductInfo.item.code}`;
-        }
+        if (currentProductInfo.type === 'node') targetInfo = `商品-${currentProductInfo.code}`;
+        else targetInfo = `库存-${currentProductInfo.itemCode || currentProductInfo.item.code}`;
         let extraHtml = '';
         if (type === 'tracking') {
             const courier = detectCourier(rawText);
@@ -796,124 +829,248 @@
         window.associateData = { content, type, rawText };
     }
 
-    // ---------- 处理扫描结果（实时刷新数据） ----------
+    // ---------- 未匹配弹窗 ----------
+    function showNotFoundModal(text) {
+        notFoundContent.innerHTML = `
+            <p>未找到与<strong>${text}</strong>关联的商品信息。</p>
+            <p>识别类型：${getTypeLabel(text)}</p>
+        `;
+        notFoundOverlay.classList.add('active');
+    }
+
+    // ---------- 关联警告弹窗 ----------
+    function showAssociateWarning(existingValue, type, scannedText) {
+        const typeName = getTypeName(type);
+        associateWarningContent.innerHTML = `
+            <p>当前商品已存在<strong>${typeName}</strong>：</p>
+            <p><strong>${existingValue}</strong></p>
+            <p>扫描到的新<strong>${typeName}</strong>：</p>
+            <p><strong>${scannedText}</strong></p>
+            <p>是否替换？</p>
+        `;
+        window.pendingAssociation = { scannedText, type };
+        window.warningType = type;
+        associateWarningOverlay.classList.add('active');
+    }
+
+    // ---------- 处理扫描结果 ----------
     async function handleScanResult(rawText) {
         const cleaned = cleanText(rawText);
         if (!cleaned) return;
 
-        // 每次扫描前刷新数据库
+        // 实时刷新数据库
         try {
             const freshData = await getGistContent(currentToken, currentGistId, currentFilename);
-            if (freshData && freshData.products) {
-                gistData = freshData;
-            }
+            if (freshData && freshData.products) gistData = freshData;
         } catch (e) {
             console.error('刷新数据失败:', e);
         }
 
         if (scanMode === 'associate') {
-            stopScan(); // 停止摄像头，避免连续扫描
+            stopScan();
             let type = '';
             if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
                 type = 'link';
             } else {
                 const courier = detectCourier(cleaned);
-                if (courier.matched) {
-                    type = 'tracking';
-                } else if (/^\d{10,}$/.test(cleaned)) {
-                    type = 'order';
-                } else {
-                    // 无法识别类型，保持关联模式，提示用户
+                if (courier.matched) type = 'tracking';
+                else if (/^\d{10,}$/.test(cleaned)) type = 'order';
+                else {
                     alert('无法识别为关联信息，请重新扫描或退出关联模式。');
-                    // 不自动重启扫描，用户可手动继续扫描或退出关联
-                    startScan(); // 重新启动扫描，但保持关联模式
+                    startScan();
                     return;
                 }
             }
-            showAssociatePrompt(cleaned, type, cleaned);
+            // 检查是否已有关联
+            if (currentProductInfo) {
+                const existingValue = getExistingValueForType(type, currentProductInfo);
+                if (existingValue) {
+                    showAssociateWarning(existingValue, type, cleaned);
+                    return;
+                } else {
+                    showAssociatePrompt(cleaned, type, cleaned);
+                }
+            }
         } else {
-            // 普通模式
             const matches = findProductByAny(cleaned);
             if (matches.length > 0) {
                 showProductDetail(matches[0]);
                 stopScan();
             } else {
-                let typeLabel = '未匹配';
+                showNotFoundModal(cleaned);
+                stopScan();
+                // 添加历史
+                let typeLabel = getTypeLabel(cleaned);
                 let detail = '';
                 if (cleaned.startsWith('http')) {
                     typeLabel = '链接';
                     detail = `<div><strong>链接:</strong> ${cleaned}</div>`;
+                } else if (typeLabel === '快递单号') {
+                    detail = `<div><strong>快递单号:</strong> ${cleaned} ${getCourierTagHtml(cleaned)}</div>`;
+                } else if (typeLabel === '订单号') {
+                    detail = `<div><strong>订单号:</strong> ${cleaned}</div>`;
                 } else {
-                    const courier = detectCourier(cleaned);
-                    if (courier.matched) {
-                        typeLabel = '快递单号';
-                        detail = `<div><strong>快递单号:</strong> ${cleaned} ${getCourierTagHtml(cleaned)}</div>`;
-                    } else if (/^\d{10,}$/.test(cleaned)) {
-                        typeLabel = '订单号';
-                        detail = `<div><strong>订单号:</strong> ${cleaned}</div>`;
-                    } else {
-                        typeLabel = '编码';
-                        detail = `<div><strong>编码:</strong> ${cleaned}</div>`;
-                    }
+                    detail = `<div><strong>编码:</strong> ${cleaned}</div>`;
                 }
-                history.push({ time: new Date(), typeLabel, detail, debug: '未关联到商品' });
+                history.push({ time: new Date(), typeLabel, detail, debug: '未匹配信息' });
                 renderHistory();
-                stopScan();
             }
         }
     }
 
-    // ---------- 确认关联 ----------
+    // 获取已有值
+    function getExistingValueForType(type, productInfo) {
+        if (!productInfo) return null;
+        if (productInfo.type === 'node') {
+            const node = productInfo.node;
+            if (type === 'tracking') return node.trackingNumber;
+            if (type === 'order') return node.orderNumber;
+            if (type === 'link') return (node.qrLinks && node.qrLinks.length) ? node.qrLinks.join(', ') : null;
+        } else if (productInfo.type === 'item') {
+            const item = productInfo.item;
+            if (type === 'tracking') return item.trackingNumber;
+            if (type === 'order') return item.orderNumber;
+            if (type === 'link') return (item.qrLinks && item.qrLinks.length) ? item.qrLinks.join(', ') : null;
+        }
+        return null;
+    }
+
+    // 应用关联
+    function applyAssociation(productInfo, content, type) {
+        if (productInfo.type === 'node') {
+            const node = productInfo.node;
+            if (type === 'tracking') node.trackingNumber = content;
+            else if (type === 'order') node.orderNumber = content;
+            else if (type === 'link') {
+                if (!node.qrLinks) node.qrLinks = [];
+                if (!node.qrLinks.includes(content)) node.qrLinks.push(content);
+            }
+        } else if (productInfo.type === 'item') {
+            const item = productInfo.item;
+            if (type === 'tracking') item.trackingNumber = content;
+            else if (type === 'order') item.orderNumber = content;
+            else if (type === 'link') {
+                if (!item.qrLinks) item.qrLinks = [];
+                if (!item.qrLinks.includes(content)) item.qrLinks.push(content);
+            }
+        }
+    }
+
+    // 自动变更状态
+    function updateStatusIfSold(productInfo, type) {
+        if (type !== 'tracking' && type !== 'order') return;
+        if (productInfo.type === 'node') {
+            const node = productInfo.node;
+            if (node.status === '在售') node.status = '已售';
+        } else if (productInfo.type === 'item') {
+            const item = productInfo.item;
+            if (item.status === '在售') item.status = '已售';
+        }
+    }
+
+    function getTypeName(type) {
+        if (type === 'tracking') return '快递单号';
+        if (type === 'order') return '订单号';
+        if (type === 'link') return '链接';
+        return '未知类型';
+    }
+    function getTypeLabel(text) {
+        if (text.startsWith('http')) return '链接';
+        const courier = detectCourier(text);
+        if (courier.matched) return '快递单号';
+        if (/^\d{10,}$/.test(text)) return '订单号';
+        return '编码';
+    }
+
+    // ---------- 确认关联按钮 ----------
     confirmAssociateBtn.addEventListener('click', async function() {
         const data = window.associateData;
         if (!data || !currentProductInfo) return;
-
-        if (currentProductInfo.type === 'node') {
-            const node = currentProductInfo.node;
-            if (data.type === 'tracking') node.trackingNumber = data.content;
-            else if (data.type === 'order') node.orderNumber = data.content;
-            else if (data.type === 'link') {
-                if (!node.qrLinks) node.qrLinks = [];
-                if (!node.qrLinks.includes(data.content)) node.qrLinks.push(data.content);
-            }
-        } else if (currentProductInfo.type === 'item') {
-            const item = currentProductInfo.item;
-            if (data.type === 'tracking') item.trackingNumber = data.content;
-            else if (data.type === 'order') item.orderNumber = data.content;
-            else if (data.type === 'link') {
-                if (!item.qrLinks) item.qrLinks = [];
-                if (!item.qrLinks.includes(data.content)) item.qrLinks.push(data.content);
-            }
-        }
-
+        const btn = this;
+        btn.classList.add('btn-loading');
+        btn.disabled = true;
+        btn.textContent = '保存中...';
         try {
+            applyAssociation(currentProductInfo, data.content, data.type);
+            updateStatusIfSold(currentProductInfo, data.type);
             await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
             alert('关联成功');
-            // 重新显示商品详情（更新数据）
-            let match;
-            if (currentProductInfo.type === 'node') {
-                match = { type: 'node', code: currentProductInfo.code, node: currentProductInfo.node };
-            } else {
-                match = { type: 'item', parentCode: currentProductInfo.parentCode, itemCode: currentProductInfo.itemCode, item: currentProductInfo.item };
-            }
-            renderProductDetail(match); // 重新渲染详情
+            renderProductDetail(currentProductInfo);
             associateOverlay.classList.remove('active');
-            scanMode = 'normal'; // 退出关联模式
+            scanMode = 'normal';
             associateModeBar.style.display = 'none';
-            productDetailOverlay.classList.add('active'); // 显示详情
+            productDetailOverlay.classList.add('active');
+            history.push({
+                time: new Date(),
+                typeLabel: getTypeName(data.type),
+                detail: `关联成功: ${data.content}`,
+                debug: '关联成功'
+            });
+            renderHistory();
         } catch (e) {
             alert('保存失败: ' + e.message);
+        } finally {
+            btn.classList.remove('btn-loading');
+            btn.disabled = false;
+            btn.textContent = '确认关联';
         }
     });
 
+    // 取消关联
     cancelAssociateBtn.addEventListener('click', function() {
         associateOverlay.classList.remove('active');
-        // 返回商品详情弹窗，并保持关联模式？用户可能想继续扫描关联，但关闭弹窗应回到详情，同时退出关联模式
-        // 我们决定：取消关联时，退出关联模式，回到详情
         exitAssociateMode();
         productDetailOverlay.classList.add('active');
     });
 
+    // 未匹配弹窗按钮
+    notFoundContinueBtn.addEventListener('click', function() {
+        notFoundOverlay.classList.remove('active');
+        startScan();
+    });
+    notFoundCloseBtn.addEventListener('click', function() {
+        notFoundOverlay.classList.remove('active');
+    });
+
+    // 关联警告替换按钮
+    replaceAssociateBtn.addEventListener('click', async function() {
+        const data = window.pendingAssociation;
+        const type = correctTypeSelect.value || window.warningType;
+        if (!data || !currentProductInfo) return;
+        const btn = this;
+        btn.classList.add('btn-loading');
+        btn.disabled = true;
+        btn.textContent = '保存中...';
+        try {
+            applyAssociation(currentProductInfo, data.scannedText, type);
+            updateStatusIfSold(currentProductInfo, type);
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+            associateWarningOverlay.classList.remove('active');
+            renderProductDetail(currentProductInfo);
+            productDetailOverlay.classList.add('active');
+            history.push({
+                time: new Date(),
+                typeLabel: getTypeName(type),
+                detail: `关联替换成功: ${data.scannedText}`,
+                debug: '关联替换'
+            });
+            renderHistory();
+        } catch (e) {
+            alert('保存失败: ' + e.message);
+        } finally {
+            btn.classList.remove('btn-loading');
+            btn.disabled = false;
+            btn.textContent = '替换';
+        }
+    });
+
+    cancelWarningBtn.addEventListener('click', function() {
+        associateWarningOverlay.classList.remove('active');
+        window.pendingAssociation = null;
+        window.warningType = null;
+    });
+
+    // 关闭详情弹窗
     closeDetailBtn.addEventListener('click', function() {
         productDetailOverlay.classList.remove('active');
         scanMode = 'normal';
@@ -923,7 +1080,7 @@
 
     // ---------- 扫码功能 ----------
     function onScanSuccess(decodedText) {
-        handleScanResult(decodedText); // 注意：handleScanResult 是 async，但这里直接调用即可
+        handleScanResult(decodedText);
     }
     function onScanError(err) {}
 
@@ -977,7 +1134,7 @@
     function manualQuery() {
         const raw = manualInput.value;
         if (!raw || raw.trim() === '') return;
-        handleScanResult(raw); // 会触发刷新和后续逻辑
+        handleScanResult(raw);
         manualInput.value = '';
     }
     manualBtn.addEventListener('click', manualQuery);
@@ -991,7 +1148,7 @@
         renderHistory();
     });
 
-    console.log('智能扫码页面已加载（实时数据库版）');
+    console.log('智能扫码页面已加载（完整版）');
 </script>
 </body>
 </html>
