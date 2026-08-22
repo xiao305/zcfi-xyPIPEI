@@ -310,6 +310,13 @@
             padding: 8px 12px;
             margin: 8px 0;
             color: #b91c1c;
+            word-break: break-all;
+        }
+        #associate-content {
+            word-break: break-all;
+        }
+        #associate-content p {
+            word-break: break-all;
         }
     </style>
 </head>
@@ -743,8 +750,9 @@
         else if (match.matchField === 'trackingNumber') debug = '扫描到关联快递单号';
         else if (match.matchField === 'qrLink') debug = '扫描到关联链接';
         else debug = '扫描到商品';
-        // 增加内容详情
-        let detail = `匹配到 ${match.type === 'node' ? '商品' : '库存'}：${match.code}`;
+        // 修正：正确显示编码
+        let codeDisplay = match.type === 'node' ? match.code : match.item.code;
+        let detail = `匹配到 ${match.type === 'node' ? '商品' : '库存'}：${codeDisplay}`;
         history.push({ time: new Date(), typeLabel: (match.type === 'node' ? '商品' : '库存'), detail: detail, debug: debug });
         renderHistory();
     }
@@ -882,39 +890,41 @@
 
     // ---------- 关联确认弹窗（增强） ----------
     function showAssociatePrompt(content, detectedType, rawText) {
-        // 检测当前商品是否已有关联值
-        let hasExisting = false;
+        // 获取当前商品的对象
+        let target = null;
+        if (currentProductInfo.type === 'node') {
+            target = currentProductInfo.node;
+        } else if (currentProductInfo.type === 'item') {
+            target = currentProductInfo.item;
+        }
+        if (!target) return;
+
+        // 检查是否已存在同类型字段
         let existingField = '';
         let existingValue = '';
-        if (currentProductInfo.type === 'node') {
-            const node = currentProductInfo.node;
-            if (detectedType === 'tracking' && node.trackingNumber) {
+        let hasExisting = false;
+        let isSameValue = false;
+
+        if (detectedType === 'tracking') {
+            if (target.trackingNumber) {
                 hasExisting = true;
                 existingField = '快递单号';
-                existingValue = node.trackingNumber;
-            } else if (detectedType === 'order' && node.orderNumber) {
-                hasExisting = true;
-                existingField = '订单号';
-                existingValue = node.orderNumber;
-            } else if (detectedType === 'link' && node.qrLinks && node.qrLinks.includes(rawText)) {
-                hasExisting = true;
-                existingField = '链接';
-                existingValue = rawText;
+                existingValue = target.trackingNumber;
+                if (target.trackingNumber === rawText) isSameValue = true;
             }
-        } else if (currentProductInfo.type === 'item') {
-            const item = currentProductInfo.item;
-            if (detectedType === 'tracking' && item.trackingNumber) {
-                hasExisting = true;
-                existingField = '快递单号';
-                existingValue = item.trackingNumber;
-            } else if (detectedType === 'order' && item.orderNumber) {
+        } else if (detectedType === 'order') {
+            if (target.orderNumber) {
                 hasExisting = true;
                 existingField = '订单号';
-                existingValue = item.orderNumber;
-            } else if (detectedType === 'link' && item.qrLinks && item.qrLinks.includes(rawText)) {
+                existingValue = target.orderNumber;
+                if (target.orderNumber === rawText) isSameValue = true;
+            }
+        } else if (detectedType === 'link') {
+            if (target.qrLinks && target.qrLinks.includes(rawText)) {
                 hasExisting = true;
                 existingField = '链接';
                 existingValue = rawText;
+                isSameValue = true; // 链接相同即为相同值
             }
         }
 
@@ -945,13 +955,40 @@
         }
 
         let warningHtml = '';
+        let showWarning = false;
         if (hasExisting) {
-            warningHtml = `
-                <div class="associate-warning">
-                    ⚠️ 该商品已有关联 ${existingField}：<strong>${existingValue}</strong><br>
-                    是否替换为新的 ${typeName}？
-                </div>
-            `;
+            if (isSameValue) {
+                warningHtml = `
+                    <div class="associate-warning">
+                        ✅ 已绑定相同 ${typeName}：<strong>${rawText}</strong><br>
+                        无需重复关联。
+                    </div>
+                `;
+                showWarning = true;
+                // 禁用确认按钮，只显示取消（或改为确定）
+                confirmAssociateBtn.disabled = true;
+                confirmAssociateBtn.textContent = '已绑定';
+                // 取消按钮文字改为“确定”
+                cancelAssociateBtn.textContent = '确定';
+            } else {
+                warningHtml = `
+                    <div class="associate-warning">
+                        ⚠️ 该商品已关联 ${existingField}：<strong>${existingValue}</strong><br>
+                        是否替换为新的 ${typeName}：<strong>${rawText}</strong>？
+                    </div>
+                `;
+                showWarning = true;
+                confirmAssociateBtn.disabled = false;
+                confirmAssociateBtn.textContent = '替换';
+                cancelAssociateBtn.textContent = '取消';
+            }
+        } else {
+            confirmAssociateBtn.disabled = false;
+            confirmAssociateBtn.textContent = '确认关联';
+            cancelAssociateBtn.textContent = '取消';
+        }
+
+        if (showWarning) {
             associateWarningArea.style.display = 'block';
             associateWarningArea.innerHTML = warningHtml;
         } else {
@@ -967,7 +1004,7 @@
         `;
 
         associateOverlay.classList.add('active');
-        currentAssociateData = { content, detectedType, rawText, hasExisting };
+        currentAssociateData = { content, detectedType, rawText, hasExisting, isSameValue };
         associateSaveStatus.innerHTML = '';
     }
 
@@ -975,13 +1012,19 @@
     confirmAssociateBtn.addEventListener('click', async function() {
         if (!currentAssociateData || !currentProductInfo) return;
 
+        // 如果已存在相同值，则不做任何操作（按钮已禁用）
+        if (currentAssociateData.isSameValue) {
+            associateOverlay.classList.remove('active');
+            // 恢复按钮状态
+            confirmAssociateBtn.disabled = false;
+            confirmAssociateBtn.textContent = '确认关联';
+            cancelAssociateBtn.textContent = '取消';
+            return;
+        }
+
         // 获取用户选择的类型
         const selectedType = associateTypeSelect.value;
         const rawText = currentAssociateData.rawText;
-        const hasExisting = currentAssociateData.hasExisting;
-
-        // 如果存在且用户未明确选择替换（我们通过弹窗的确认按钮表示替换，但无额外选项，直接替换）
-        // 但如果有警告，用户仍然点击确认，我们视为同意替换。
 
         // 构建保存对象
         let targetNode = null;
@@ -1045,25 +1088,33 @@
             let detail = `关联${selectedType}: ${rawText}`;
             history.push({ time: new Date(), typeLabel: '关联', detail: detail, debug: '关联成功' });
             renderHistory();
+            // 恢复按钮状态
+            confirmAssociateBtn.disabled = false;
+            confirmAssociateBtn.textContent = '确认关联';
+            cancelAssociateBtn.textContent = '取消';
+            associateSaveStatus.innerHTML = '';
         } catch (e) {
             associateSaveStatus.className = 'save-status error';
             associateSaveStatus.textContent = '✗ 保存失败: ' + e.message;
             confirmAssociateBtn.disabled = false;
             confirmAssociateBtn.textContent = '确认关联';
-        } finally {
-            // 恢复按钮状态（如果成功，弹窗关闭，按钮重置在下次打开时）
-            if (!associateOverlay.classList.contains('active')) {
-                confirmAssociateBtn.disabled = false;
-                confirmAssociateBtn.textContent = '确认关联';
-                associateSaveStatus.innerHTML = '';
-            }
         }
     });
 
     cancelAssociateBtn.addEventListener('click', function() {
         associateOverlay.classList.remove('active');
-        exitAssociateMode();
-        productDetailOverlay.classList.add('active');
+        // 如果是“确定”状态（相同值），直接退出关联模式并返回详情
+        if (currentAssociateData && currentAssociateData.isSameValue) {
+            exitAssociateMode();
+            productDetailOverlay.classList.add('active');
+        } else {
+            exitAssociateMode();
+            productDetailOverlay.classList.add('active');
+        }
+        // 恢复按钮状态
+        confirmAssociateBtn.disabled = false;
+        confirmAssociateBtn.textContent = '确认关联';
+        cancelAssociateBtn.textContent = '取消';
     });
 
     closeDetailBtn.addEventListener('click', function() {
@@ -1071,6 +1122,7 @@
         scanMode = 'normal';
         associateModeBar.style.display = 'none';
         currentProductInfo = null;
+        associateOverlay.classList.remove('active');
     });
 
     // ---------- 扫码功能 ----------
@@ -1173,7 +1225,6 @@
                 } else {
                     // 无法识别类型，弹出提示并重新开始扫描
                     alert('无法识别为关联信息，请重新扫描或退出关联模式。');
-                    // 重新启动扫描（保持关联模式）
                     startScan();
                     return;
                 }
