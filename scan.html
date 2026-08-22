@@ -750,7 +750,6 @@
         else if (match.matchField === 'trackingNumber') debug = '扫描到关联快递单号';
         else if (match.matchField === 'qrLink') debug = '扫描到关联链接';
         else debug = '扫描到商品';
-        // 修正：正确显示编码
         let codeDisplay = match.type === 'node' ? match.code : match.item.code;
         let detail = `匹配到 ${match.type === 'node' ? '商品' : '库存'}：${codeDisplay}`;
         history.push({ time: new Date(), typeLabel: (match.type === 'node' ? '商品' : '库存'), detail: detail, debug: debug });
@@ -759,7 +758,6 @@
 
     function renderProductDetail(match) {
         let detailHtml = '';
-        let typeLabel = '商品';
         if (match.type === 'node') {
             const node = match.node;
             const name = node.name || match.code;
@@ -785,7 +783,6 @@
             const parentName = parentNode?.name || match.parentCode;
             const name = item.name || parentName;
             const status = item.status || '在售';
-            typeLabel = '库存';
             detailHtml += `<div class="detail-item"><strong>库存:</strong> ${name} (${item.code})</div>`;
             detailHtml += `<div class="detail-item"><strong>父级:</strong> ${parentName}</div>`;
             detailHtml += `<div class="detail-item"><strong>状态:</strong> ${statusBadge(status)}</div>`;
@@ -811,7 +808,6 @@
             editBtn.addEventListener('click', function() {
                 const remarkSpan = document.getElementById('remark-text');
                 const currentRemark = (remarkSpan && remarkSpan.textContent !== '无') ? remarkSpan.textContent : '';
-                // 创建编辑UI
                 const editArea = document.createElement('div');
                 editArea.className = 'remark-edit-area active';
                 editArea.innerHTML = `
@@ -844,7 +840,6 @@
                         await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
                         remarkSaveStatus.className = 'save-status success';
                         remarkSaveStatus.innerHTML = '✓ 保存成功';
-                        // 重新渲染详情
                         renderProductDetail(currentProductInfo);
                     } catch (e) {
                         remarkSaveStatus.className = 'save-status error';
@@ -890,7 +885,6 @@
 
     // ---------- 关联确认弹窗（增强） ----------
     function showAssociatePrompt(content, detectedType, rawText) {
-        // 获取当前商品的对象
         let target = null;
         if (currentProductInfo.type === 'node') {
             target = currentProductInfo.node;
@@ -899,7 +893,6 @@
         }
         if (!target) return;
 
-        // 检查是否已存在同类型字段
         let existingField = '';
         let existingValue = '';
         let hasExisting = false;
@@ -924,14 +917,12 @@
                 hasExisting = true;
                 existingField = '链接';
                 existingValue = rawText;
-                isSameValue = true; // 链接相同即为相同值
+                isSameValue = true;
             }
         }
 
-        // 设置类型下拉框
         associateTypeSelect.value = detectedType;
 
-        // 显示内容
         let typeName = '';
         if (detectedType === 'tracking') typeName = '快递单号';
         else if (detectedType === 'order') typeName = '订单号';
@@ -965,11 +956,9 @@
                     </div>
                 `;
                 showWarning = true;
-                // 禁用确认按钮，只显示取消（或改为确定）
-                confirmAssociateBtn.disabled = true;
-                confirmAssociateBtn.textContent = '已绑定';
-                // 取消按钮文字改为“确定”
-                cancelAssociateBtn.textContent = '确定';
+                confirmAssociateBtn.textContent = '确定';
+                cancelAssociateBtn.textContent = '取消';
+                confirmAssociateBtn.disabled = false;
             } else {
                 warningHtml = `
                     <div class="associate-warning">
@@ -978,14 +967,14 @@
                     </div>
                 `;
                 showWarning = true;
-                confirmAssociateBtn.disabled = false;
                 confirmAssociateBtn.textContent = '替换';
                 cancelAssociateBtn.textContent = '取消';
+                confirmAssociateBtn.disabled = false;
             }
         } else {
-            confirmAssociateBtn.disabled = false;
             confirmAssociateBtn.textContent = '确认关联';
             cancelAssociateBtn.textContent = '取消';
+            confirmAssociateBtn.disabled = false;
         }
 
         if (showWarning) {
@@ -1012,21 +1001,20 @@
     confirmAssociateBtn.addEventListener('click', async function() {
         if (!currentAssociateData || !currentProductInfo) return;
 
-        // 如果已存在相同值，则不做任何操作（按钮已禁用）
+        // 如果是相同值，直接关闭弹窗并提示
         if (currentAssociateData.isSameValue) {
+            alert('该信息已关联，无需重复操作。');
             associateOverlay.classList.remove('active');
             // 恢复按钮状态
-            confirmAssociateBtn.disabled = false;
             confirmAssociateBtn.textContent = '确认关联';
             cancelAssociateBtn.textContent = '取消';
+            confirmAssociateBtn.disabled = false;
             return;
         }
 
-        // 获取用户选择的类型
         const selectedType = associateTypeSelect.value;
         const rawText = currentAssociateData.rawText;
 
-        // 构建保存对象
         let targetNode = null;
         let targetItem = null;
         if (currentProductInfo.type === 'node') {
@@ -1035,7 +1023,7 @@
             targetItem = currentProductInfo.item;
         }
 
-        // 根据选择类型更新字段
+        // 更新字段
         if (selectedType === 'tracking') {
             if (targetNode) targetNode.trackingNumber = rawText;
             else if (targetItem) targetItem.trackingNumber = rawText;
@@ -1061,7 +1049,6 @@
             }
         }
 
-        // 保存
         confirmAssociateBtn.disabled = true;
         confirmAssociateBtn.textContent = '保存中...';
         associateSaveStatus.innerHTML = '<span class="spinner"></span> 保存中...';
@@ -1103,18 +1090,13 @@
 
     cancelAssociateBtn.addEventListener('click', function() {
         associateOverlay.classList.remove('active');
-        // 如果是“确定”状态（相同值），直接退出关联模式并返回详情
-        if (currentAssociateData && currentAssociateData.isSameValue) {
-            exitAssociateMode();
-            productDetailOverlay.classList.add('active');
-        } else {
-            exitAssociateMode();
-            productDetailOverlay.classList.add('active');
-        }
+        exitAssociateMode();
+        productDetailOverlay.classList.add('active');
         // 恢复按钮状态
         confirmAssociateBtn.disabled = false;
         confirmAssociateBtn.textContent = '确认关联';
         cancelAssociateBtn.textContent = '取消';
+        associateSaveStatus.innerHTML = '';
     });
 
     closeDetailBtn.addEventListener('click', function() {
@@ -1195,12 +1177,11 @@
         renderHistory();
     });
 
-    // ---------- 处理扫码结果（核心修改） ----------
+    // ---------- 处理扫码结果 ----------
     async function handleScanResult(rawText) {
         const cleaned = cleanText(rawText);
         if (!cleaned) return;
 
-        // 刷新数据
         try {
             const freshData = await getGistContent(currentToken, currentGistId, currentFilename);
             if (freshData && freshData.products) {
@@ -1211,8 +1192,7 @@
         }
 
         if (scanMode === 'associate') {
-            // 关联模式
-            stopScan(); // 先停止扫描，防止重复触发
+            stopScan();
             let type = '';
             if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
                 type = 'link';
@@ -1223,26 +1203,21 @@
                 } else if (/^\d{10,}$/.test(cleaned)) {
                     type = 'order';
                 } else {
-                    // 无法识别类型，弹出提示并重新开始扫描
                     alert('无法识别为关联信息，请重新扫描或退出关联模式。');
                     startScan();
                     return;
                 }
             }
-            // 显示关联确认弹窗（含警告）
             showAssociatePrompt(cleaned, type, cleaned);
         } else {
-            // 普通模式：查找匹配
             const matches = findProductByAny(cleaned);
             if (matches.length > 0) {
                 showProductDetail(matches[0]);
                 stopScan();
             } else {
-                // 未匹配：弹窗提示并停止扫描
                 notFoundContent.textContent = `扫描内容: "${cleaned}"\n无法关联到任何商品或库存项。`;
                 notFoundOverlay.classList.add('active');
                 stopScan();
-                // 记录日志
                 let typeLabel = '未匹配';
                 let detail = `内容: ${cleaned}`;
                 let debug = '未匹配到任何商品';
@@ -1252,10 +1227,8 @@
         }
     }
 
-    // 未找到弹窗确认按钮
     notFoundOk.addEventListener('click', function() {
         notFoundOverlay.classList.remove('active');
-        // 不自动重启扫描，用户可手动点击开始
     });
 
     console.log('智能扫码页面已加载（优化版）');
