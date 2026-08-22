@@ -91,6 +91,7 @@
         .login-box label { display: block; margin-top: 12px; font-weight: 600; }
         .login-box input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; margin-top: 4px; }
         #login-error { color: #ef4444; margin-top: 10px; }
+
         /* 打印状态提示 */
         .lodop-status {
             font-size: 12px;
@@ -103,6 +104,7 @@
         }
         .lodop-status.error { background: #fee2e2; color: #b91c1c; }
         .lodop-status.success { background: #dcfce7; color: #166534; }
+
         /* 打印预览模态框 */
         #print-preview-overlay {
             display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
@@ -110,17 +112,31 @@
         }
         #print-preview-overlay.active { display: flex; }
         .print-preview-box {
-            background: white; border-radius: 16px; padding: 24px; max-width: 500px;
-            width: 90%; max-height: 90vh; overflow-y: auto;
+            background: white; border-radius: 16px; padding: 24px; max-width: 700px;
+            width: 95%; max-height: 90vh; overflow-y: auto;
         }
         .print-info { margin-bottom: 20px; }
         .print-info p { margin: 5px 0; }
         .print-settings label { display: block; margin-top: 12px; font-weight: 600; }
         .print-settings select, .print-settings input { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 4px; }
+
+        /* 模板选择卡片 */
+        .template-select-container {
+            display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px;
+        }
+        .template-card {
+            border: 2px solid #e2e8f0; border-radius: 8px; padding: 8px;
+            cursor: pointer; transition: border-color 0.2s; text-align: center;
+        }
+        .template-card.selected { border-color: #2563eb; }
+        .template-card canvas { display: block; margin: 0 auto; }
+        .template-card .template-name { margin-top: 4px; font-size: 13px; font-weight: 600; }
+
         /* 批量操作 */
         .batch-actions { display: flex; gap: 8px; margin-top: 8px; margin-bottom: 8px; }
         .batch-actions .btn { padding: 4px 10px; font-size: 12px; }
         .item-checkbox { cursor: pointer; }
+
         /* 保存动画 */
         .save-status { display: inline-flex; align-items: center; gap: 8px; margin-left: 10px; }
         .spinner {
@@ -129,6 +145,7 @@
             border-radius: 50%; animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+
         /* 刷新按钮动画 */
         .refresh-icon {
             display: inline-block; width: 16px; height: 16px;
@@ -287,7 +304,7 @@
         <div class="print-info" id="print-info"></div>
         <div class="print-settings">
             <label>标签模板</label>
-            <select id="print-template-select"></select>
+            <div id="template-select-container" class="template-select-container"></div>
             <label>选择打印机</label>
             <select id="printer-select"></select>
             <label>打印份数</label>
@@ -374,7 +391,7 @@
 
 <!-- ========== 主脚本 ========== -->
 <script>
-    // 存储模板定义
+    // 模板定义
     const printTemplates = [
         {
             name: '50*30标签',
@@ -386,7 +403,7 @@
                 { type: 'barcode', field: 'code', x: 3.5, y: 14, width: 43, height: 13, barcodeType: 'PDF417', align: 'center' }
             ]
         }
-        // 以后可以添加更多模板
+        // 以后可增加更多模板
     ];
 
     const STORAGE_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
@@ -395,7 +412,7 @@
     let currentGistId = 'f13d97c430522e4851afbf3cd2331e14';
     let currentFilename = 'data.json';
 
-    // DOM 元素（略去与之前相同的引用，此处保留关键）
+    // DOM 元素
     const loginOverlay = document.getElementById('login-overlay');
     const loginToken = document.getElementById('login-token');
     const loginGistId = document.getElementById('login-gistid');
@@ -448,7 +465,7 @@
 
     const printPreviewOverlay = document.getElementById('print-preview-overlay');
     const printInfoDiv = document.getElementById('print-info');
-    const printTemplateSelect = document.getElementById('print-template-select');
+    const templateSelectContainer = document.getElementById('template-select-container');
     const printerSelect = document.getElementById('printer-select');
     const printCopiesInput = document.getElementById('print-copies');
     const printPreviewCancel = document.getElementById('print-preview-cancel');
@@ -459,6 +476,8 @@
     const batchStatusSelect = document.getElementById('batch-status-select');
     const batchStatusCancel = document.getElementById('batch-status-cancel');
     const batchStatusSave = document.getElementById('batch-status-save');
+
+    let selectedTemplateIndex = 0; // 当前选中的模板索引
 
     // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
@@ -1068,7 +1087,7 @@
         items.forEach(cb => cb.checked = checkbox.checked);
     };
 
-    // 批量打印：打开打印预览弹窗，传递数据数组
+    // 批量打印：收集数据并打开打印弹窗
     window.batchPrintItems = function(parentCode) {
         const selected = getSelectedItems(parentCode);
         if (selected.length === 0) { alert('请先选择要打印的库存项'); return; }
@@ -1147,17 +1166,68 @@
         }
     }
 
-    // 打开打印预览弹窗，dataList 为数组
-    function openPrintPreview(dataList) {
-        // 填充模板选择
-        printTemplateSelect.innerHTML = '';
-        printTemplates.forEach((tpl, idx) => {
-            const opt = document.createElement('option');
-            opt.value = idx;
-            opt.textContent = tpl.name;
-            printTemplateSelect.appendChild(opt);
+    // 绘制模板预览
+    function drawTemplatePreview(canvas, template) {
+        const scale = 4; // 1mm = 4px
+        canvas.width = template.paperWidth * scale;
+        canvas.height = template.paperHeight * scale;
+        const ctx = canvas.getContext('2d');
+
+        // 白色背景
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 边框（可选）
+        ctx.strokeStyle = '#cccccc';
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+        // 遍历元素绘制
+        template.elements.forEach(el => {
+            const x = el.x * scale;
+            const y = el.y * scale;
+            const width = el.width * scale;
+            const height = el.height * scale;
+
+            if (el.type === 'text') {
+                ctx.fillStyle = '#000000';
+                ctx.font = `${el.bold ? 'bold ' : ''}${el.fontSize * scale}px SimHei, sans-serif`;
+                ctx.textAlign = el.align === 'center' ? 'center' : 'left';
+                const text = el.field === 'static' ? (el.text || '') : (el.prefix || '') + '示例编码';
+                ctx.fillText(text, x + (el.align === 'center' ? width / 2 : 0), y + height / 2 + el.fontSize * scale / 3);
+            } else if (el.type === 'barcode') {
+                // 绘制条码占位框
+                ctx.fillStyle = '#e0e0e0';
+                ctx.fillRect(x, y, width, height);
+                ctx.fillStyle = '#333333';
+                ctx.font = `${scale * 4}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText('条码区域', x + width / 2, y + height / 2 + scale * 2);
+            }
         });
-        printTemplateSelect.value = 0; // 默认第一个模板
+    }
+
+    // 打开打印预览弹窗
+    function openPrintPreview(dataList) {
+        // 填充模板选择卡片
+        templateSelectContainer.innerHTML = '';
+        printTemplates.forEach((tpl, idx) => {
+            const card = document.createElement('div');
+            card.className = 'template-card' + (idx === selectedTemplateIndex ? ' selected' : '');
+            card.dataset.index = idx;
+            const canvas = document.createElement('canvas');
+            drawTemplatePreview(canvas, tpl);
+            card.appendChild(canvas);
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'template-name';
+            nameDiv.textContent = tpl.name;
+            card.appendChild(nameDiv);
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedTemplateIndex = idx;
+            });
+            templateSelectContainer.appendChild(card);
+        });
 
         // 显示信息
         if (dataList.length === 1) {
@@ -1179,7 +1249,7 @@
             printerSelect.appendChild(option);
         } else {
             let defaultIndex = 0;
-            const virtualKeywords = ['pdf', 'wps', 'fax', 'virtual', 'one note', 'microsoft print to pdf'];
+            const virtualKeywords = ['pdf', 'wps', 'fax', 'virtual', 'one note', 'onenote', 'microsoft print to pdf', 'print to pdf'];
             for (let i = 0; i < printers.length; i++) {
                 const name = printers[i].toLowerCase();
                 if (!virtualKeywords.some(k => name.includes(k))) {
@@ -1239,7 +1309,6 @@
                     LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
                 }
             });
-            // 如果不是最后一个标签，开始新页
             if (i < dataList.length - 1) {
                 LODOP.NEWPAGE();
             }
@@ -1253,8 +1322,7 @@
         const dataList = window.currentPrintDataList;
         if (!dataList || dataList.length === 0) return;
 
-        const templateIndex = parseInt(printTemplateSelect.value);
-        const template = printTemplates[templateIndex];
+        const template = printTemplates[selectedTemplateIndex];
         const printerIndex = parseInt(printerSelect.value);
         const copies = parseInt(printCopiesInput.value) || 1;
 
@@ -1277,8 +1345,7 @@
         const dataList = window.currentPrintDataList;
         if (!dataList || dataList.length === 0) return;
 
-        const templateIndex = parseInt(printTemplateSelect.value);
-        const template = printTemplates[templateIndex];
+        const template = printTemplates[selectedTemplateIndex];
         const printerIndex = parseInt(printerSelect.value);
 
         buildLodopPrintData(LODOP, dataList, template, printerIndex);
