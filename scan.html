@@ -140,6 +140,16 @@
         .cost-toggle:hover {
             background: #e2e8f0;
         }
+        /* 快递公司标签 */
+        .courier-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-left: 6px;
+            color: #1e293b;
+        }
+        /* 弹窗 */
         #login-overlay {
             display: none;
             position: fixed;
@@ -158,27 +168,11 @@
             width: 90%;
         }
         .login-box h2 { margin-top: 0; }
-        .login-box label {
-            display: block;
-            margin-top: 12px;
-            font-weight: 600;
-        }
-        .login-box input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            margin-top: 4px;
-        }
+        .login-box label { display: block; margin-top: 12px; font-weight: 600; }
+        .login-box input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; margin-top: 4px; }
         #login-error { color: #ef4444; margin-top: 10px; }
-        .status-tip {
-            font-size: 14px;
-            color: #64748b;
-            margin-top: 8px;
-            text-align: center;
-        }
+        .status-tip { font-size: 14px; color: #64748b; margin-top: 8px; text-align: center; }
         .clear-btn { margin-top: 8px; }
-
         /* 商品详情弹窗 */
         .modal-overlay {
             display: none;
@@ -201,13 +195,17 @@
             box-shadow: 0 8px 16px rgba(0,0,0,0.2);
         }
         .modal h3 { margin-top: 0; }
-        .modal .detail-item {
-            margin-bottom: 8px;
-            font-size: 15px;
-        }
-        .modal .btn-group {
-            margin-top: 16px;
-        }
+        .modal .detail-item { margin-bottom: 8px; font-size: 15px; }
+        .modal .btn-group { margin-top: 16px; }
+        /* 快递公司颜色 */
+        .courier-jt { background: #fee2e2; }    /* 浅红 */
+        .courier-jd { background: #fee2e2; }    /* 浅红 */
+        .courier-yd { background: #ffedd5; }    /* 浅橙 */
+        .courier-yz { background: #dcfce7; }    /* 浅绿 */
+        .courier-ems { background: #dbeafe; }   /* 浅蓝 */
+        .courier-zto { background: #dbeafe; }   /* 浅蓝 */
+        .courier-yt { background: #bfdbfe; }    /* 偏深蓝 */
+        .courier-sto { background: #f3d9c6; }   /* 棕色 */
     </style>
 </head>
 <body>
@@ -290,33 +288,48 @@
 
 <script>
     // ============================================================
-    // 快递单号识别库（正则表达式）
+    // 快递单号识别库（正则 + 公司名称 + 颜色类）
     // ============================================================
     const COURIER_RULES = [
-        // 优先匹配特定前缀（如申通7734/7720，韵达434/435）
-        { name: '申通(7734)', regex: /^7734\d{11}$/ },
-        { name: '申通(7720)', regex: /^7720\d{11}$/ },
-        { name: '韵达(434)', regex: /^434\d{12}$/ },
-        { name: '韵达(435)', regex: /^435\d{12}$/ },
-        // 通用规则
-        { name: '极兔', regex: /^JT\d{13}$/i },
-        { name: '顺丰', regex: /^SF\d{13}$/i },
-        { name: '申通', regex: /^77\d{13}$/ },          // 77开头共15位
-        { name: '中通', regex: /^790\d{11}$/ },          // 790开头共14位
-        { name: '圆通', regex: /^YT\d{13}$/i },          // YT开头+13数字
-        { name: '韵达', regex: /^43\d{13}$/ },           // 43开头共15位
-        { name: '邮政', regex: /^9\d{12}$/ },            // 13位数字，9开头
-        { name: 'EMS', regex: /^1\d{12}$/ }              // 13位数字，1开头
+        // 京东优先规则（具体格式）
+        { company: '京东', regex: /^JDX\d{12}$/i },                     // JDX+12位数字
+        { company: '京东', regex: /^JD[A-Z]{2}\d{11}$/i },             // JD+2字母+11数字
+        { company: '京东', regex: /^JD[A-Z]{3}\d{10}$/i },             // JD+3字母+10数字（退货）
+        { company: '京东', regex: /^JD\d{13}$/i },                     // JD+13数字
+        // 其他快递
+        { company: '极兔', regex: /^JT\d{13}$/i },
+        { company: '申通(7734)', regex: /^7734\d{11}$/ },
+        { company: '申通(7720)', regex: /^7720\d{11}$/ },
+        { company: '申通', regex: /^77\d{13}$/ },
+        { company: '韵达(434)', regex: /^434\d{12}$/ },
+        { company: '韵达(435)', regex: /^435\d{12}$/ },
+        { company: '韵达', regex: /^43\d{13}$/ },
+        { company: '中通', regex: /^790\d{11}$/ },
+        { company: '圆通', regex: /^YT\d{13}$/i },
+        { company: '邮政', regex: /^9\d{12}$/ },
+        { company: 'EMS', regex: /^1\d{12}$/ }
     ];
+
+    // 快递公司名称到颜色类的映射
+    const COMPANY_COLOR_MAP = {
+        '极兔': 'courier-jt',
+        '京东': 'courier-jd',
+        '韵达': 'courier-yd',
+        '韵达(434)': 'courier-yd',
+        '韵达(435)': 'courier-yd',
+        '邮政': 'courier-yz',
+        'EMS': 'courier-ems',
+        '中通': 'courier-zto',
+        '圆通': 'courier-yt',
+        '申通': 'courier-sto',
+        '申通(7734)': 'courier-sto',
+        '申通(7720)': 'courier-sto'
+    };
 
     // ============================================================
     // 存储与全局状态
     // ============================================================
-    const STORAGE_KEYS = {
-        TOKEN: 'github_token',
-        GIST_ID: 'gist_id',
-        FILENAME: 'gist_filename'
-    };
+    const STORAGE_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
     let gistData = { products: {} };
     let currentToken = '', currentGistId = '', currentFilename = 'data.json';
 
@@ -338,7 +351,6 @@
     const readerContainer = document.getElementById('reader-container');
     const clearHistoryBtn = document.getElementById('clear-history-btn');
 
-    // 弹窗元素
     const productDetailOverlay = document.getElementById('product-detail-overlay');
     const detailContent = document.getElementById('detail-content');
     const scanAssociateBtn = document.getElementById('scan-associate-btn');
@@ -351,7 +363,7 @@
     let html5QrCode = null;
     let isScanning = false;
     let history = [];
-    let scanMode = 'normal'; // 'normal' 或 'associate'
+    let scanMode = 'normal';
     let currentProductInfo = null;
 
     // ---------- GitHub API ----------
@@ -469,10 +481,17 @@
         const cleaned = cleanText(text);
         for (let rule of COURIER_RULES) {
             if (rule.regex.test(cleaned)) {
-                return { matched: true, name: rule.name, prefix: rule.name };
+                return { matched: true, company: rule.company };
             }
         }
         return { matched: false };
+    }
+
+    function getCourierTagHtml(trackingNumber) {
+        const courier = detectCourier(trackingNumber);
+        if (!courier.matched) return '';
+        const colorClass = COMPANY_COLOR_MAP[courier.company] || '';
+        return `<span class="courier-tag ${colorClass}">${courier.company}</span>`;
     }
 
     function findProductByAny(query) {
@@ -481,13 +500,13 @@
         function traverse(obj, path) {
             for (let key in obj) {
                 const node = obj[key];
-                if (key === query) results.push({ type: 'node', code: key, node: node });
+                if (key === query) results.push({ type: 'node', code: key, node: node, matchField: 'code' });
                 if (node.orderNumber === query) results.push({ type: 'node', code: key, node: node, matchField: 'orderNumber' });
                 if (node.trackingNumber === query) results.push({ type: 'node', code: key, node: node, matchField: 'trackingNumber' });
                 if (node.qrLinks && node.qrLinks.includes(query)) results.push({ type: 'node', code: key, node: node, matchField: 'qrLink' });
                 if (node.items) {
                     node.items.forEach(item => {
-                        if (item.code === query) results.push({ type: 'item', parentCode: key, item: item });
+                        if (item.code === query) results.push({ type: 'item', parentCode: key, item: item, matchField: 'code' });
                         if (item.orderNumber === query) results.push({ type: 'item', parentCode: key, item: item, matchField: 'orderNumber' });
                         if (item.trackingNumber === query) results.push({ type: 'item', parentCode: key, item: item, matchField: 'trackingNumber' });
                         if (item.qrLinks && item.qrLinks.includes(query)) results.push({ type: 'item', parentCode: key, item: item, matchField: 'qrLink' });
@@ -512,7 +531,7 @@
         return null;
     }
 
-    // ---------- 渲染历史 ----------
+    // ---------- 渲染历史（分行显示） ----------
     function renderHistory() {
         if (history.length === 0) {
             resultContent.innerHTML = '<div style="color:#64748b;">暂无记录</div>';
@@ -550,7 +569,7 @@
         }
     });
 
-    // ---------- 商品详情弹窗 ----------
+    // ---------- 商品详情弹窗（含备注、快递公司标签） ----------
     function showProductDetail(match) {
         let detailHtml = '';
         let typeLabel = '商品';
@@ -564,9 +583,12 @@
                 const cost = Number(node.cost).toFixed(2);
                 detailHtml += `<div class="detail-item"><strong>成本:</strong> <span class="cost-display" data-cost="${cost}">***</span><button class="cost-toggle">显示</button></div>`;
             }
-            if (node.trackingNumber) detailHtml += `<div class="detail-item"><strong>快递:</strong> ${node.trackingNumber}</div>`;
+            if (node.trackingNumber) {
+                detailHtml += `<div class="detail-item"><strong>快递:</strong> ${node.trackingNumber} ${getCourierTagHtml(node.trackingNumber)}</div>`;
+            }
             if (node.orderNumber) detailHtml += `<div class="detail-item"><strong>订单:</strong> ${node.orderNumber}</div>`;
             if (node.qrLinks && node.qrLinks.length) detailHtml += `<div class="detail-item"><strong>链接数:</strong> ${node.qrLinks.length}</div>`;
+            if (node.remark) detailHtml += `<div class="detail-item"><strong>备注:</strong> ${node.remark}</div>`;
             if (match.matchField) detailHtml += `<div class="detail-item"><strong>匹配字段:</strong> ${match.matchField}</div>`;
             currentProductInfo = { type: 'node', code: match.code, node: node };
         } else if (match.type === 'item') {
@@ -583,33 +605,52 @@
                 const cost = Number(item.cost).toFixed(2);
                 detailHtml += `<div class="detail-item"><strong>成本:</strong> <span class="cost-display" data-cost="${cost}">***</span><button class="cost-toggle">显示</button></div>`;
             }
-            if (item.trackingNumber) detailHtml += `<div class="detail-item"><strong>快递:</strong> ${item.trackingNumber}</div>`;
+            if (item.trackingNumber) {
+                detailHtml += `<div class="detail-item"><strong>快递:</strong> ${item.trackingNumber} ${getCourierTagHtml(item.trackingNumber)}</div>`;
+            }
             if (item.orderNumber) detailHtml += `<div class="detail-item"><strong>订单:</strong> ${item.orderNumber}</div>`;
             if (item.qrLinks && item.qrLinks.length) detailHtml += `<div class="detail-item"><strong>链接数:</strong> ${item.qrLinks.length}</div>`;
+            if (item.remark) detailHtml += `<div class="detail-item"><strong>备注:</strong> ${item.remark}</div>`;
             if (match.matchField) detailHtml += `<div class="detail-item"><strong>匹配字段:</strong> ${match.matchField}</div>`;
             currentProductInfo = { type: 'item', parentCode: match.parentCode, itemCode: item.code, item: item };
         }
         detailContent.innerHTML = detailHtml;
         productDetailOverlay.classList.add('active');
+        // 存储历史（含HTML）
+        let debug = '';
+        if (match.matchField === 'code') debug = '扫描到编码-精准匹配';
+        else if (match.matchField === 'orderNumber') debug = '扫描到关联订单号';
+        else if (match.matchField === 'trackingNumber') debug = '扫描到关联快递单号';
+        else if (match.matchField === 'qrLink') debug = '扫描到关联链接';
+        else debug = '扫描到商品';
         history.push({
             time: new Date(),
             typeLabel: typeLabel,
-            detail: detailHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
-            debug: '扫描到商品'
+            detail: detailHtml,
+            debug: debug
         });
         renderHistory();
     }
 
-    // ---------- 关联确认弹窗 ----------
+    // ---------- 关联确认弹窗（含快递公司标签） ----------
     function showAssociatePrompt(content, type, rawText) {
         let typeName = '';
         if (type === 'tracking') typeName = '快递单号';
         else if (type === 'order') typeName = '订单号';
         else if (type === 'link') typeName = '链接';
         else typeName = '未知类型';
+        let extraHtml = '';
+        if (type === 'tracking') {
+            const courier = detectCourier(rawText);
+            if (courier.matched) {
+                const colorClass = COMPANY_COLOR_MAP[courier.company] || '';
+                extraHtml = `<p>快递公司: <span class="courier-tag ${colorClass}">${courier.company}</span></p>`;
+            }
+        }
         associateContent.innerHTML = `
             <p>识别到 ${typeName}:</p>
             <p><strong>${rawText}</strong></p>
+            ${extraHtml}
             <p>是否关联到当前商品？</p>
         `;
         associateOverlay.classList.add('active');
@@ -645,17 +686,24 @@
                 showProductDetail(matches[0]);
                 stopScan();
             } else {
+                // 未匹配到商品，生成未匹配记录
                 let typeLabel = '未匹配';
-                let detail = `编码: ${cleaned}`;
+                let detail = '';
                 if (cleaned.startsWith('http')) {
                     typeLabel = '链接';
-                    detail = `链接: ${cleaned}`;
-                } else if (detectCourier(cleaned).matched) {
-                    typeLabel = '快递单号';
-                    detail = `快递单号: ${cleaned}`;
-                } else if (/^\d{10,}$/.test(cleaned)) {
-                    typeLabel = '订单号';
-                    detail = `订单号: ${cleaned}`;
+                    detail = `<div><strong>链接:</strong> ${cleaned}</div>`;
+                } else {
+                    const courier = detectCourier(cleaned);
+                    if (courier.matched) {
+                        typeLabel = '快递单号';
+                        detail = `<div><strong>快递单号:</strong> ${cleaned} ${getCourierTagHtml(cleaned)}</div>`;
+                    } else if (/^\d{10,}$/.test(cleaned)) {
+                        typeLabel = '订单号';
+                        detail = `<div><strong>订单号:</strong> ${cleaned}</div>`;
+                    } else {
+                        typeLabel = '编码';
+                        detail = `<div><strong>编码:</strong> ${cleaned}</div>`;
+                    }
                 }
                 history.push({ time: new Date(), typeLabel, detail, debug: '未关联到商品' });
                 renderHistory();
@@ -797,7 +845,7 @@
         renderHistory();
     });
 
-    console.log('智能扫码页面已加载（快递规则优化版）');
+    console.log('智能扫码页面已加载（完整优化版）');
 </script>
 </body>
 </html>
