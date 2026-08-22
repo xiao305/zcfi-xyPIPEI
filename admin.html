@@ -477,7 +477,7 @@
     const batchStatusCancel = document.getElementById('batch-status-cancel');
     const batchStatusSave = document.getElementById('batch-status-save');
 
-    let selectedTemplateIndex = 0; // 当前选中的模板索引
+    let selectedTemplateIndex = 0;
 
     // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
@@ -1087,7 +1087,6 @@
         items.forEach(cb => cb.checked = checkbox.checked);
     };
 
-    // 批量打印：收集数据并打开打印弹窗
     window.batchPrintItems = function(parentCode) {
         const selected = getSelectedItems(parentCode);
         if (selected.length === 0) { alert('请先选择要打印的库存项'); return; }
@@ -1107,7 +1106,6 @@
         openPrintPreview(dataList);
     };
 
-    // 批量修改状态
     window.openBatchStatus = function(parentCode) {
         const selected = getSelectedItems(parentCode);
         if (selected.length === 0) { alert('请先选择要修改的库存项'); return; }
@@ -1166,7 +1164,6 @@
         }
     }
 
-    // 绘制模板预览
     function drawTemplatePreview(canvas, template) {
         const scale = 4; // 1mm = 4px
         canvas.width = template.paperWidth * scale;
@@ -1177,11 +1174,10 @@
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 边框（可选）
+        // 边框
         ctx.strokeStyle = '#cccccc';
         ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-        // 遍历元素绘制
         template.elements.forEach(el => {
             const x = el.x * scale;
             const y = el.y * scale;
@@ -1190,25 +1186,28 @@
 
             if (el.type === 'text') {
                 ctx.fillStyle = '#000000';
-                ctx.font = `${el.bold ? 'bold ' : ''}${el.fontSize * scale}px SimHei, sans-serif`;
+                // 修正字号：fontSize 为 pt，1pt ≈ 0.3528mm，再乘以缩放比例
+                const fontSizePx = el.fontSize * 0.3528 * scale;
+                ctx.font = `${el.bold ? 'bold ' : ''}${fontSizePx}px SimHei, sans-serif`;
                 ctx.textAlign = el.align === 'center' ? 'center' : 'left';
+                ctx.textBaseline = 'middle';
                 const text = el.field === 'static' ? (el.text || '') : (el.prefix || '') + '示例编码';
-                ctx.fillText(text, x + (el.align === 'center' ? width / 2 : 0), y + height / 2 + el.fontSize * scale / 3);
+                const textX = el.align === 'center' ? x + width / 2 : x;
+                const textY = y + height / 2;
+                ctx.fillText(text, textX, textY);
             } else if (el.type === 'barcode') {
-                // 绘制条码占位框
                 ctx.fillStyle = '#e0e0e0';
                 ctx.fillRect(x, y, width, height);
                 ctx.fillStyle = '#333333';
                 ctx.font = `${scale * 4}px sans-serif`;
                 ctx.textAlign = 'center';
-                ctx.fillText('条码区域', x + width / 2, y + height / 2 + scale * 2);
+                ctx.textBaseline = 'middle';
+                ctx.fillText('条码区域', x + width / 2, y + height / 2);
             }
         });
     }
 
-    // 打开打印预览弹窗
     function openPrintPreview(dataList) {
-        // 填充模板选择卡片
         templateSelectContainer.innerHTML = '';
         printTemplates.forEach((tpl, idx) => {
             const card = document.createElement('div');
@@ -1229,7 +1228,6 @@
             templateSelectContainer.appendChild(card);
         });
 
-        // 显示信息
         if (dataList.length === 1) {
             const d = dataList[0];
             printInfoDiv.innerHTML = `<p><strong>编码：</strong>${d.code || ''}</p><p><strong>名称：</strong>${d.name || ''}</p>`;
@@ -1239,7 +1237,6 @@
 
         printPreviewOverlay.classList.add('active');
 
-        // 填充打印机列表
         const printers = getPrinterList();
         printerSelect.innerHTML = '';
         if (printers.length === 0) {
@@ -1270,7 +1267,6 @@
         window.currentPrintDataList = dataList;
     }
 
-    // 构建打印数据（支持多标签）
     function buildLodopPrintData(LODOP, dataList, template, printerIndex) {
         LODOP.PRINT_INIT(template.name || '标签打印');
         LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
@@ -1352,7 +1348,6 @@
         LODOP.PREVIEW();
     }
 
-    // 单标签打印
     window.printNodeLabel = function(code) {
         const node = findNodeByCode(code);
         if (!node) { alert('节点不存在'); return; }
@@ -1383,7 +1378,6 @@
         openPrintPreview([data]);
     };
 
-    // 打印弹窗事件
     printPreviewCancel.addEventListener('click', () => printPreviewOverlay.classList.remove('active'));
     printPreviewBtn.addEventListener('click', showLodopPreview);
     printExecute.addEventListener('click', executePrint);
