@@ -178,6 +178,36 @@
             text-align: center;
         }
         .clear-btn { margin-top: 8px; }
+
+        /* 商品详情弹窗 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 400px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        .modal h3 { margin-top: 0; }
+        .modal .detail-item {
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        .modal .btn-group {
+            margin-top: 16px;
+        }
     </style>
 </head>
 <body>
@@ -234,27 +264,47 @@
     </div>
 </div>
 
+<!-- 商品详情弹窗 -->
+<div id="product-detail-overlay" class="modal-overlay">
+    <div class="modal">
+        <h3 id="detail-title">商品详情</h3>
+        <div id="detail-content"></div>
+        <div class="btn-group">
+            <button class="btn btn-primary" id="scan-associate-btn">扫描关联信息</button>
+            <button class="btn btn-secondary" id="close-detail-btn">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 关联确认弹窗 -->
+<div id="associate-overlay" class="modal-overlay">
+    <div class="modal">
+        <h3>关联确认</h3>
+        <div id="associate-content"></div>
+        <div class="btn-group">
+            <button class="btn btn-success" id="confirm-associate-btn">确认关联</button>
+            <button class="btn btn-secondary" id="cancel-associate-btn">取消</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // ============================================================
     // 可配置的快递单号规则（前缀 + 长度范围）
     // ============================================================
     const COURIER_RULES = [
-        { prefix: 'SF', minLen: 12, maxLen: 12 },   // 顺丰
-        { prefix: 'YT', minLen: 10, maxLen: 13 },   // 圆通
-        { prefix: 'YTO', minLen: 10, maxLen: 13 },  // 圆通
-        { prefix: 'ZTO', minLen: 10, maxLen: 13 },  // 中通
-        { prefix: 'STO', minLen: 10, maxLen: 13 },  // 申通
-        { prefix: 'HT', minLen: 10, maxLen: 13 },   // 汇通
-        { prefix: 'JD', minLen: 10, maxLen: 15 },   // 京东
-        { prefix: 'EMS', minLen: 13, maxLen: 13 },  // EMS
-        { prefix: 'UB', minLen: 10, maxLen: 12 },   // 优速
-        { prefix: 'DB', minLen: 10, maxLen: 12 },   // 德邦
-        // 可继续添加更多规则
+        { prefix: 'SF', minLen: 12, maxLen: 12 },
+        { prefix: 'YT', minLen: 10, maxLen: 13 },
+        { prefix: 'YTO', minLen: 10, maxLen: 13 },
+        { prefix: 'ZTO', minLen: 10, maxLen: 13 },
+        { prefix: 'STO', minLen: 10, maxLen: 13 },
+        { prefix: 'HT', minLen: 10, maxLen: 13 },
+        { prefix: 'JD', minLen: 10, maxLen: 15 },
+        { prefix: 'EMS', minLen: 13, maxLen: 13 },
+        { prefix: 'UB', minLen: 10, maxLen: 12 },
+        { prefix: 'DB', minLen: 10, maxLen: 12 },
     ];
 
-    // ============================================================
-    // 存储与全局状态
-    // ============================================================
     const STORAGE_KEYS = {
         TOKEN: 'github_token',
         GIST_ID: 'gist_id',
@@ -281,18 +331,27 @@
     const readerContainer = document.getElementById('reader-container');
     const clearHistoryBtn = document.getElementById('clear-history-btn');
 
+    // 弹窗元素
+    const productDetailOverlay = document.getElementById('product-detail-overlay');
+    const detailContent = document.getElementById('detail-content');
+    const scanAssociateBtn = document.getElementById('scan-associate-btn');
+    const closeDetailBtn = document.getElementById('close-detail-btn');
+    const associateOverlay = document.getElementById('associate-overlay');
+    const associateContent = document.getElementById('associate-content');
+    const confirmAssociateBtn = document.getElementById('confirm-associate-btn');
+    const cancelAssociateBtn = document.getElementById('cancel-associate-btn');
+
     let html5QrCode = null;
     let isScanning = false;
     let history = [];
+    let scanMode = 'normal'; // 'normal' 或 'associate'
+    let currentProductInfo = null; // 当前弹窗显示的商品信息
 
     // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
         const url = `https://api.github.com/gists/${gistId}`;
         const resp = await fetch(url, {
-            headers: {
-                'Authorization': `token ${token}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
+            headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
         });
         if (!resp.ok) {
             const err = await resp.json();
@@ -301,8 +360,23 @@
         const data = await resp.json();
         const files = data.files;
         if (!files || !files[filename]) return {};
-        try { return JSON.parse(files[filename].content); }
-        catch { return {}; }
+        try { return JSON.parse(files[filename].content); } catch { return {}; }
+    }
+
+    async function updateGistContent(token, gistId, filename, content) {
+        const contentStr = JSON.stringify(content, null, 2);
+        const url = `https://api.github.com/gists/${gistId}`;
+        const payload = { files: { [filename]: { content: contentStr } } };
+        const resp = await fetch(url, {
+            method: 'PATCH',
+            headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(`更新失败: ${err.message || resp.statusText}`);
+        }
+        return await resp.json();
     }
 
     // ---------- 登录/登出 ----------
@@ -351,6 +425,10 @@
         stopScan();
         history = [];
         renderHistory();
+        productDetailOverlay.classList.remove('active');
+        associateOverlay.classList.remove('active');
+        scanMode = 'normal';
+        currentProductInfo = null;
     }
 
     loginBtn.addEventListener('click', performLogin);
@@ -374,13 +452,12 @@
         }
     })();
 
-    // ---------- 工具函数：清洗文本 ----------
+    // ---------- 工具函数 ----------
     function cleanText(text) {
         if (typeof text !== 'string') return '';
         return text.replace(/^[\s\r\n\t]+|[\s\r\n\t]+$/g, '');
     }
 
-    // ---------- 快递单号识别 ----------
     function detectCourier(text) {
         const upper = text.toUpperCase();
         for (let rule of COURIER_RULES) {
@@ -395,193 +472,31 @@
         return { matched: false };
     }
 
-    // ---------- 查找商品（支持编码、订单号、快递单号、链接） ----------
     function findProductByAny(query) {
         const products = gistData.products || {};
         let results = [];
-
         function traverse(obj, path) {
             for (let key in obj) {
                 const node = obj[key];
-                if (key === query) {
-                    results.push({ type: 'node', code: key, node: node, path: path + '/' + key });
-                }
-                if (node.orderNumber === query) {
-                    results.push({ type: 'node', code: key, node: node, path: path + '/' + key, matchField: 'orderNumber' });
-                }
-                if (node.trackingNumber === query) {
-                    results.push({ type: 'node', code: key, node: node, path: path + '/' + key, matchField: 'trackingNumber' });
-                }
-                if (node.qrLinks && node.qrLinks.includes(query)) {
-                    results.push({ type: 'node', code: key, node: node, path: path + '/' + key, matchField: 'qrLink' });
-                }
-
+                if (key === query) results.push({ type: 'node', code: key, node: node });
+                if (node.orderNumber === query) results.push({ type: 'node', code: key, node: node, matchField: 'orderNumber' });
+                if (node.trackingNumber === query) results.push({ type: 'node', code: key, node: node, matchField: 'trackingNumber' });
+                if (node.qrLinks && node.qrLinks.includes(query)) results.push({ type: 'node', code: key, node: node, matchField: 'qrLink' });
                 if (node.items) {
                     node.items.forEach(item => {
-                        if (item.code === query) {
-                            results.push({ type: 'item', parentCode: key, item: item });
-                        }
-                        if (item.orderNumber === query) {
-                            results.push({ type: 'item', parentCode: key, item: item, matchField: 'orderNumber' });
-                        }
-                        if (item.trackingNumber === query) {
-                            results.push({ type: 'item', parentCode: key, item: item, matchField: 'trackingNumber' });
-                        }
-                        if (item.qrLinks && item.qrLinks.includes(query)) {
-                            results.push({ type: 'item', parentCode: key, item: item, matchField: 'qrLink' });
-                        }
+                        if (item.code === query) results.push({ type: 'item', parentCode: key, item: item });
+                        if (item.orderNumber === query) results.push({ type: 'item', parentCode: key, item: item, matchField: 'orderNumber' });
+                        if (item.trackingNumber === query) results.push({ type: 'item', parentCode: key, item: item, matchField: 'trackingNumber' });
+                        if (item.qrLinks && item.qrLinks.includes(query)) results.push({ type: 'item', parentCode: key, item: item, matchField: 'qrLink' });
                     });
                 }
-
-                if (node.children) {
-                    traverse(node.children, path + '/' + key);
-                }
+                if (node.children) traverse(node.children, path + '/' + key);
             }
         }
-
         traverse(products, '');
         return results;
     }
 
-    // ---------- 渲染历史（支持 HTML） ----------
-    function renderHistory() {
-        if (history.length === 0) {
-            resultContent.innerHTML = '<div style="color:#64748b;">暂无记录</div>';
-            resultArea.className = 'result-area';
-            return;
-        }
-        let html = '';
-        history.forEach((item) => {
-            const time = item.time.toLocaleTimeString();
-            const typeLabel = item.typeLabel || '未知';
-            html += `<div class="result-item">
-                <div>
-                    <span class="timestamp">${time}</span>
-                    <span class="type-badge">${typeLabel}</span>
-                </div>
-                <div class="content">${item.detail || item.content}</div>
-                ${item.debug ? `<div class="debug-info">${item.debug}</div>` : ''}
-            </div>`;
-        });
-        resultContent.innerHTML = html;
-        resultArea.className = 'result-area found';
-        resultArea.scrollTop = resultArea.scrollHeight;
-    }
-
-    // ---------- 成本隐藏切换函数（事件委托） ----------
-    document.addEventListener('click', function(e) {
-        if (e.target && e.target.classList.contains('cost-toggle')) {
-            const button = e.target;
-            const costSpan = button.previousElementSibling;
-            if (costSpan && costSpan.classList.contains('cost-display')) {
-                const actual = costSpan.dataset.cost;
-                if (costSpan.textContent === '***') {
-                    costSpan.textContent = actual;
-                    button.textContent = '隐藏';
-                } else {
-                    costSpan.textContent = '***';
-                    button.textContent = '显示';
-                }
-            }
-        }
-    });
-
-    // ---------- 核心：处理查询 ----------
-    function handleScanResult(rawText) {
-        const cleaned = cleanText(rawText);
-        if (!cleaned) {
-            alert('无效内容（为空或仅含空白字符）');
-            return;
-        }
-
-        let typeLabel = '编码';
-        let detailHtml = '';
-        let debugInfo = '';
-
-        const exactMatches = findProductByAny(cleaned);
-        let matched = false;
-
-        if (exactMatches.length > 0) {
-            const match = exactMatches[0];
-            matched = true;
-            if (match.type === 'node') {
-                const node = match.node;
-                const name = node.name || match.code;
-                const status = node.status || '在售';
-                typeLabel = '商品';
-                let parts = [];
-                parts.push(`<div>商品: ${name} (${match.code})</div>`);
-                parts.push(`<div>状态: ${status}</div>`);
-                if (node.cost !== undefined) {
-                    const cost = Number(node.cost).toFixed(2);
-                    parts.push(`<div>成本: <span class="cost-display" data-cost="${cost}">***</span><button class="cost-toggle">显示</button></div>`);
-                }
-                if (node.trackingNumber) parts.push(`<div>快递: ${node.trackingNumber}</div>`);
-                if (node.orderNumber) parts.push(`<div>订单: ${node.orderNumber}</div>`);
-                if (node.qrLinks && node.qrLinks.length) parts.push(`<div>链接数: ${node.qrLinks.length}</div>`);
-                if (match.matchField) parts.push(`<div>匹配字段: ${match.matchField}</div>`);
-                detailHtml = parts.join('');
-                debugInfo = '匹配类型: 精确匹配';
-            } else if (match.type === 'item') {
-                const item = match.item;
-                const parentNode = findNodeByCode(match.parentCode);
-                const parentName = parentNode?.name || match.parentCode;
-                const name = item.name || parentName;
-                const status = item.status || '在售';
-                typeLabel = '库存';
-                let parts = [];
-                parts.push(`<div>库存: ${name} (${item.code})</div>`);
-                parts.push(`<div>父级: ${parentName}</div>`);
-                parts.push(`<div>状态: ${status}</div>`);
-                if (item.cost !== undefined) {
-                    const cost = Number(item.cost).toFixed(2);
-                    parts.push(`<div>成本: <span class="cost-display" data-cost="${cost}">***</span><button class="cost-toggle">显示</button></div>`);
-                }
-                if (item.trackingNumber) parts.push(`<div>快递: ${item.trackingNumber}</div>`);
-                if (item.orderNumber) parts.push(`<div>订单: ${item.orderNumber}</div>`);
-                if (item.qrLinks && item.qrLinks.length) parts.push(`<div>链接数: ${item.qrLinks.length}</div>`);
-                if (match.matchField) parts.push(`<div>匹配字段: ${match.matchField}</div>`);
-                detailHtml = parts.join('');
-                debugInfo = '匹配类型: 精确匹配';
-            }
-        } else {
-            // 未匹配，处理其他类型
-            if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
-                typeLabel = '链接';
-                detailHtml = `<div>链接: ${cleaned}</div>`;
-                debugInfo = '未关联到任何商品';
-            } else {
-                const courier = detectCourier(cleaned);
-                if (courier.matched) {
-                    typeLabel = '快递单号';
-                    detailHtml = `<div>快递单号: ${cleaned} (${courier.prefix})</div>`;
-                    debugInfo = '未关联到任何商品';
-                } else {
-                    if (/^\d{10,}$/.test(cleaned)) {
-                        typeLabel = '订单号';
-                        detailHtml = `<div>订单号: ${cleaned}</div>`;
-                        debugInfo = '未关联到任何商品';
-                    } else {
-                        typeLabel = '编码';
-                        detailHtml = `<div>编码: ${cleaned}</div>`;
-                        debugInfo = '未找到关联商品';
-                    }
-                }
-            }
-        }
-
-        history.push({
-            time: new Date(),
-            typeLabel: typeLabel,
-            content: cleaned,
-            detail: detailHtml,
-            debug: debugInfo
-        });
-        renderHistory();
-        stopScan();
-    }
-
-    // 辅助：查找节点
     function findNodeByCode(code, obj) {
         if (!obj) obj = gistData.products;
         if (obj[code]) return obj[code];
@@ -594,6 +509,239 @@
         return null;
     }
 
+    // ---------- 渲染历史 ----------
+    function renderHistory() {
+        if (history.length === 0) {
+            resultContent.innerHTML = '<div style="color:#64748b;">暂无记录</div>';
+            resultArea.className = 'result-area';
+            return;
+        }
+        let html = '';
+        history.forEach((item) => {
+            const time = item.time.toLocaleTimeString();
+            html += `<div class="result-item">
+                <div><span class="timestamp">${time}</span> <span class="type-badge">${item.typeLabel}</span></div>
+                <div class="content">${item.detail}</div>
+                ${item.debug ? `<div class="debug-info">${item.debug}</div>` : ''}
+            </div>`;
+        });
+        resultContent.innerHTML = html;
+        resultArea.className = 'result-area found';
+        resultArea.scrollTop = resultArea.scrollHeight;
+    }
+
+    // ---------- 成本切换（事件委托） ----------
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('cost-toggle')) {
+            const button = e.target;
+            const costSpan = button.previousElementSibling;
+            if (costSpan && costSpan.classList.contains('cost-display')) {
+                if (costSpan.textContent === '***') {
+                    costSpan.textContent = costSpan.dataset.cost;
+                    button.textContent = '隐藏';
+                } else {
+                    costSpan.textContent = '***';
+                    button.textContent = '显示';
+                }
+            }
+        }
+    });
+
+    // ---------- 商品详情弹窗 ----------
+    function showProductDetail(match) {
+        let detailHtml = '';
+        let typeLabel = '商品';
+        if (match.type === 'node') {
+            const node = match.node;
+            const name = node.name || match.code;
+            const status = node.status || '在售';
+            detailHtml += `<div class="detail-item"><strong>商品:</strong> ${name} (${match.code})</div>`;
+            detailHtml += `<div class="detail-item"><strong>状态:</strong> ${status}</div>`;
+            if (node.cost !== undefined) {
+                const cost = Number(node.cost).toFixed(2);
+                detailHtml += `<div class="detail-item"><strong>成本:</strong> <span class="cost-display" data-cost="${cost}">***</span><button class="cost-toggle">显示</button></div>`;
+            }
+            if (node.trackingNumber) detailHtml += `<div class="detail-item"><strong>快递:</strong> ${node.trackingNumber}</div>`;
+            if (node.orderNumber) detailHtml += `<div class="detail-item"><strong>订单:</strong> ${node.orderNumber}</div>`;
+            if (node.qrLinks && node.qrLinks.length) detailHtml += `<div class="detail-item"><strong>链接数:</strong> ${node.qrLinks.length}</div>`;
+            if (match.matchField) detailHtml += `<div class="detail-item"><strong>匹配字段:</strong> ${match.matchField}</div>`;
+            currentProductInfo = { type: 'node', code: match.code, node: node };
+        } else if (match.type === 'item') {
+            const item = match.item;
+            const parentNode = findNodeByCode(match.parentCode);
+            const parentName = parentNode?.name || match.parentCode;
+            const name = item.name || parentName;
+            const status = item.status || '在售';
+            typeLabel = '库存';
+            detailHtml += `<div class="detail-item"><strong>库存:</strong> ${name} (${item.code})</div>`;
+            detailHtml += `<div class="detail-item"><strong>父级:</strong> ${parentName}</div>`;
+            detailHtml += `<div class="detail-item"><strong>状态:</strong> ${status}</div>`;
+            if (item.cost !== undefined) {
+                const cost = Number(item.cost).toFixed(2);
+                detailHtml += `<div class="detail-item"><strong>成本:</strong> <span class="cost-display" data-cost="${cost}">***</span><button class="cost-toggle">显示</button></div>`;
+            }
+            if (item.trackingNumber) detailHtml += `<div class="detail-item"><strong>快递:</strong> ${item.trackingNumber}</div>`;
+            if (item.orderNumber) detailHtml += `<div class="detail-item"><strong>订单:</strong> ${item.orderNumber}</div>`;
+            if (item.qrLinks && item.qrLinks.length) detailHtml += `<div class="detail-item"><strong>链接数:</strong> ${item.qrLinks.length}</div>`;
+            if (match.matchField) detailHtml += `<div class="detail-item"><strong>匹配字段:</strong> ${match.matchField}</div>`;
+            currentProductInfo = { type: 'item', parentCode: match.parentCode, itemCode: item.code, item: item };
+        }
+        detailContent.innerHTML = detailHtml;
+        productDetailOverlay.classList.add('active');
+        // 记录历史
+        history.push({
+            time: new Date(),
+            typeLabel: typeLabel,
+            detail: detailHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+            debug: '扫描到商品'
+        });
+        renderHistory();
+    }
+
+    // ---------- 关联确认弹窗 ----------
+    function showAssociatePrompt(content, type, rawText) {
+        let typeName = '';
+        if (type === 'tracking') typeName = '快递单号';
+        else if (type === 'order') typeName = '订单号';
+        else if (type === 'link') typeName = '链接';
+        else typeName = '未知类型';
+        associateContent.innerHTML = `
+            <p>识别到 ${typeName}:</p>
+            <p><strong>${rawText}</strong></p>
+            <p>是否关联到当前商品？</p>
+        `;
+        associateOverlay.classList.add('active');
+        // 临时保存关联数据
+        window.associateData = { content, type, rawText };
+    }
+
+    // ---------- 处理扫描结果 ----------
+    function handleScanResult(rawText) {
+        const cleaned = cleanText(rawText);
+        if (!cleaned) return;
+
+        if (scanMode === 'associate') {
+            // 关联扫描模式：识别类型
+            stopScan(); // 停止摄像头
+            let type = '';
+            if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+                type = 'link';
+            } else {
+                const courier = detectCourier(cleaned);
+                if (courier.matched) {
+                    type = 'tracking';
+                } else if (/^\d{10,}$/.test(cleaned)) {
+                    type = 'order';
+                } else {
+                    // 无法识别类型，提示
+                    alert('无法识别的类型，请重新扫描');
+                    startAssociateScan();
+                    return;
+                }
+            }
+            showAssociatePrompt(cleaned, type, cleaned);
+        } else {
+            // 普通扫描模式：查找商品
+            const matches = findProductByAny(cleaned);
+            if (matches.length > 0) {
+                showProductDetail(matches[0]);
+                stopScan();
+            } else {
+                // 未找到，加入历史并提示
+                let typeLabel = '未匹配';
+                let detail = `编码: ${cleaned}`;
+                if (cleaned.startsWith('http')) {
+                    typeLabel = '链接';
+                    detail = `链接: ${cleaned}`;
+                } else if (detectCourier(cleaned).matched) {
+                    typeLabel = '快递单号';
+                    detail = `快递单号: ${cleaned}`;
+                } else if (/^\d{10,}$/.test(cleaned)) {
+                    typeLabel = '订单号';
+                    detail = `订单号: ${cleaned}`;
+                }
+                history.push({ time: new Date(), typeLabel, detail, debug: '未关联到商品' });
+                renderHistory();
+                stopScan();
+            }
+        }
+    }
+
+    // ---------- 关联扫描 ----------
+    function startAssociateScan() {
+        scanMode = 'associate';
+        productDetailOverlay.classList.remove('active');
+        startScan();
+    }
+
+    // ---------- 确认关联 ----------
+    confirmAssociateBtn.addEventListener('click', async function() {
+        const data = window.associateData;
+        if (!data || !currentProductInfo) return;
+
+        // 更新数据
+        if (currentProductInfo.type === 'node') {
+            const node = currentProductInfo.node;
+            if (data.type === 'tracking') {
+                node.trackingNumber = data.content;
+            } else if (data.type === 'order') {
+                node.orderNumber = data.content;
+            } else if (data.type === 'link') {
+                if (!node.qrLinks) node.qrLinks = [];
+                if (!node.qrLinks.includes(data.content)) node.qrLinks.push(data.content);
+            }
+        } else if (currentProductInfo.type === 'item') {
+            const item = currentProductInfo.item;
+            if (data.type === 'tracking') {
+                item.trackingNumber = data.content;
+            } else if (data.type === 'order') {
+                item.orderNumber = data.content;
+            } else if (data.type === 'link') {
+                if (!item.qrLinks) item.qrLinks = [];
+                if (!item.qrLinks.includes(data.content)) item.qrLinks.push(data.content);
+            }
+        }
+
+        // 保存到 Gist
+        try {
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+            alert('关联成功');
+            // 重新显示商品详情（更新数据）
+            let match;
+            if (currentProductInfo.type === 'node') {
+                match = { type: 'node', code: currentProductInfo.code, node: currentProductInfo.node };
+            } else {
+                match = { type: 'item', parentCode: currentProductInfo.parentCode, itemCode: currentProductInfo.itemCode, item: currentProductInfo.item };
+            }
+            showProductDetail(match);
+            associateOverlay.classList.remove('active');
+            scanMode = 'normal';
+        } catch (e) {
+            alert('保存失败: ' + e.message);
+        }
+    });
+
+    // 取消关联
+    cancelAssociateBtn.addEventListener('click', function() {
+        associateOverlay.classList.remove('active');
+        // 返回商品详情弹窗
+        productDetailOverlay.classList.add('active');
+        scanMode = 'normal';
+        // 重新开启关联扫描？用户可能想继续扫描关联，但我们返回详情弹窗让用户选择
+    });
+
+    // 扫描关联信息按钮
+    scanAssociateBtn.addEventListener('click', function() {
+        startAssociateScan();
+    });
+
+    // 关闭详情弹窗
+    closeDetailBtn.addEventListener('click', function() {
+        productDetailOverlay.classList.remove('active');
+        scanMode = 'normal';
+        currentProductInfo = null;
+    });
+
     // ---------- 扫码功能 ----------
     function onScanSuccess(decodedText) {
         handleScanResult(decodedText);
@@ -604,10 +752,7 @@
         if (isScanning) return;
         if (html5QrCode) { html5QrCode.clear(); html5QrCode = null; }
         html5QrCode = new Html5Qrcode("reader-container");
-        const config = {
-            fps: 15,
-            qrbox: { width: 250, height: 250 }
-        };
+        const config = { fps: 15, qrbox: { width: 250, height: 250 } };
         html5QrCode.start(
             { facingMode: "environment" },
             config,
@@ -652,19 +797,13 @@
     // ---------- 手动查询 ----------
     function manualQuery() {
         const raw = manualInput.value;
-        if (!raw || raw.trim() === '') {
-            alert('请输入内容');
-            return;
-        }
+        if (!raw || raw.trim() === '') return;
         handleScanResult(raw);
         manualInput.value = '';
     }
-
     manualBtn.addEventListener('click', manualQuery);
     manualInput.addEventListener('keyup', function(e) {
-        if (e.key === 'Enter') {
-            manualQuery();
-        }
+        if (e.key === 'Enter') manualQuery();
     });
 
     // ---------- 清空历史 ----------
@@ -673,7 +812,7 @@
         renderHistory();
     });
 
-    console.log('智能扫码页面已加载（修复版）');
+    console.log('智能扫码页面已加载（关联扫描版）');
 </script>
 </body>
 </html>
