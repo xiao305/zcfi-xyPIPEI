@@ -124,9 +124,7 @@
             padding-top: 4px;
         }
         /* 成本隐藏相关 */
-        .cost-display {
-            font-weight: 600;
-        }
+        .cost-display { font-weight: 600; }
         .cost-toggle {
             background: none;
             border: 1px solid #94a3b8;
@@ -137,9 +135,7 @@
             margin-left: 4px;
             color: #475569;
         }
-        .cost-toggle:hover {
-            background: #e2e8f0;
-        }
+        .cost-toggle:hover { background: #e2e8f0; }
         /* 快递公司标签 */
         .courier-tag {
             display: inline-block;
@@ -149,7 +145,65 @@
             margin-left: 6px;
             color: #1e293b;
         }
-        /* 弹窗 */
+        .courier-jt { background: #fee2e2; }    /* 浅红 */
+        .courier-jd { background: #fee2e2; }    /* 浅红 */
+        .courier-yd { background: #ffedd5; }    /* 浅橙 */
+        .courier-yz { background: #dcfce7; }    /* 浅绿 */
+        .courier-ems { background: #dbeafe; }   /* 浅蓝 */
+        .courier-zto { background: #dbeafe; }   /* 浅蓝 */
+        .courier-yt { background: #bfdbfe; }    /* 偏深蓝 */
+        .courier-sto { background: #f3d9c6; }   /* 棕色 */
+        .courier-sf { background: #e5e7eb; color: #1e293b; } /* 顺丰浅灰 */
+        /* 关联模式提示条 */
+        #associate-mode-bar {
+            display: none;
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-top: 12px;
+            font-size: 14px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #associate-mode-bar .exit-associate-btn {
+            background: none;
+            border: 1px solid #b45309;
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #b45309;
+            background: #fff7ed;
+        }
+        /* 备注编辑 */
+        .remark-edit-btn {
+            background: none;
+            border: 1px solid #94a3b8;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 6px;
+            color: #475569;
+        }
+        .remark-edit-btn:hover { background: #e2e8f0; }
+        .remark-edit-area {
+            display: none;
+            margin-top: 6px;
+        }
+        .remark-edit-area.active { display: block; }
+        .remark-edit-area input {
+            width: calc(100% - 100px);
+            padding: 6px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .remark-edit-area .btn-group {
+            margin-top: 6px;
+        }
+        /* 登录遮罩 */
         #login-overlay {
             display: none;
             position: fixed;
@@ -197,15 +251,6 @@
         .modal h3 { margin-top: 0; }
         .modal .detail-item { margin-bottom: 8px; font-size: 15px; }
         .modal .btn-group { margin-top: 16px; }
-        /* 快递公司颜色 */
-        .courier-jt { background: #fee2e2; }    /* 浅红 */
-        .courier-jd { background: #fee2e2; }    /* 浅红 */
-        .courier-yd { background: #ffedd5; }    /* 浅橙 */
-        .courier-yz { background: #dcfce7; }    /* 浅绿 */
-        .courier-ems { background: #dbeafe; }   /* 浅蓝 */
-        .courier-zto { background: #dbeafe; }   /* 浅蓝 */
-        .courier-yt { background: #bfdbfe; }    /* 偏深蓝 */
-        .courier-sto { background: #f3d9c6; }   /* 棕色 */
     </style>
 </head>
 <body>
@@ -252,6 +297,11 @@
                 <input type="text" id="manual-input" placeholder="手动输入编码 / 订单号 / 快递单号" />
                 <button class="btn btn-primary" id="manual-btn">查询</button>
             </div>
+            <!-- 关联模式提示条 -->
+            <div id="associate-mode-bar">
+                <span id="associate-mode-text">正在关联商品-编码</span>
+                <button class="exit-associate-btn" id="exit-associate-btn">退出关联</button>
+            </div>
         </div>
         <div class="card">
             <div id="result-area" class="result-area">
@@ -291,11 +341,11 @@
     // 快递单号识别库（正则 + 公司名称 + 颜色类）
     // ============================================================
     const COURIER_RULES = [
-        // 京东优先规则（具体格式）
-        { company: '京东', regex: /^JDX\d{12}$/i },                     // JDX+12位数字
-        { company: '京东', regex: /^JD[A-Z]{2}\d{11}$/i },             // JD+2字母+11数字
-        { company: '京东', regex: /^JD[A-Z]{3}\d{10}$/i },             // JD+3字母+10数字（退货）
-        { company: '京东', regex: /^JD\d{13}$/i },                     // JD+13数字
+        // 京东优先规则
+        { company: '京东', regex: /^JDX\d{12}$/i },
+        { company: '京东', regex: /^JD[A-Z]{2}\d{11}$/i },
+        { company: '京东', regex: /^JD[A-Z]{3}\d{10}$/i },
+        { company: '京东', regex: /^JD\d{13}$/i },
         // 其他快递
         { company: '极兔', regex: /^JT\d{13}$/i },
         { company: '申通(7734)', regex: /^7734\d{11}$/ },
@@ -306,11 +356,11 @@
         { company: '韵达', regex: /^43\d{13}$/ },
         { company: '中通', regex: /^790\d{11}$/ },
         { company: '圆通', regex: /^YT\d{13}$/i },
+        { company: '顺丰', regex: /^SF\d{13}$/i },
         { company: '邮政', regex: /^9\d{12}$/ },
         { company: 'EMS', regex: /^1\d{12}$/ }
     ];
 
-    // 快递公司名称到颜色类的映射
     const COMPANY_COLOR_MAP = {
         '极兔': 'courier-jt',
         '京东': 'courier-jd',
@@ -323,7 +373,8 @@
         '圆通': 'courier-yt',
         '申通': 'courier-sto',
         '申通(7734)': 'courier-sto',
-        '申通(7720)': 'courier-sto'
+        '申通(7720)': 'courier-sto',
+        '顺丰': 'courier-sf'
     };
 
     // ============================================================
@@ -350,6 +401,9 @@
     const resultArea = document.getElementById('result-area');
     const readerContainer = document.getElementById('reader-container');
     const clearHistoryBtn = document.getElementById('clear-history-btn');
+    const associateModeBar = document.getElementById('associate-mode-bar');
+    const associateModeText = document.getElementById('associate-mode-text');
+    const exitAssociateBtn = document.getElementById('exit-associate-btn');
 
     const productDetailOverlay = document.getElementById('product-detail-overlay');
     const detailContent = document.getElementById('detail-content');
@@ -363,8 +417,8 @@
     let html5QrCode = null;
     let isScanning = false;
     let history = [];
-    let scanMode = 'normal';
-    let currentProductInfo = null;
+    let scanMode = 'normal'; // 'normal' 或 'associate'
+    let currentProductInfo = null; // 当前弹窗显示的商品信息
 
     // ---------- GitHub API ----------
     async function getGistContent(token, gistId, filename) {
@@ -448,6 +502,7 @@
         associateOverlay.classList.remove('active');
         scanMode = 'normal';
         currentProductInfo = null;
+        associateModeBar.style.display = 'none';
     }
 
     loginBtn.addEventListener('click', performLogin);
@@ -531,7 +586,7 @@
         return null;
     }
 
-    // ---------- 渲染历史（分行显示） ----------
+    // ---------- 渲染历史 ----------
     function renderHistory() {
         if (history.length === 0) {
             resultContent.innerHTML = '<div style="color:#64748b;">暂无记录</div>';
@@ -569,8 +624,23 @@
         }
     });
 
-    // ---------- 商品详情弹窗（含备注、快递公司标签） ----------
+    // ---------- 商品详情弹窗（含备注编辑） ----------
     function showProductDetail(match) {
+        // 重新绘制详情
+        renderProductDetail(match);
+        productDetailOverlay.classList.add('active');
+        // 记录历史
+        let debug = '';
+        if (match.matchField === 'code') debug = '扫描到编码-精准匹配';
+        else if (match.matchField === 'orderNumber') debug = '扫描到关联订单号';
+        else if (match.matchField === 'trackingNumber') debug = '扫描到关联快递单号';
+        else if (match.matchField === 'qrLink') debug = '扫描到关联链接';
+        else debug = '扫描到商品';
+        history.push({ time: new Date(), typeLabel: (match.type === 'node' ? '商品' : '库存'), detail: '详情弹窗', debug: debug });
+        renderHistory();
+    }
+
+    function renderProductDetail(match) {
         let detailHtml = '';
         let typeLabel = '商品';
         if (match.type === 'node') {
@@ -588,7 +658,9 @@
             }
             if (node.orderNumber) detailHtml += `<div class="detail-item"><strong>订单:</strong> ${node.orderNumber}</div>`;
             if (node.qrLinks && node.qrLinks.length) detailHtml += `<div class="detail-item"><strong>链接数:</strong> ${node.qrLinks.length}</div>`;
-            if (node.remark) detailHtml += `<div class="detail-item"><strong>备注:</strong> ${node.remark}</div>`;
+            // 备注行（始终显示）
+            const remark = node.remark || '无';
+            detailHtml += `<div class="detail-item"><strong>备注:</strong> <span id="remark-text">${remark}</span><button class="remark-edit-btn" id="edit-remark-btn">编辑</button></div>`;
             if (match.matchField) detailHtml += `<div class="detail-item"><strong>匹配字段:</strong> ${match.matchField}</div>`;
             currentProductInfo = { type: 'node', code: match.code, node: node };
         } else if (match.type === 'item') {
@@ -610,35 +682,101 @@
             }
             if (item.orderNumber) detailHtml += `<div class="detail-item"><strong>订单:</strong> ${item.orderNumber}</div>`;
             if (item.qrLinks && item.qrLinks.length) detailHtml += `<div class="detail-item"><strong>链接数:</strong> ${item.qrLinks.length}</div>`;
-            if (item.remark) detailHtml += `<div class="detail-item"><strong>备注:</strong> ${item.remark}</div>`;
+            const remark = item.remark || '无';
+            detailHtml += `<div class="detail-item"><strong>备注:</strong> <span id="remark-text">${remark}</span><button class="remark-edit-btn" id="edit-remark-btn">编辑</button></div>`;
             if (match.matchField) detailHtml += `<div class="detail-item"><strong>匹配字段:</strong> ${match.matchField}</div>`;
             currentProductInfo = { type: 'item', parentCode: match.parentCode, itemCode: item.code, item: item };
         }
         detailContent.innerHTML = detailHtml;
-        productDetailOverlay.classList.add('active');
-        // 存储历史（含HTML）
-        let debug = '';
-        if (match.matchField === 'code') debug = '扫描到编码-精准匹配';
-        else if (match.matchField === 'orderNumber') debug = '扫描到关联订单号';
-        else if (match.matchField === 'trackingNumber') debug = '扫描到关联快递单号';
-        else if (match.matchField === 'qrLink') debug = '扫描到关联链接';
-        else debug = '扫描到商品';
-        history.push({
-            time: new Date(),
-            typeLabel: typeLabel,
-            detail: detailHtml,
-            debug: debug
-        });
-        renderHistory();
+
+        // 绑定编辑备注按钮
+        const editBtn = document.getElementById('edit-remark-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', function() {
+                // 显示编辑区域
+                const remarkSpan = document.getElementById('remark-text');
+                const currentRemark = (remarkSpan && remarkSpan.textContent !== '无') ? remarkSpan.textContent : '';
+                // 创建编辑UI
+                const editArea = document.createElement('div');
+                editArea.className = 'remark-edit-area active';
+                editArea.innerHTML = `
+                    <input type="text" id="remark-edit-input" value="${currentRemark}" placeholder="输入备注" />
+                    <div class="btn-group" style="margin-top:6px;">
+                        <button class="btn btn-success btn-sm" id="save-remark-btn">保存</button>
+                        <button class="btn btn-secondary btn-sm" id="cancel-remark-btn">取消</button>
+                    </div>
+                `;
+                // 插入到备注行之后
+                const remarkItem = remarkSpan.closest('.detail-item');
+                remarkItem.after(editArea);
+                editBtn.style.display = 'none'; // 隐藏编辑按钮
+
+                // 保存按钮
+                document.getElementById('save-remark-btn').addEventListener('click', async function() {
+                    const newRemark = document.getElementById('remark-edit-input').value.trim();
+                    // 更新数据
+                    if (currentProductInfo.type === 'node') {
+                        currentProductInfo.node.remark = newRemark || undefined;
+                    } else if (currentProductInfo.type === 'item') {
+                        currentProductInfo.item.remark = newRemark || undefined;
+                    }
+                    try {
+                        await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+                        // 重新显示详情（更新UI）
+                        renderProductDetail(currentProductInfo);
+                    } catch (e) {
+                        alert('保存失败: ' + e.message);
+                    }
+                });
+                // 取消按钮
+                document.getElementById('cancel-remark-btn').addEventListener('click', function() {
+                    editArea.remove();
+                    editBtn.style.display = 'inline-block';
+                });
+            });
+        }
     }
 
-    // ---------- 关联确认弹窗（含快递公司标签） ----------
+    // ---------- 关联扫描模式 ----------
+    function enterAssociateMode() {
+        scanMode = 'associate';
+        // 显示提示条
+        let productCode = '';
+        if (currentProductInfo.type === 'node') {
+            productCode = currentProductInfo.code;
+        } else if (currentProductInfo.type === 'item') {
+            productCode = currentProductInfo.itemCode || currentProductInfo.item.code;
+        }
+        associateModeText.textContent = `正在关联商品-${productCode}`;
+        associateModeBar.style.display = 'flex';
+        // 关闭商品详情弹窗，开始扫描
+        productDetailOverlay.classList.remove('active');
+        startScan();
+    }
+
+    function exitAssociateMode() {
+        scanMode = 'normal';
+        associateModeBar.style.display = 'none';
+        stopScan();
+    }
+
+    // 扫描关联信息按钮
+    scanAssociateBtn.addEventListener('click', enterAssociateMode);
+    exitAssociateBtn.addEventListener('click', exitAssociateMode);
+
+    // ---------- 关联确认弹窗 ----------
     function showAssociatePrompt(content, type, rawText) {
         let typeName = '';
         if (type === 'tracking') typeName = '快递单号';
         else if (type === 'order') typeName = '订单号';
         else if (type === 'link') typeName = '链接';
         else typeName = '未知类型';
+        let targetInfo = '';
+        if (currentProductInfo.type === 'node') {
+            targetInfo = `商品-${currentProductInfo.code}`;
+        } else if (currentProductInfo.type === 'item') {
+            targetInfo = `库存-${currentProductInfo.itemCode || currentProductInfo.item.code}`;
+        }
         let extraHtml = '';
         if (type === 'tracking') {
             const courier = detectCourier(rawText);
@@ -648,22 +786,33 @@
             }
         }
         associateContent.innerHTML = `
+            <p>正在为<strong>${targetInfo}</strong>关联</p>
             <p>识别到 ${typeName}:</p>
             <p><strong>${rawText}</strong></p>
             ${extraHtml}
-            <p>是否关联到当前商品？</p>
+            <p>是否确认关联？</p>
         `;
         associateOverlay.classList.add('active');
         window.associateData = { content, type, rawText };
     }
 
-    // ---------- 处理扫描结果 ----------
-    function handleScanResult(rawText) {
+    // ---------- 处理扫描结果（实时刷新数据） ----------
+    async function handleScanResult(rawText) {
         const cleaned = cleanText(rawText);
         if (!cleaned) return;
 
+        // 每次扫描前刷新数据库
+        try {
+            const freshData = await getGistContent(currentToken, currentGistId, currentFilename);
+            if (freshData && freshData.products) {
+                gistData = freshData;
+            }
+        } catch (e) {
+            console.error('刷新数据失败:', e);
+        }
+
         if (scanMode === 'associate') {
-            stopScan();
+            stopScan(); // 停止摄像头，避免连续扫描
             let type = '';
             if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
                 type = 'link';
@@ -674,19 +823,21 @@
                 } else if (/^\d{10,}$/.test(cleaned)) {
                     type = 'order';
                 } else {
-                    alert('无法识别的类型，请重新扫描');
-                    startAssociateScan();
+                    // 无法识别类型，保持关联模式，提示用户
+                    alert('无法识别为关联信息，请重新扫描或退出关联模式。');
+                    // 不自动重启扫描，用户可手动继续扫描或退出关联
+                    startScan(); // 重新启动扫描，但保持关联模式
                     return;
                 }
             }
             showAssociatePrompt(cleaned, type, cleaned);
         } else {
+            // 普通模式
             const matches = findProductByAny(cleaned);
             if (matches.length > 0) {
                 showProductDetail(matches[0]);
                 stopScan();
             } else {
-                // 未匹配到商品，生成未匹配记录
                 let typeLabel = '未匹配';
                 let detail = '';
                 if (cleaned.startsWith('http')) {
@@ -710,13 +861,6 @@
                 stopScan();
             }
         }
-    }
-
-    // ---------- 关联扫描 ----------
-    function startAssociateScan() {
-        scanMode = 'associate';
-        productDetailOverlay.classList.remove('active');
-        startScan();
     }
 
     // ---------- 确认关联 ----------
@@ -745,15 +889,18 @@
         try {
             await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
             alert('关联成功');
+            // 重新显示商品详情（更新数据）
             let match;
             if (currentProductInfo.type === 'node') {
                 match = { type: 'node', code: currentProductInfo.code, node: currentProductInfo.node };
             } else {
                 match = { type: 'item', parentCode: currentProductInfo.parentCode, itemCode: currentProductInfo.itemCode, item: currentProductInfo.item };
             }
-            showProductDetail(match);
+            renderProductDetail(match); // 重新渲染详情
             associateOverlay.classList.remove('active');
-            scanMode = 'normal';
+            scanMode = 'normal'; // 退出关联模式
+            associateModeBar.style.display = 'none';
+            productDetailOverlay.classList.add('active'); // 显示详情
         } catch (e) {
             alert('保存失败: ' + e.message);
         }
@@ -761,23 +908,22 @@
 
     cancelAssociateBtn.addEventListener('click', function() {
         associateOverlay.classList.remove('active');
+        // 返回商品详情弹窗，并保持关联模式？用户可能想继续扫描关联，但关闭弹窗应回到详情，同时退出关联模式
+        // 我们决定：取消关联时，退出关联模式，回到详情
+        exitAssociateMode();
         productDetailOverlay.classList.add('active');
-        scanMode = 'normal';
-    });
-
-    scanAssociateBtn.addEventListener('click', function() {
-        startAssociateScan();
     });
 
     closeDetailBtn.addEventListener('click', function() {
         productDetailOverlay.classList.remove('active');
         scanMode = 'normal';
+        associateModeBar.style.display = 'none';
         currentProductInfo = null;
     });
 
     // ---------- 扫码功能 ----------
     function onScanSuccess(decodedText) {
-        handleScanResult(decodedText);
+        handleScanResult(decodedText); // 注意：handleScanResult 是 async，但这里直接调用即可
     }
     function onScanError(err) {}
 
@@ -831,7 +977,7 @@
     function manualQuery() {
         const raw = manualInput.value;
         if (!raw || raw.trim() === '') return;
-        handleScanResult(raw);
+        handleScanResult(raw); // 会触发刷新和后续逻辑
         manualInput.value = '';
     }
     manualBtn.addEventListener('click', manualQuery);
@@ -845,7 +991,7 @@
         renderHistory();
     });
 
-    console.log('智能扫码页面已加载（完整优化版）');
+    console.log('智能扫码页面已加载（实时数据库版）');
 </script>
 </body>
 </html>
