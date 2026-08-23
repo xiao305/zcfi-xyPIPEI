@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>商品管理后台（带标签打印）</title>
     <style>
+        /* ===== 全局重置 ===== */
         * { box-sizing: border-box; }
         body {
-            font-family: system-ui, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background: #f1f5f9;
             margin: 0;
             padding: 20px;
@@ -136,7 +137,7 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ===== 新增：美化刷新按钮 ===== */
+        /* ===== 优化刷新按钮 ===== */
         .refresh-btn {
             display: inline-flex;
             align-items: center;
@@ -146,7 +147,6 @@
             display: inline-block;
             width: 18px;
             height: 18px;
-            background: transparent;
             position: relative;
         }
         .refresh-btn .refresh-icon svg {
@@ -155,22 +155,16 @@
             height: 100%;
             fill: none;
             stroke: currentColor;
-            stroke-width: 2.5;
+            stroke-width: 2.2;
             stroke-linecap: round;
             stroke-linejoin: round;
         }
         .refresh-btn.loading .refresh-icon svg {
-            animation: spin-arrow 1s linear infinite;
+            animation: spin-arrow 0.9s linear infinite;
         }
         @keyframes spin-arrow {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
-        }
-
-        /* ===== 打印模板中文字换行样式（不影响界面） ===== */
-        .print-text-wrap {
-            word-wrap: break-word;
-            white-space: normal;
         }
     </style>
 </head>
@@ -415,47 +409,51 @@
 
 <!-- ========== 主脚本 ========== -->
 <script>
-    // ===== 模板定义（优化：增大宽度、减小字号、开启换行） =====
+    // ===== 模板定义（优化：预留边距+智能字号） =====
     const printTemplates = [
         {
             name: '50*30标签',
             paperWidth: 50,
             paperHeight: 30,
             elements: [
+                // 内部编码（动态字号，根据长度自动调整）
                 { 
                     type: 'text', 
                     field: 'code', 
-                    x: 1, 
-                    y: 1, 
-                    width: 48,        // 增宽
-                    height: 7, 
-                    fontSize: 10,     // 减小字号
+                    x: 2,          // 左边距 2mm
+                    y: 2,          // 上边距 2mm
+                    width: 46,     // 总宽度 46mm（50-2*2）
+                    height: 12,    // 高度固定，但字号会自适应
+                    fontSize: 10,  // 基准字号，后面会根据长度调整
                     fontName: '黑体', 
                     bold: true, 
                     align: 'center', 
                     prefix: '内部编码: ',
-                    wordWrap: true    // 开启换行
+                    wordWrap: true,
+                    dynamicSize: true  // 标记启用动态字号
                 },
+                // 静态提示（固定）
                 { 
                     type: 'text', 
                     field: 'static', 
                     text: '仅供内部查询使用', 
-                    x: 1, 
-                    y: 8.5, 
-                    width: 48, 
-                    height: 5, 
-                    fontSize: 11, 
+                    x: 2, 
+                    y: 15,         // 下移，留出空间
+                    width: 46, 
+                    height: 4, 
+                    fontSize: 9, 
                     fontName: '黑体', 
                     bold: true, 
                     align: 'center' 
                 },
+                // 条码（下移）
                 { 
                     type: 'barcode', 
                     field: 'code', 
                     x: 2.5, 
-                    y: 13.5, 
+                    y: 19.5,       // 进一步下移
                     width: 45, 
-                    height: 14, 
+                    height: 9,      // 高度减小
                     barcodeType: 'PDF417', 
                     align: 'center' 
                 }
@@ -463,6 +461,20 @@
         }
     ];
 
+    // ---------- 辅助：计算动态字号 ----------
+    function calcFontSize(text, maxWidth, maxHeight, baseSize) {
+        // 根据文本长度估算合适字号，确保能在给定宽度内显示
+        const len = text.length;
+        // 如果长度 <= 10，使用 baseSize
+        if (len <= 10) return Math.min(baseSize, 14);
+        // 长度 11-15，减小 1-2pt
+        if (len <= 15) return Math.max(baseSize - 2, 8);
+        if (len <= 20) return Math.max(baseSize - 4, 6);
+        // 更长，使用最小字号并依赖换行
+        return 5.5;
+    }
+
+    // ===== 管理端核心逻辑（与之前相同，仅调整打印部分） =====
     const STORAGE_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
     let gistData = { products: {} };
     let currentToken = '';
@@ -1189,7 +1201,7 @@
         }
     });
 
-    // ---------- 打印相关 ----------
+    // ---------- 打印相关（智能字号+边距） ----------
     function getLodopInstance() {
         if (typeof getLodop === 'function') {
             return getLodop();
@@ -1240,14 +1252,19 @@
 
             if (el.type === 'text') {
                 ctx.fillStyle = '#000000';
-                const fontSizePx = el.fontSize * 0.3528 * scale;
+                let fontSizePx = el.fontSize * 0.3528 * scale;
+                // 如果是动态字号，用示例文本“示例编码”演示
+                const text = el.field === 'static' ? (el.text || '') : (el.prefix || '') + '示例编码';
+                // 简单根据长度模拟动态字号（仅预览用）
+                if (el.dynamicSize) {
+                    const demoLen = text.length;
+                    const demoSize = calcFontSize(text, width, height, el.fontSize);
+                    fontSizePx = demoSize * 0.3528 * scale;
+                }
                 ctx.font = `${el.bold ? 'bold ' : ''}${fontSizePx}px SimHei, sans-serif`;
                 ctx.textAlign = el.align === 'center' ? 'center' : 'left';
                 ctx.textBaseline = 'middle';
-                const text = el.field === 'static' ? (el.text || '') : (el.prefix || '') + '示例编码';
-                const textX = el.align === 'center' ? x + width / 2 : x;
-                const textY = y + height / 2;
-                // 简易换行处理（仅演示，实际打印用Lodop换行）
+                // 换行处理
                 const lines = text.split(/\n/);
                 if (lines.length > 1) {
                     ctx.textAlign = 'center';
@@ -1257,7 +1274,7 @@
                         ctx.fillText(line, x + width / 2, startY + i * lineHeight);
                     });
                 } else {
-                    ctx.fillText(text, textX, textY);
+                    ctx.fillText(text, x + width / 2, y + height / 2);
                 }
             } else if (el.type === 'barcode') {
                 ctx.fillStyle = '#e0e0e0';
@@ -1356,14 +1373,23 @@
                 const height = el.height + 'mm';
 
                 if (el.type === 'text') {
+                    // 动态字号处理
+                    let finalFontSize = el.fontSize;
+                    if (el.dynamicSize && value) {
+                        // 根据文本长度计算字号
+                        const len = value.length;
+                        if (len > 20) finalFontSize = 5.5;
+                        else if (len > 15) finalFontSize = 7;
+                        else if (len > 10) finalFontSize = 8.5;
+                        else finalFontSize = Math.min(el.fontSize, 12);
+                    }
                     LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
-                    if (el.fontSize) LODOP.SET_PRINT_STYLEA(0, "FontSize", el.fontSize);
+                    LODOP.SET_PRINT_STYLEA(0, "FontSize", finalFontSize);
                     if (el.fontName) LODOP.SET_PRINT_STYLEA(0, "FontName", el.fontName);
                     if (el.bold) LODOP.SET_PRINT_STYLEA(0, "Bold", 1);
                     if (el.align === 'center') {
                         LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
                     }
-                    // 开启自动换行（关键修复）
                     if (el.wordWrap) {
                         LODOP.SET_PRINT_STYLEA(0, "WordWrap", 1);
                     }
@@ -1533,7 +1559,7 @@
     }
     autoLogin();
 
-    console.log('管理后台已加载（优化版）');
+    console.log('管理后台已加载（智能字号+边距优化版）');
 </script>
 </body>
 </html>
