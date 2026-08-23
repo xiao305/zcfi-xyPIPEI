@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>商品管理后台（带标签打印）</title>
     <style>
-        /* ===== 全局重置 ===== */
         * { box-sizing: border-box; }
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -137,17 +136,12 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ===== 优化刷新按钮 ===== */
-        .refresh-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
+        /* 刷新按钮图标 */
         .refresh-btn .refresh-icon {
             display: inline-block;
             width: 18px;
             height: 18px;
-            position: relative;
+            vertical-align: middle;
         }
         .refresh-btn .refresh-icon svg {
             display: block;
@@ -170,7 +164,7 @@
 </head>
 <body>
 
-<!-- Login Overlay -->
+<!-- 登录遮罩 -->
 <div id="login-overlay" class="active">
     <div class="login-box">
         <h2>登录</h2>
@@ -188,7 +182,7 @@
     </div>
 </div>
 
-<!-- Main App -->
+<!-- 主界面 -->
 <div id="app-container" style="display:none;">
     <div class="container">
         <div class="top-bar">
@@ -226,7 +220,7 @@
     </div>
 </div>
 
-<!-- 节点编辑/添加 Modal -->
+<!-- 模态框：节点编辑/添加 -->
 <div class="modal-overlay" id="modal-node-overlay">
     <div class="modal">
         <h3 id="modal-node-title">编辑节点</h3>
@@ -262,7 +256,7 @@
     </div>
 </div>
 
-<!-- 库存项编辑/添加 Modal -->
+<!-- 模态框：库存编辑/添加 -->
 <div class="modal-overlay" id="modal-item-overlay">
     <div class="modal">
         <h3 id="modal-item-title">添加库存</h3>
@@ -298,7 +292,7 @@
     </div>
 </div>
 
-<!-- 批量修改状态模态框 -->
+<!-- 批量修改状态 -->
 <div class="modal-overlay" id="batch-status-overlay">
     <div class="modal">
         <h3>批量修改状态</h3>
@@ -315,7 +309,7 @@
     </div>
 </div>
 
-<!-- 打印预览模态框 -->
+<!-- 打印预览 -->
 <div id="print-preview-overlay">
     <div class="print-preview-box">
         <h3>打印标签</h3>
@@ -336,7 +330,7 @@
     </div>
 </div>
 
-<!-- ========== 引入 C-Lodop ========== -->
+<!-- ========== 加载 C-Lodop ========== -->
 <script src="CLodopFuncs.js" onerror="console.warn('本地CLodopFuncs.js加载失败，尝试远程...')"></script>
 <script>
     (function() {
@@ -409,79 +403,16 @@
 
 <!-- ========== 主脚本 ========== -->
 <script>
-    // ===== 模板定义（优化：预留边距+智能字号） =====
-    const printTemplates = [
-        {
-            name: '50*30标签',
-            paperWidth: 50,
-            paperHeight: 30,
-            elements: [
-                // 内部编码（动态字号，根据长度自动调整）
-                { 
-                    type: 'text', 
-                    field: 'code', 
-                    x: 2,          // 左边距 2mm
-                    y: 2,          // 上边距 2mm
-                    width: 46,     // 总宽度 46mm（50-2*2）
-                    height: 12,    // 高度固定，但字号会自适应
-                    fontSize: 10,  // 基准字号，后面会根据长度调整
-                    fontName: '黑体', 
-                    bold: true, 
-                    align: 'center', 
-                    prefix: '内部编码: ',
-                    wordWrap: true,
-                    dynamicSize: true  // 标记启用动态字号
-                },
-                // 静态提示（固定）
-                { 
-                    type: 'text', 
-                    field: 'static', 
-                    text: '仅供内部查询使用', 
-                    x: 2, 
-                    y: 15,         // 下移，留出空间
-                    width: 46, 
-                    height: 4, 
-                    fontSize: 9, 
-                    fontName: '黑体', 
-                    bold: true, 
-                    align: 'center' 
-                },
-                // 条码（下移）
-                { 
-                    type: 'barcode', 
-                    field: 'code', 
-                    x: 2.5, 
-                    y: 19.5,       // 进一步下移
-                    width: 45, 
-                    height: 9,      // 高度减小
-                    barcodeType: 'PDF417', 
-                    align: 'center' 
-                }
-            ]
-        }
-    ];
-
-    // ---------- 辅助：计算动态字号 ----------
-    function calcFontSize(text, maxWidth, maxHeight, baseSize) {
-        // 根据文本长度估算合适字号，确保能在给定宽度内显示
-        const len = text.length;
-        // 如果长度 <= 10，使用 baseSize
-        if (len <= 10) return Math.min(baseSize, 14);
-        // 长度 11-15，减小 1-2pt
-        if (len <= 15) return Math.max(baseSize - 2, 8);
-        if (len <= 20) return Math.max(baseSize - 4, 6);
-        // 更长，使用最小字号并依赖换行
-        return 5.5;
-    }
-
-    // ===== 管理端核心逻辑（与之前相同，仅调整打印部分） =====
+    // ============================================================
+    // 全局状态与存储
+    // ============================================================
     const STORAGE_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
     let gistData = { products: {} };
     let currentToken = '';
     let currentGistId = 'f13d97c430522e4851afbf3cd2331e14';
     let currentFilename = 'data.json';
 
-    // DOM 元素
+    // DOM 引用
     const loginOverlay = document.getElementById('login-overlay');
     const loginToken = document.getElementById('login-token');
     const loginGistId = document.getElementById('login-gistid');
@@ -580,6 +511,59 @@
         return await resp.json();
     }
 
+    // ---------- 登录/登出 ----------
+    async function performLogin() {
+        const token = loginToken.value.trim();
+        const gistId = loginGistId.value.trim();
+        const filename = loginFilename.value.trim() || 'data.json';
+        if (!token || !gistId) {
+            loginError.textContent = '请填写 Token 和 Gist ID';
+            return;
+        }
+        loginError.textContent = '';
+        try {
+            const data = await getGistContent(token, gistId, filename);
+            if (!data.products) data.products = {};
+            localStorage.setItem(STORAGE_KEYS.TOKEN, token);
+            localStorage.setItem(STORAGE_KEYS.GIST_ID, gistId);
+            localStorage.setItem(STORAGE_KEYS.FILENAME, filename);
+            currentToken = token;
+            currentGistId = gistId;
+            currentFilename = filename;
+            gistData = data;
+            loginOverlay.classList.remove('active');
+            appContainer.style.display = 'block';
+            userStatus.textContent = `已连接 (${gistId})`;
+            renderTree();
+            populateFilter();
+        } catch (e) {
+            loginError.textContent = `登录失败: ${e.message}`;
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
+        localStorage.removeItem(STORAGE_KEYS.GIST_ID);
+        localStorage.removeItem(STORAGE_KEYS.FILENAME);
+        currentToken = '';
+        currentGistId = '';
+        currentFilename = 'data.json';
+        gistData = { products: {} };
+        appContainer.style.display = 'none';
+        loginOverlay.classList.add('active');
+        loginError.textContent = '';
+        loginToken.value = '';
+        loginGistId.value = 'f13d97c430522e4851afbf3cd2331e14';
+        loginFilename.value = 'data.json';
+    }
+
+    loginBtn.addEventListener('click', performLogin);
+    document.querySelectorAll('#login-token, #login-gistid, #login-filename').forEach(el => {
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') performLogin(); });
+    });
+    logoutBtn.addEventListener('click', logout);
+
+    // ---------- 数据加载与渲染 ----------
     async function loadData() {
         try {
             const data = await getGistContent(currentToken, currentGistId, currentFilename);
@@ -605,7 +589,6 @@
         }
     }
 
-    // ---------- 查找函数 ----------
     function findNodeByCode(code, obj) {
         if (!obj) obj = gistData.products;
         if (obj[code]) return obj[code];
@@ -701,7 +684,7 @@
         return parentCode + '/' + String(next).padStart(3, '0');
     }
 
-    // ---------- 渲染 ----------
+    // ---------- 渲染树 ----------
     function statusColor(status) {
         if (status === '待售') return '#f59e0b';
         if (status === '在售') return '#22c55e';
@@ -1201,7 +1184,97 @@
         }
     });
 
-    // ---------- 打印相关（智能字号+边距） ----------
+    // ---------- 搜索和过滤 ----------
+    searchBtn.addEventListener('click', renderTree);
+    clearSearchBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        renderTree();
+    });
+    searchInput.addEventListener('keyup', e => { if (e.key === 'Enter') renderTree(); });
+    filterSelect.addEventListener('change', renderTree);
+
+    refreshBtn.addEventListener('click', async function() {
+        refreshBtn.classList.add('loading');
+        await loadData();
+        setTimeout(() => refreshBtn.classList.remove('loading'), 500);
+    });
+    addRootBtn.addEventListener('click', () => openNodeModal('add', '', ''));
+
+    // ---------- 打印相关 ----------
+    const printTemplates = [
+        {
+            name: '50*30标签',
+            paperWidth: 50,
+            paperHeight: 30,
+            elements: [
+                { 
+                    type: 'text', 
+                    field: 'code', 
+                    x: 2,          // 左边距 2mm
+                    y: 2,          // 上边距 2mm
+                    width: 46,     // 总宽度 50-2*2
+                    height: 6.5,   // 高度 6.5mm
+                    fontSize: 14, 
+                    fontName: '黑体', 
+                    bold: true, 
+                    align: 'center', 
+                    prefix: '内部编码: ',
+                    wordWrap: true,
+                    dynamicSize: true
+                },
+                { 
+                    type: 'text', 
+                    field: 'static', 
+                    text: '仅供内部查询使用', 
+                    x: 2, 
+                    y: 9,          // 保持原位置
+                    width: 46, 
+                    height: 5, 
+                    fontSize: 13, 
+                    fontName: '黑体', 
+                    bold: true, 
+                    align: 'center' 
+                },
+                { 
+                    type: 'barcode', 
+                    field: 'code', 
+                    x: 3.5, 
+                    y: 14,         // 保持原位置
+                    width: 43, 
+                    height: 13, 
+                    barcodeType: 'PDF417', 
+                    align: 'center' 
+                }
+            ]
+        }
+    ];
+
+    function calcDynamicFontSize(text, maxWidthMm, maxHeightMm, baseSize) {
+        const maxWidthPt = maxWidthMm * 2.83465;
+        const maxHeightPt = maxHeightMm * 2.83465;
+        const fullText = '内部编码: ' + text;
+        const charCount = fullText.length;
+        let fontSize = Math.min(baseSize, 14);
+        while (fontSize > 4) {
+            const estimatedWidth = charCount * fontSize * 0.65;
+            if (estimatedWidth <= maxWidthPt) {
+                const lineHeight = fontSize * 1.2;
+                if (lineHeight <= maxHeightPt) {
+                    break;
+                }
+            } else {
+                const charsPerLine = Math.floor(maxWidthPt / (fontSize * 0.65));
+                const lines = Math.ceil(charCount / charsPerLine);
+                const totalHeight = lines * fontSize * 1.2;
+                if (totalHeight <= maxHeightPt) {
+                    break;
+                }
+            }
+            fontSize -= 0.5;
+        }
+        return Math.max(fontSize, 4);
+    }
+
     function getLodopInstance() {
         if (typeof getLodop === 'function') {
             return getLodop();
@@ -1210,9 +1283,7 @@
         } else if (window.CLodop) {
             return window.CLodop;
         } else {
-            alert('打印服务未加载，请确保已安装 C-Lodop 并刷新页面。\n' +
-                  '如果已安装，请检查服务是否运行（访问 http://localhost:8000/CLodopFuncs.js 测试）。\n' +
-                  '如果网站是 HTTPS，请先手动信任证书：在浏览器中打开 https://localhost.lodop.net:8443/CLodopFuncs.js 并点击"高级"->"继续前往"。');
+            alert('打印服务未加载，请确保已安装 C-Lodop 并刷新页面。');
             return null;
         }
     }
@@ -1252,25 +1323,23 @@
 
             if (el.type === 'text') {
                 ctx.fillStyle = '#000000';
-                let fontSizePx = el.fontSize * 0.3528 * scale;
-                // 如果是动态字号，用示例文本“示例编码”演示
-                const text = el.field === 'static' ? (el.text || '') : (el.prefix || '') + '示例编码';
-                // 简单根据长度模拟动态字号（仅预览用）
+                let text = el.field === 'static' ? (el.text || '') : (el.prefix || '') + '示例编码';
+                let fontSize = el.fontSize;
                 if (el.dynamicSize) {
-                    const demoLen = text.length;
-                    const demoSize = calcFontSize(text, width, height, el.fontSize);
-                    fontSizePx = demoSize * 0.3528 * scale;
+                    const demoText = text;
+                    const maxWidthMm = el.width;
+                    const maxHeightMm = el.height;
+                    fontSize = calcDynamicFontSize(demoText.replace('内部编码: ', ''), maxWidthMm, maxHeightMm, el.fontSize);
                 }
+                const fontSizePx = fontSize * 0.3528 * scale;
                 ctx.font = `${el.bold ? 'bold ' : ''}${fontSizePx}px SimHei, sans-serif`;
-                ctx.textAlign = el.align === 'center' ? 'center' : 'left';
+                ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                // 换行处理
-                const lines = text.split(/\n/);
-                if (lines.length > 1) {
-                    ctx.textAlign = 'center';
+                const words = text.split(/\n/);
+                if (words.length > 1) {
                     const lineHeight = fontSizePx * 1.2;
-                    const startY = y + height / 2 - (lines.length - 1) * lineHeight / 2;
-                    lines.forEach((line, i) => {
+                    const startY = y + height / 2 - (words.length - 1) * lineHeight / 2;
+                    words.forEach((line, i) => {
                         ctx.fillText(line, x + width / 2, startY + i * lineHeight);
                     });
                 } else {
@@ -1373,15 +1442,10 @@
                 const height = el.height + 'mm';
 
                 if (el.type === 'text') {
-                    // 动态字号处理
                     let finalFontSize = el.fontSize;
                     if (el.dynamicSize && value) {
-                        // 根据文本长度计算字号
-                        const len = value.length;
-                        if (len > 20) finalFontSize = 5.5;
-                        else if (len > 15) finalFontSize = 7;
-                        else if (len > 10) finalFontSize = 8.5;
-                        else finalFontSize = Math.min(el.fontSize, 12);
+                        const codeText = data[el.field] || '';
+                        finalFontSize = calcDynamicFontSize(codeText, el.width, el.height, el.fontSize);
                     }
                     LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
                     LODOP.SET_PRINT_STYLEA(0, "FontSize", finalFontSize);
@@ -1476,74 +1540,8 @@
     printPreviewBtn.addEventListener('click', showLodopPreview);
     printExecute.addEventListener('click', executePrint);
 
-    // ---------- 搜索和过滤 ----------
-    searchBtn.addEventListener('click', renderTree);
-    clearSearchBtn.addEventListener('click', function() {
-        searchInput.value = '';
-        renderTree();
-    });
-    searchInput.addEventListener('keyup', e => { if (e.key === 'Enter') renderTree(); });
-    filterSelect.addEventListener('change', renderTree);
-
-    // ---------- 登录/登出 ----------
-    async function performLogin() {
-        const token = loginToken.value.trim();
-        const gistId = loginGistId.value.trim();
-        const filename = loginFilename.value.trim() || 'data.json';
-        if (!token || !gistId) {
-            loginError.textContent = '请填写 Token 和 Gist ID';
-            return;
-        }
-        loginError.textContent = '';
-        try {
-            const data = await getGistContent(token, gistId, filename);
-            if (!data.products) data.products = {};
-            localStorage.setItem(STORAGE_KEYS.TOKEN, token);
-            localStorage.setItem(STORAGE_KEYS.GIST_ID, gistId);
-            localStorage.setItem(STORAGE_KEYS.FILENAME, filename);
-            currentToken = token;
-            currentGistId = gistId;
-            currentFilename = filename;
-            gistData = data;
-            loginOverlay.classList.remove('active');
-            appContainer.style.display = 'block';
-            userStatus.textContent = `已连接 (${gistId})`;
-            renderTree();
-            populateFilter();
-        } catch (e) {
-            loginError.textContent = `登录失败: ${e.message}`;
-        }
-    }
-
-    function logout() {
-        localStorage.removeItem(STORAGE_KEYS.TOKEN);
-        localStorage.removeItem(STORAGE_KEYS.GIST_ID);
-        localStorage.removeItem(STORAGE_KEYS.FILENAME);
-        currentToken = '';
-        currentGistId = '';
-        currentFilename = 'data.json';
-        gistData = { products: {} };
-        appContainer.style.display = 'none';
-        loginOverlay.classList.add('active');
-        loginError.textContent = '';
-        loginToken.value = '';
-        loginGistId.value = 'f13d97c430522e4851afbf3cd2331e14';
-        loginFilename.value = 'data.json';
-    }
-
-    loginBtn.addEventListener('click', performLogin);
-    document.querySelectorAll('#login-token, #login-gistid, #login-filename').forEach(el => {
-        el.addEventListener('keydown', e => { if (e.key === 'Enter') performLogin(); });
-    });
-    logoutBtn.addEventListener('click', logout);
-    refreshBtn.addEventListener('click', async function() {
-        refreshBtn.classList.add('loading');
-        await loadData();
-        setTimeout(() => refreshBtn.classList.remove('loading'), 500);
-    });
-    addRootBtn.addEventListener('click', () => openNodeModal('add', '', ''));
-
-    function autoLogin() {
+    // ---------- 自动登录 ----------
+    (function autoLogin() {
         const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
         const gistId = localStorage.getItem(STORAGE_KEYS.GIST_ID);
         const filename = localStorage.getItem(STORAGE_KEYS.FILENAME) || 'data.json';
@@ -1556,8 +1554,7 @@
             loginOverlay.classList.add('active');
             appContainer.style.display = 'none';
         }
-    }
-    autoLogin();
+    })();
 
     console.log('管理后台已加载（智能字号+边距优化版）');
 </script>
