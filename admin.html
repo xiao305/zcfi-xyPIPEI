@@ -160,6 +160,27 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* 内置预览容器样式 */
+        #inner-preview-container {
+            width: 100%;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f8fafc;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
+        #inner-preview-container canvas {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
     </style>
 </head>
 <body>
@@ -317,14 +338,18 @@
         <div class="print-settings">
             <label>标签模板</label>
             <div id="template-select-container" class="template-select-container"></div>
+            
+            <label>内置预览（所见即所得）</label>
+            <div id="inner-preview-container"></div>
+            
             <label>选择打印机</label>
             <select id="printer-select"></select>
             <label>打印份数</label>
             <input type="number" id="print-copies" value="1" min="1" max="100" />
             <div class="btn-group" style="margin-top:20px; justify-content:flex-end;">
                 <button class="btn btn-secondary" id="print-preview-cancel">取消</button>
-                <button class="btn btn-secondary" id="print-preview-btn">预览</button>
-                <button class="btn btn-primary" id="print-execute">打印</button>
+                <button class="btn btn-secondary" id="print-preview-btn">原生预览（无水印）</button>
+                <button class="btn btn-primary" id="print-execute">直接打印</button>
             </div>
         </div>
     </div>
@@ -1210,27 +1235,28 @@
                 { 
                     type: 'text', 
                     field: 'code', 
-                    x: 1,          // 左右边距压缩到 1mm
-                    y: 1,          // 顶部留 1mm
-                    width: 48,     // 50 - 2 = 48mm 可用宽度
-                    height: 9,     // 高度暴增到 9mm
-                    fontSize: 20,  // 基础字号提高
+                    x: 1,          
+                    y: 1,          
+                    width: 48,     
+                    height: 8.5,   
+                    fontSize: 24,  
                     fontName: '黑体', 
                     bold: true, 
                     align: 'center', 
                     prefix: '内部编码: ',
                     wordWrap: true,
-                    dynamicSize: true
+                    dynamicSize: true,
+                    showLastLevelOnly: true // 只显示最后一级编码
                 },
                 { 
                     type: 'text', 
                     field: 'static', 
                     text: '仅供内部查询使用', 
                     x: 1, 
-                    y: 10.5,       // 1 + 9 + 0.5 间隙
+                    y: 9.5,      
                     width: 48, 
-                    height: 3,     // 高度压缩到 3mm
-                    fontSize: 10,  // 字号缩小到 10
+                    height: 3.5, 
+                    fontSize: 11,  // 字号大一号
                     fontName: '黑体', 
                     bold: true, 
                     align: 'center' 
@@ -1238,10 +1264,10 @@
                 { 
                     type: 'barcode', 
                     field: 'code', 
-                    x: 2,          // 条码边距也压缩
-                    y: 14,         // 10.5 + 3 + 0.5 间隙
-                    width: 46,     // 条码宽度增加
-                    height: 14,    // 条码高度增加
+                    x: 2, 
+                    y: 14,       
+                    width: 46, 
+                    height: 14,    
                     barcodeType: 'PDF417', 
                     align: 'center' 
                 }
@@ -1295,7 +1321,7 @@
         const lineHeightRatio = 1.1; // 极致紧凑行高
         
         let low = 2;
-        let high = Math.min(baseSize, 30); // 上限提高到 30，短编码可以更大
+        let high = 40; // 上限提高到 40，短编码可以更大
         let bestSize = low;
         
         while (high - low > 0.05) {
@@ -1343,9 +1369,8 @@
     }
 
     // Canvas 预览同步优化，精确绘制多行并垂直居中
-    function drawTemplatePreview(canvas, template) {
-        const scale = 4;
-        canvas.width = template.paperWidth * scale;
+    function drawTemplatePreview(canvas, template, data) {
+        const scale = canvas.width / template.paperWidth;
         canvas.height = template.paperHeight * scale;
         const ctx = canvas.getContext('2d');
 
@@ -1362,7 +1387,23 @@
 
             if (el.type === 'text') {
                 ctx.fillStyle = '#000000';
-                let text = el.field === 'static' ? (el.text || '') : (el.prefix || '') + 'A001/B001/00123456789'; 
+                let text = '';
+                if (el.field === 'static') {
+                    text = el.text || '';
+                } else if (data && data[el.field] !== undefined) {
+                    let rawData = data[el.field].toString();
+                    // 如果配置了只显示最后一级
+                    if (el.showLastLevelOnly && rawData.includes('/')) {
+                        const parts = rawData.split('/');
+                        rawData = parts[parts.length - 1];
+                    }
+                    text = rawData;
+                    if (el.prefix) text = el.prefix + text;
+                } else {
+                    // 无数据时，使用示例（只显示最后一级）
+                    text = (el.prefix || '') + 'C001'; 
+                }
+                
                 let fontSize = el.fontSize;
                 if (el.dynamicSize) {
                     const demoText = text.replace(el.prefix || '', '');
@@ -1405,11 +1446,29 @@
                 ctx.fillStyle = '#e0e0e0';
                 ctx.fillRect(x, y, width, height);
                 ctx.fillStyle = '#333333';
-                ctx.font = `${scale * 4}px sans-serif`;
+                ctx.font = `${Math.max(scale * 2, 8)}px sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText('条码区域', x + width / 2, y + height / 2);
+                const codeText = data && data[el.field] ? data[el.field] : '条码区域';
+                let displayText = codeText;
+                if (displayText.length > 15) {
+                    displayText = displayText.substring(0, 12) + '...';
+                }
+                ctx.fillText(displayText, x + width / 2, y + height / 2);
             }
+        });
+    }
+
+    function renderInnerPreview(dataList, template) {
+        const container = document.getElementById('inner-preview-container');
+        container.innerHTML = '';
+        
+        dataList.forEach(data => {
+            const canvas = document.createElement('canvas');
+            // 50mm * 3.78 = 189px, 30mm * 3.78 = 113px
+            canvas.width = template.paperWidth * 3.78; 
+            drawTemplatePreview(canvas, template, data);
+            container.appendChild(canvas);
         });
     }
 
@@ -1420,7 +1479,8 @@
             card.className = 'template-card' + (idx === selectedTemplateIndex ? ' selected' : '');
             card.dataset.index = idx;
             const canvas = document.createElement('canvas');
-            drawTemplatePreview(canvas, tpl);
+            canvas.width = 150; // 固定预览卡片大小
+            drawTemplatePreview(canvas, tpl, null); // 无数据
             card.appendChild(canvas);
             const nameDiv = document.createElement('div');
             nameDiv.className = 'template-name';
@@ -1430,6 +1490,8 @@
                 document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
                 selectedTemplateIndex = idx;
+                // 更新内置预览
+                renderInnerPreview(window.currentPrintDataList, printTemplates[idx]);
             });
             templateSelectContainer.appendChild(card);
         });
@@ -1471,6 +1533,9 @@
 
         printCopiesInput.value = 1;
         window.currentPrintDataList = dataList;
+        
+        // 初始化内置预览
+        renderInnerPreview(dataList, printTemplates[selectedTemplateIndex]);
     }
 
     // 所有文本统一使用 HTML 打印，确保完美的垂直居中和行距控制
@@ -1487,7 +1552,13 @@
                 if (el.field === 'static') {
                     value = el.text || '';
                 } else {
-                    value = data[el.field] !== undefined ? data[el.field] : '';
+                    let rawData = data[el.field] !== undefined ? data[el.field] : '';
+                    // 如果配置了只显示最后一级编码
+                    if (el.showLastLevelOnly && typeof rawData === 'string' && rawData.includes('/')) {
+                        const parts = rawData.split('/');
+                        rawData = parts[parts.length - 1];
+                    }
+                    value = rawData;
                 }
                 if (el.prefix && value) {
                     value = el.prefix + value;
@@ -1528,7 +1599,9 @@
                     `;
                     LODOP.ADD_PRINT_HTM(y, x, width, height, htmlContent);
                 } else if (el.type === 'barcode') {
-                    LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, value);
+                    // 条码始终使用完整编码
+                    let barcodeValue = data[el.field] !== undefined ? data[el.field] : '';
+                    LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, barcodeValue);
                     LODOP.SET_PRINT_STYLEA(0, "Horient", 2);
                     LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
                 }
@@ -1626,7 +1699,7 @@
         }
     })();
 
-    console.log('管理后台已加载（极致空间压榨版）');
+    console.log('管理后台已加载（最后一级编码优化版）');
 </script>
 </body>
 </html>
