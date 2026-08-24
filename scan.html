@@ -533,6 +533,53 @@
         try { return JSON.parse(files[filename].content); } catch { return {}; }
     }
 
+    // 深度合并函数：递归合并两个对象，确保嵌套数据不被覆盖
+    function deepMerge(target, source) {
+        if (!source || typeof source !== 'object') return source;
+        if (!target || typeof target !== 'object') return source;
+        
+        const result = {...target};
+        
+        for (const key in source) {
+            if (source.hasOwnProperty(key)) {
+                if (Array.isArray(source[key]) && Array.isArray(target[key])) {
+                    // 数组合并：去重合并
+                    const targetArr = target[key];
+                    const sourceArr = source[key];
+                    const merged = [...targetArr];
+                    for (const item of sourceArr) {
+                        // 简单去重：如果数组元素是对象，比较关键属性；如果是原始值，直接比较
+                        let exists = false;
+                        if (typeof item === 'object' && item !== null) {
+                            // 对于对象，尝试用 code 或 id 作为唯一标识
+                            const identifier = item.code || item.id || JSON.stringify(item);
+                            exists = merged.some(m => {
+                                if (typeof m === 'object' && m !== null) {
+                                    return (m.code || m.id || JSON.stringify(m)) === identifier;
+                                }
+                                return false;
+                            });
+                        } else {
+                            exists = merged.includes(item);
+                        }
+                        if (!exists) {
+                            merged.push(item);
+                        }
+                    }
+                    result[key] = merged;
+                } else if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+                    // 对象递归合并
+                    result[key] = deepMerge(target[key], source[key]);
+                } else {
+                    // 原始值：优先使用 source 的值（最新修改）
+                    result[key] = source[key];
+                }
+            }
+        }
+        
+        return result;
+    }
+
     async function updateGistContent(token, gistId, filename, content, retryCount = 0) {
         const MAX_RETRIES = 3;
         const contentStr = JSON.stringify(content, null, 2);
@@ -543,9 +590,9 @@
         if (retryCount > 0) {
             try {
                 const freshData = await getGistContent(token, gistId, filename);
-                // 合并数据：保留远程的最新状态
-                Object.assign(content, freshData);
-                const newContentStr = JSON.stringify(content, null, 2);
+                // 深度合并数据：保留双方的修改
+                const mergedData = deepMerge(freshData, content);
+                const newContentStr = JSON.stringify(mergedData, null, 2);
                 payload.files[filename].content = newContentStr;
             } catch (e) {
                 console.error('获取最新数据失败:', e);
