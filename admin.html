@@ -1210,10 +1210,10 @@
                 { 
                     type: 'text', 
                     field: 'code', 
-                    x: 2,          // 左边距 2mm
-                    y: 2,          // 上边距 2mm
-                    width: 46,     // 总宽度 50-2*2
-                    height: 6.5,   // 高度 6.5mm
+                    x: 2,          
+                    y: 2,          
+                    width: 46,     
+                    height: 6.5,   
                     fontSize: 14, 
                     fontName: '黑体', 
                     bold: true, 
@@ -1227,7 +1227,7 @@
                     field: 'static', 
                     text: '仅供内部查询使用', 
                     x: 2, 
-                    y: 9,          // 保持原位置
+                    y: 9,          
                     width: 46, 
                     height: 5, 
                     fontSize: 13, 
@@ -1239,7 +1239,7 @@
                     type: 'barcode', 
                     field: 'code', 
                     x: 3.5, 
-                    y: 14,         // 保持原位置
+                    y: 14,         
                     width: 43, 
                     height: 13, 
                     barcodeType: 'PDF417', 
@@ -1249,26 +1249,33 @@
         }
     ];
 
-    function calcDynamicFontSize(text, maxWidthMm, maxHeightMm, baseSize) {
+    function calcDynamicFontSize(text, maxWidthMm, maxHeightMm, baseSize, fontName, bold) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const fullText = (text || '').toString();
+        const prefix = '内部编码: ';
+        const displayText = prefix + fullText;
+        
+        // 1mm ≈ 2.83465pt
         const maxWidthPt = maxWidthMm * 2.83465;
         const maxHeightPt = maxHeightMm * 2.83465;
-        const fullText = '内部编码: ' + text;
-        const charCount = fullText.length;
+        
         let fontSize = Math.min(baseSize, 14);
+        const lineHeightRatio = 1.15; // 关键：设定紧凑的行高比例 (1.1~1.2之间)
+        
         while (fontSize > 4) {
-            const estimatedWidth = charCount * fontSize * 0.65;
-            if (estimatedWidth <= maxWidthPt) {
-                const lineHeight = fontSize * 1.2;
-                if (lineHeight <= maxHeightPt) {
-                    break;
-                }
+            // 使用 Canvas 精确测量当前字号下的文本宽度
+            ctx.font = `${bold ? 'bold ' : ''}${fontSize}pt ${fontName || 'SimHei'}`;
+            const textWidthPt = ctx.measureText(displayText).width;
+            
+            if (textWidthPt <= maxWidthPt) {
+                // 单行能放下，检查高度
+                if (fontSize * lineHeightRatio <= maxHeightPt) break;
             } else {
-                const charsPerLine = Math.floor(maxWidthPt / (fontSize * 0.65));
-                const lines = Math.ceil(charCount / charsPerLine);
-                const totalHeight = lines * fontSize * 1.2;
-                if (totalHeight <= maxHeightPt) {
-                    break;
-                }
+                // 需要换行，估算行数
+                const lines = Math.ceil(textWidthPt / maxWidthPt);
+                const totalHeight = lines * fontSize * lineHeightRatio;
+                if (totalHeight <= maxHeightPt) break;
             }
             fontSize -= 0.5;
         }
@@ -1323,27 +1330,44 @@
 
             if (el.type === 'text') {
                 ctx.fillStyle = '#000000';
-                let text = el.field === 'static' ? (el.text || '') : (el.prefix || '') + '示例编码';
+                // 使用一个较长的示例文本以触发换行预览
+                let text = el.field === 'static' ? (el.text || '') : (el.prefix || '') + 'A001/B001/00123456789'; 
                 let fontSize = el.fontSize;
                 if (el.dynamicSize) {
-                    const demoText = text;
-                    const maxWidthMm = el.width;
-                    const maxHeightMm = el.height;
-                    fontSize = calcDynamicFontSize(demoText.replace('内部编码: ', ''), maxWidthMm, maxHeightMm, el.fontSize);
+                    const demoText = text.replace(el.prefix || '', '');
+                    fontSize = calcDynamicFontSize(demoText, el.width, el.height, el.fontSize, el.fontName, el.bold);
                 }
-                const fontSizePx = fontSize * 0.3528 * scale;
-                ctx.font = `${el.bold ? 'bold ' : ''}${fontSizePx}px SimHei, sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                const words = text.split(/\n/);
-                if (words.length > 1) {
-                    const lineHeight = fontSizePx * 1.2;
-                    const startY = y + height / 2 - (words.length - 1) * lineHeight / 2;
-                    words.forEach((line, i) => {
-                        ctx.fillText(line, x + width / 2, startY + i * lineHeight);
-                    });
-                } else {
-                    ctx.fillText(text, x + width / 2, y + height / 2);
+                const fontSizePx = fontSize * 0.3528 * scale; // pt to px
+                ctx.font = `${el.bold ? 'bold ' : ''}${fontSizePx}px ${el.fontName || 'SimHei'}, sans-serif`;
+                
+                const maxWidthPx = el.width * scale;
+                const lineHeightPx = fontSizePx * 1.15; // 匹配 HTML 的紧凑行高
+                const startX = el.x * scale;
+                const startY = el.y * scale;
+                
+                ctx.textAlign = el.align === 'center' ? 'center' : 'left';
+                ctx.textBaseline = 'top';
+                
+                // 模拟 CSS 的 word-break: break-all 效果
+                let currentLine = '';
+                let currentY = startY;
+                const chars = text.split('');
+                
+                for (let i = 0; i < chars.length; i++) {
+                    const testLine = currentLine + chars[i];
+                    const metrics = ctx.measureText(testLine);
+                    if (metrics.width > maxWidthPx && currentLine !== '') {
+                        const drawX = el.align === 'center' ? (startX + maxWidthPx / 2) : startX;
+                        ctx.fillText(currentLine, drawX, currentY);
+                        currentLine = chars[i];
+                        currentY += lineHeightPx;
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                if (currentLine) {
+                    const drawX = el.align === 'center' ? (startX + maxWidthPx / 2) : startX;
+                    ctx.fillText(currentLine, drawX, currentY);
                 }
             } else if (el.type === 'barcode') {
                 ctx.fillStyle = '#e0e0e0';
@@ -1445,17 +1469,39 @@
                     let finalFontSize = el.fontSize;
                     if (el.dynamicSize && value) {
                         const codeText = data[el.field] || '';
-                        finalFontSize = calcDynamicFontSize(codeText, el.width, el.height, el.fontSize);
+                        // 传入字体和加粗参数以获得更准确的计算
+                        finalFontSize = calcDynamicFontSize(codeText, el.width, el.height, el.fontSize, el.fontName, el.bold);
                     }
-                    LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
-                    LODOP.SET_PRINT_STYLEA(0, "FontSize", finalFontSize);
-                    if (el.fontName) LODOP.SET_PRINT_STYLEA(0, "FontName", el.fontName);
-                    if (el.bold) LODOP.SET_PRINT_STYLEA(0, "Bold", 1);
-                    if (el.align === 'center') {
-                        LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
-                    }
+                    
+                    // 【核心优化】：如果启用了自动换行，使用 HTML 打印以精确控制行距和高度
                     if (el.wordWrap) {
-                        LODOP.SET_PRINT_STYLEA(0, "WordWrap", 1);
+                        const htmlContent = `
+                            <div style="
+                                width: ${el.width}mm; 
+                                height: ${el.height}mm; 
+                                font-family: ${el.fontName || 'SimHei'}, sans-serif; 
+                                font-size: ${finalFontSize}pt; 
+                                font-weight: ${el.bold ? 'bold' : 'normal'}; 
+                                text-align: ${el.align || 'center'};
+                                line-height: 1.15; 
+                                word-break: break-all; 
+                                overflow: hidden;
+                                margin: 0;
+                                padding: 0;
+                            ">
+                                ${value}
+                            </div>
+                        `;
+                        LODOP.ADD_PRINT_HTM(y, x, width, height, htmlContent);
+                    } else {
+                        // 保持原有的单行文本打印逻辑
+                        LODOP.ADD_PRINT_TEXT(y, x, width, height, value);
+                        LODOP.SET_PRINT_STYLEA(0, "FontSize", finalFontSize);
+                        if (el.fontName) LODOP.SET_PRINT_STYLEA(0, "FontName", el.fontName);
+                        if (el.bold) LODOP.SET_PRINT_STYLEA(0, "Bold", 1);
+                        if (el.align === 'center') {
+                            LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
+                        }
                     }
                 } else if (el.type === 'barcode') {
                     LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, value);
@@ -1556,7 +1602,7 @@
         }
     })();
 
-    console.log('管理后台已加载（智能字号+边距优化版）');
+    console.log('管理后台已加载（智能字号+HTML打印优化版）');
 </script>
 </body>
 </html>
