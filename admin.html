@@ -1246,7 +1246,7 @@
                     prefix: '内部编码: ',
                     wordWrap: true,
                     dynamicSize: true,
-                    showLastLevelOnly: true // 只显示最后一级编码
+                    showLastLevelOnly: true
                 },
                 { 
                     type: 'text', 
@@ -1256,7 +1256,7 @@
                     y: 9.5,      
                     width: 48, 
                     height: 3.5, 
-                    fontSize: 11,  // 字号大一号
+                    fontSize: 11,  
                     fontName: '黑体', 
                     bold: true, 
                     align: 'center' 
@@ -1286,11 +1286,12 @@
             .replace(/'/g, "&#039;");
     }
 
-    // 精确模拟逐字换行，获取真实行数
-    function getTextLines(text, fontSize, fontName, bold, maxWidthPt) {
+    // 【核心修复】：统一使用 px 单位进行测量，避免 pt/px 混用导致的字号偏差
+    function getTextLines(text, fontSizePt, fontName, bold, maxWidthPx) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        ctx.font = `${bold ? 'bold ' : ''}${fontSize}pt ${fontName || 'SimHei'}`;
+        const fontSizePx = fontSizePt * 1.3333; // 1pt ≈ 1.3333px
+        ctx.font = `${bold ? 'bold ' : ''}${fontSizePx}px ${fontName || 'SimHei'}`;
         
         const lines = [];
         let currentLine = '';
@@ -1300,7 +1301,7 @@
             const testLine = currentLine + char;
             const metrics = ctx.measureText(testLine);
             
-            if (metrics.width > maxWidthPt && currentLine !== '') {
+            if (metrics.width > maxWidthPx && currentLine !== '') {
                 lines.push(currentLine);
                 currentLine = char;
             } else {
@@ -1313,27 +1314,28 @@
         return lines;
     }
 
-    // 二分查找法，以 0.05pt 精度逼近最大极限字号
+    // 【核心修复】：二分查找法，统一使用 px 单位计算
     function calcDynamicFontSize(text, maxWidthMm, maxHeightMm, baseSize, fontName, bold) {
         const displayText = '内部编码: ' + (text || '').toString();
-        const maxWidthPt = maxWidthMm * 2.83465;
-        const maxHeightPt = maxHeightMm * 2.83465;
-        const lineHeightRatio = 1.1; // 极致紧凑行高
+        const maxWidthPx = maxWidthMm * 3.7795; // 1mm ≈ 3.7795px
+        const maxHeightPx = maxHeightMm * 3.7795;
+        const lineHeightRatio = 1.05; // 更激进的行高，让字号更大
         
         let low = 2;
-        let high = 40; // 上限提高到 40，短编码可以更大
+        let high = 40;
         let bestSize = low;
         
         while (high - low > 0.05) {
             const mid = (low + high) / 2;
-            const lines = getTextLines(displayText, mid, fontName, bold, maxWidthPt);
-            const totalHeight = lines.length * mid * lineHeightRatio;
+            const lines = getTextLines(displayText, mid, fontName, bold, maxWidthPx);
+            const fontSizePx = mid * 1.3333;
+            const totalHeightPx = lines.length * fontSizePx * lineHeightRatio;
             
-            if (totalHeight <= maxHeightPt) {
-                bestSize = mid; // 能放下，尝试更大的字号
+            if (totalHeightPx <= maxHeightPx) {
+                bestSize = mid;
                 low = mid;
             } else {
-                high = mid; // 放不下，缩小字号
+                high = mid;
             }
         }
         return bestSize;
@@ -1392,7 +1394,6 @@
                     text = el.text || '';
                 } else if (data && data[el.field] !== undefined) {
                     let rawData = data[el.field].toString();
-                    // 如果配置了只显示最后一级
                     if (el.showLastLevelOnly && rawData.includes('/')) {
                         const parts = rawData.split('/');
                         rawData = parts[parts.length - 1];
@@ -1400,7 +1401,6 @@
                     text = rawData;
                     if (el.prefix) text = el.prefix + text;
                 } else {
-                    // 无数据时，使用示例（只显示最后一级）
                     text = (el.prefix || '') + 'C001'; 
                 }
                 
@@ -1413,9 +1413,8 @@
                 ctx.font = `${el.bold ? 'bold ' : ''}${fontSizePx}px ${el.fontName || 'SimHei'}, sans-serif`;
                 
                 const maxWidthPx = el.width * scale;
-                const lineHeightPx = fontSizePx * 1.1; 
+                const lineHeightPx = fontSizePx * 1.05; // 同步调整为 1.05
                 
-                // 精确获取行数
                 const lines = [];
                 let currentLine = '';
                 const chars = text.split('');
@@ -1430,7 +1429,6 @@
                 }
                 if (currentLine) lines.push(currentLine);
                 
-                // 计算垂直居中的起始 Y 坐标
                 const totalTextHeightPx = lines.length * lineHeightPx;
                 const startY = y + (height - totalTextHeightPx) / 2;
                 
@@ -1465,7 +1463,6 @@
         
         dataList.forEach(data => {
             const canvas = document.createElement('canvas');
-            // 50mm * 3.78 = 189px, 30mm * 3.78 = 113px
             canvas.width = template.paperWidth * 3.78; 
             drawTemplatePreview(canvas, template, data);
             container.appendChild(canvas);
@@ -1479,8 +1476,8 @@
             card.className = 'template-card' + (idx === selectedTemplateIndex ? ' selected' : '');
             card.dataset.index = idx;
             const canvas = document.createElement('canvas');
-            canvas.width = 150; // 固定预览卡片大小
-            drawTemplatePreview(canvas, tpl, null); // 无数据
+            canvas.width = 150;
+            drawTemplatePreview(canvas, tpl, null);
             card.appendChild(canvas);
             const nameDiv = document.createElement('div');
             nameDiv.className = 'template-name';
@@ -1490,7 +1487,6 @@
                 document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
                 selectedTemplateIndex = idx;
-                // 更新内置预览
                 renderInnerPreview(window.currentPrintDataList, printTemplates[idx]);
             });
             templateSelectContainer.appendChild(card);
@@ -1534,7 +1530,6 @@
         printCopiesInput.value = 1;
         window.currentPrintDataList = dataList;
         
-        // 初始化内置预览
         renderInnerPreview(dataList, printTemplates[selectedTemplateIndex]);
     }
 
@@ -1553,7 +1548,6 @@
                     value = el.text || '';
                 } else {
                     let rawData = data[el.field] !== undefined ? data[el.field] : '';
-                    // 如果配置了只显示最后一级编码
                     if (el.showLastLevelOnly && typeof rawData === 'string' && rawData.includes('/')) {
                         const parts = rawData.split('/');
                         rawData = parts[parts.length - 1];
@@ -1576,7 +1570,6 @@
                         finalFontSize = calcDynamicFontSize(codeText, el.width, el.height, el.fontSize, el.fontName, el.bold);
                     }
                     
-                    // 统一使用 HTML 打印，确保所有文本（包括静态文案）都能完美垂直居中
                     const htmlContent = `
                         <div style="
                             width: ${el.width}mm; 
@@ -1586,7 +1579,7 @@
                             font-size: ${finalFontSize}pt; 
                             font-weight: ${el.bold ? 'bold' : 'normal'}; 
                             text-align: ${el.align || 'center'};
-                            line-height: 1.1; 
+                            line-height: 1.05; 
                             word-break: break-all; 
                             overflow: hidden;
                             margin: 0;
@@ -1599,7 +1592,6 @@
                     `;
                     LODOP.ADD_PRINT_HTM(y, x, width, height, htmlContent);
                 } else if (el.type === 'barcode') {
-                    // 条码始终使用完整编码
                     let barcodeValue = data[el.field] !== undefined ? data[el.field] : '';
                     LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, barcodeValue);
                     LODOP.SET_PRINT_STYLEA(0, "Horient", 2);
@@ -1699,7 +1691,7 @@
         }
     })();
 
-    console.log('管理后台已加载（最后一级编码优化版）');
+    console.log('管理后台已加载（单位换算修复版）');
 </script>
 </body>
 </html>
