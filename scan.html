@@ -533,10 +533,25 @@
         try { return JSON.parse(files[filename].content); } catch { return {}; }
     }
 
-    async function updateGistContent(token, gistId, filename, content) {
+    async function updateGistContent(token, gistId, filename, content, retryCount = 0) {
+        const MAX_RETRIES = 3;
         const contentStr = JSON.stringify(content, null, 2);
         const url = `https://api.github.com/gists/${gistId}`;
         const payload = { files: { [filename]: { content: contentStr } } };
+        
+        // 重试前先获取最新数据，确保基于最新版本更新
+        if (retryCount > 0) {
+            try {
+                const freshData = await getGistContent(token, gistId, filename);
+                // 合并数据：保留远程的最新状态
+                Object.assign(content, freshData);
+                const newContentStr = JSON.stringify(content, null, 2);
+                payload.files[filename].content = newContentStr;
+            } catch (e) {
+                console.error('获取最新数据失败:', e);
+            }
+        }
+        
         const resp = await fetch(url, {
             method: 'PATCH',
             headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
@@ -544,7 +559,13 @@
         });
         if (!resp.ok) {
             const err = await resp.json();
-            throw new Error(`更新失败: ${err.message || resp.statusText}`);
+            // 如果是并发冲突（403 或特定错误），尝试重试
+            if (resp.status === 403 && retryCount < MAX_RETRIES) {
+                console.log(`并发冲突，重试 ${retryCount + 1}/${MAX_RETRIES}...`);
+                await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)));
+                return await updateGistContent(token, gistId, filename, content, retryCount + 1);
+            }
+            throw new Error(`更新失败：${err.message || resp.statusText}`);
         }
         return await resp.json();
     }
