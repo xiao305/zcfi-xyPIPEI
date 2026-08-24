@@ -1,1 +1,2 @@
-Nothing should be ignored since the changes only include HTML files (admin.html, scan.html) which are source files.
+# No build artifacts, dependencies, or temporary files detected in changes
+# Source file scan.html was modified, no ignores needed
