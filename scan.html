@@ -582,22 +582,21 @@
 
     async function updateGistContent(token, gistId, filename, content, retryCount = 0) {
         const MAX_RETRIES = 3;
-        const contentStr = JSON.stringify(content, null, 2);
+        
+        // 每次都先获取最新数据，确保基于最新版本进行合并更新
+        let finalContent = content;
+        try {
+            const freshData = await getGistContent(token, gistId, filename);
+            // 深度合并数据：以远程最新数据为基础，融入本地修改
+            finalContent = deepMerge(freshData, content);
+        } catch (e) {
+            console.error('获取最新数据失败:', e);
+            // 如果获取失败，继续使用原始内容
+        }
+        
+        const contentStr = JSON.stringify(finalContent, null, 2);
         const url = `https://api.github.com/gists/${gistId}`;
         const payload = { files: { [filename]: { content: contentStr } } };
-        
-        // 重试前先获取最新数据，确保基于最新版本更新
-        if (retryCount > 0) {
-            try {
-                const freshData = await getGistContent(token, gistId, filename);
-                // 深度合并数据：保留双方的修改
-                const mergedData = deepMerge(freshData, content);
-                const newContentStr = JSON.stringify(mergedData, null, 2);
-                payload.files[filename].content = newContentStr;
-            } catch (e) {
-                console.error('获取最新数据失败:', e);
-            }
-        }
         
         const resp = await fetch(url, {
             method: 'PATCH',
@@ -606,10 +605,11 @@
         });
         if (!resp.ok) {
             const err = await resp.json();
-            // 如果是并发冲突（403 或特定错误），尝试重试
+            // 如果是并发冲突（403 或特定错误），递归重试
             if (resp.status === 403 && retryCount < MAX_RETRIES) {
                 console.log(`并发冲突，重试 ${retryCount + 1}/${MAX_RETRIES}...`);
                 await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)));
+                // 重试时重新传入原始 content，函数开头会再次获取最新数据并合并
                 return await updateGistContent(token, gistId, filename, content, retryCount + 1);
             }
             throw new Error(`更新失败：${err.message || resp.statusText}`);
