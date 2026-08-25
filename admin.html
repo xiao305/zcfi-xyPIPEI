@@ -990,7 +990,7 @@
     });
 </script>
 
-<!-- ========== 主脚本（带合并逻辑） ========== -->
+<!-- ========== 主脚本（带智能冲突检测） ========== -->
 <script>
     // ============================================================
     // 全局状态与存储
@@ -1000,6 +1000,10 @@
     let currentToken = '';
     let currentGistId = 'f13d97c430522e4851afbf3cd2331e14';
     let currentFilename = 'data.json';
+
+    // 编辑时的原始快照
+    let _originalNodeData = null;
+    let _originalItemData = null;
 
     // DOM 引用
     const loginOverlay = document.getElementById('login-overlay');
@@ -1168,152 +1172,7 @@
         }
     }
 
-    // ---------- 【核心】带合并逻辑的保存函数 ----------
-    async function saveData() {
-        try {
-            // 1. 先拉取最新的远程数据
-            let remoteData;
-            try {
-                remoteData = await getGistContent(currentToken, currentGistId, currentFilename);
-            } catch (e) {
-                // 拉取失败则直接提交（风险较高，但可保底）
-                console.warn('拉取远程数据失败，强制覆盖提交', e);
-                await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-                return true;
-            }
-
-            // 2. 如果没有远程数据，直接提交本地
-            if (!remoteData || !remoteData.products || Object.keys(remoteData.products).length === 0) {
-                await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-                return true;
-            }
-
-            // 3. 执行深度合并与冲突检测
-            const merged = deepMergeAndConflict(gistData.products, remoteData.products);
-
-            // 4. 如果合并函数返回 null，表示有冲突且用户取消了（或选择了放弃），则保存取消
-            if (merged === null) {
-                console.log('用户取消了保存');
-                return false;
-            }
-
-            // 5. 将合并结果赋给当前内存，并提交
-            gistData.products = merged;
-            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-            return true;
-        } catch (e) {
-            alert(`保存失败: ${e.message}`);
-            return false;
-        }
-    }
-
-    // ---------- 合并与冲突处理函数 ----------
-    function deepMergeAndConflict(local, remote) {
-        const result = {};
-        const allKeys = new Set([...Object.keys(local), ...Object.keys(remote)]);
-
-        for (const key of allKeys) {
-            const localNode = local[key];
-            const remoteNode = remote[key];
-
-            if (localNode && !remoteNode) {
-                result[key] = JSON.parse(JSON.stringify(localNode));
-                continue;
-            }
-            if (!localNode && remoteNode) {
-                result[key] = JSON.parse(JSON.stringify(remoteNode));
-                continue;
-            }
-            if (localNode && remoteNode) {
-                const mergedNode = mergeNode(localNode, remoteNode, key);
-                if (mergedNode === null) return null;
-                result[key] = mergedNode;
-            }
-        }
-        return result;
-    }
-
-    function mergeNode(localNode, remoteNode, nodeKey) {
-        const merged = {};
-
-        // 字段列表
-        const fields = ['name', 'unified', 'cost', 'trackingNumber', 'orderNumber', 'remark', 'qrLinks'];
-        let hasConflict = false;
-        let conflictFields = [];
-
-        for (const field of fields) {
-            const localVal = localNode[field];
-            const remoteVal = remoteNode[field];
-            if (JSON.stringify(localVal) !== JSON.stringify(remoteVal)) {
-                if (localVal !== undefined && remoteVal !== undefined && localVal !== null && remoteVal !== null) {
-                    hasConflict = true;
-                    conflictFields.push(field);
-                    merged[field] = localVal; // 默认本地，后面可改
-                } else {
-                    merged[field] = localVal !== undefined ? localVal : remoteVal;
-                }
-            } else {
-                merged[field] = localVal;
-            }
-        }
-
-        // children 递归
-        const mergedChildren = deepMergeAndConflict(localNode.children || {}, remoteNode.children || {});
-        if (mergedChildren === null) return null;
-        merged.children = mergedChildren;
-
-        // items 合并
-        const localItems = localNode.items || [];
-        const remoteItems = remoteNode.items || [];
-        const itemMap = new Map();
-        remoteItems.forEach(item => itemMap.set(item.code, { source: 'remote', data: JSON.parse(JSON.stringify(item)) }));
-        localItems.forEach(item => {
-            const existing = itemMap.get(item.code);
-            if (!existing) {
-                itemMap.set(item.code, { source: 'local', data: JSON.parse(JSON.stringify(item)) });
-            } else {
-                // 比较字段
-                const localData = item;
-                const remoteData = existing.data;
-                const fieldsItem = ['name', 'cost', 'trackingNumber', 'orderNumber', 'status', 'qrLinks', 'remark'];
-                let itemConflict = false;
-                for (const f of fieldsItem) {
-                    if (JSON.stringify(localData[f]) !== JSON.stringify(remoteData[f])) {
-                        itemConflict = true;
-                        break;
-                    }
-                }
-                if (itemConflict) {
-                    const choice = confirm(
-                        `⚠️ 库存项 "${item.code}" 在本地和远程都被修改。\n` +
-                        `点击“确定”使用本地版本，点击“取消”使用远程版本。`
-                    );
-                    if (choice) {
-                        existing.data = JSON.parse(JSON.stringify(localData));
-                    } // 否则保留远程
-                }
-            }
-        });
-        merged.items = Array.from(itemMap.values()).map(entry => entry.data);
-
-        // 处理字段冲突（用户选择）
-        if (hasConflict) {
-            const fieldStr = conflictFields.join(', ');
-            const choice = confirm(
-                `⚠️ 节点 "${nodeKey}" 的以下字段在本地和远程不一致：\n${fieldStr}\n\n` +
-                `点击“确定”使用本地版本，点击“取消”使用远程版本。`
-            );
-            if (!choice) {
-                for (const field of conflictFields) {
-                    merged[field] = remoteNode[field];
-                }
-            }
-        }
-
-        return merged;
-    }
-
-    // ---------- 其余辅助函数（findNodeByCode, renderNode 等）与原先完全相同 ----------
+    // ---------- 辅助查找函数 ----------
     function findNodeByCode(code, obj) {
         if (!obj) obj = gistData.products;
         if (obj[code]) return obj[code];
@@ -1354,6 +1213,7 @@
         return null;
     }
 
+    // ---------- 编码生成 ----------
     function generateRootCode() {
         const keys = Object.keys(gistData.products).filter(k => /^A\d{3}$/.test(k));
         let maxNum = 0;
@@ -1400,14 +1260,7 @@
         return parentCode + '/' + String(next).padStart(3, '0');
     }
 
-    // 渲染（与原版一致，只是使用了新的状态标签）
-    function statusColor(status) {
-        if (status === '待售') return '#f59e0b';
-        if (status === '在售') return '#22c55e';
-        if (status === '售出') return '#94a3b8';
-        return '#94a3b8';
-    }
-
+    // ---------- 渲染 ----------
     function renderNode(code, node, depth) {
         const hasChildren = node.children && Object.keys(node.children).length > 0;
         const hasItems = node.items && node.items.length > 0;
@@ -1549,7 +1402,73 @@
         });
     }
 
-    // 节点操作
+    // ---------- 核心保存函数（智能合并） ----------
+    async function mergeAndSave(nodeKey, newNodeData, originalData, isItem, parentCode) {
+        // 拉取远程最新数据
+        let remoteData;
+        try {
+            remoteData = await getGistContent(currentToken, currentGistId, currentFilename);
+        } catch (e) {
+            console.warn('拉取远程失败，强制覆盖', e);
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+            return true;
+        }
+        if (!remoteData || !remoteData.products) {
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+            return true;
+        }
+
+        // 获取远程对应的节点/库存数据
+        let remoteNode = null;
+        if (isItem) {
+            const parent = findNodeByCode(parentCode, remoteData.products);
+            if (parent && parent.items) {
+                remoteNode = parent.items.find(it => it.code === nodeKey);
+            }
+        } else {
+            remoteNode = findNodeByCode(nodeKey, remoteData.products);
+        }
+
+        // 如果没有远程数据（新增），直接提交
+        if (!remoteNode) {
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+            return true;
+        }
+
+        // 检测冲突：只比较修改过的字段（与原始快照对比）
+        const fields = ['name', 'unified', 'cost', 'trackingNumber', 'orderNumber', 'remark', 'qrLinks'];
+        let conflict = false;
+        if (originalData) {
+            for (const f of fields) {
+                const origVal = originalData[f];
+                const remoteVal = remoteNode[f];
+                if (origVal !== undefined && origVal !== null) {
+                    if (JSON.stringify(remoteVal) !== JSON.stringify(origVal)) {
+                        conflict = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 如果有冲突，弹窗询问
+        if (conflict) {
+            const choice = confirm(
+                `⚠️ 远程数据已被其他设备修改，与您的修改有冲突。\n点击“确定”使用您的版本覆盖远程，点击“取消”放弃本次修改并恢复远程数据。`
+            );
+            if (!choice) {
+                // 放弃本地修改，恢复远程数据到内存
+                gistData = remoteData;
+                return false;
+            }
+        }
+
+        // 无冲突或用户确定覆盖，提交本地数据
+        await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+        return true;
+    }
+
+    // ---------- 节点操作 ----------
     function openNodeModal(mode, code, parentCode) {
         if (mode === 'add') {
             modalNodeMode.value = 'add';
@@ -1565,6 +1484,7 @@
             modalNodeQrlinks.value = '';
             modalNodeRemark.value = '';
             modalNodeOriginalCode.value = '';
+            _originalNodeData = null;
         } else {
             const node = findNodeByCode(code);
             if (!node) { alert('节点不存在'); return; }
@@ -1580,6 +1500,8 @@
             modalNodeOrder.value = node.orderNumber || '';
             modalNodeQrlinks.value = (node.qrLinks && node.qrLinks.length) ? node.qrLinks.join(', ') : '';
             modalNodeRemark.value = node.remark || '';
+            // 保存原始快照
+            _originalNodeData = JSON.parse(JSON.stringify(node));
         }
         modalNodeOverlay.classList.add('active');
         resetSaveButton(modalNodeSave, nodeSaveStatus);
@@ -1621,18 +1543,22 @@
         nodeSaveStatus.innerHTML = '<div class="spinner"></div>';
 
         try {
+            // 构建新节点数据
+            const newNodeData = {
+                name: name,
+                unified: unified,
+                children: {},
+                cost: isNaN(cost) ? undefined : cost,
+                trackingNumber: tracking || undefined,
+                orderNumber: order || undefined,
+                qrLinks: qrLinks.length ? qrLinks : undefined,
+                remark: remark || undefined
+            };
+
+            // 如果是新增，直接添加到 gistData
             if (mode === 'add') {
                 if (findNodeByCode(code)) { alert('编码已存在'); resetSaveButton(modalNodeSave, nodeSaveStatus); return; }
-                const newNode = {
-                    name: name,
-                    unified: unified,
-                    children: {},
-                    cost: isNaN(cost) ? undefined : cost,
-                    trackingNumber: tracking || undefined,
-                    orderNumber: order || undefined,
-                    qrLinks: qrLinks.length ? qrLinks : undefined,
-                    remark: remark || undefined
-                };
+                const newNode = { ...newNodeData };
                 const parentCode = modalNodeParent.value;
                 if (!parentCode) {
                     gistData.products[code] = newNode;
@@ -1648,15 +1574,10 @@
                     }
                 }
             } else {
+                // 编辑模式
                 const node = findNodeByCode(originalCode);
                 if (!node) { alert('节点不存在'); resetSaveButton(modalNodeSave, nodeSaveStatus); return; }
-                node.name = name;
-                node.unified = unified;
-                node.cost = isNaN(cost) ? undefined : cost;
-                node.trackingNumber = tracking || undefined;
-                node.orderNumber = order || undefined;
-                node.qrLinks = qrLinks.length ? qrLinks : undefined;
-                node.remark = remark || undefined;
+                // 处理编码重命名
                 if (code !== originalCode) {
                     if (findNodeByCode(code)) { alert('新编码已被占用'); resetSaveButton(modalNodeSave, nodeSaveStatus); return; }
                     const parent = findParentNode(originalCode);
@@ -1675,9 +1596,19 @@
                         alert('⚠️ 编码已更改，但子节点编码未自动更新，请手动调整子节点编码以避免数据混乱。');
                     }
                 }
+                // 应用新数据
+                Object.assign(node, newNodeData);
             }
 
-            const success = await saveData(); // 使用合并后的保存
+            // 调用合并保存
+            const success = await mergeAndSave(
+                code,
+                newNodeData,
+                mode === 'edit' ? _originalNodeData : null,
+                false,
+                null
+            );
+
             if (success) {
                 nodeSaveStatus.innerHTML = '✓ 已保存';
                 modalNodeSave.textContent = '已保存';
@@ -1688,7 +1619,16 @@
                     resetSaveButton(modalNodeSave, nodeSaveStatus);
                 }, 3000);
             } else {
-                resetSaveButton(modalNodeSave, nodeSaveStatus);
+                // 用户取消
+                nodeSaveStatus.innerHTML = '⚠️ 已取消，数据已恢复最新';
+                modalNodeSave.textContent = '取消';
+                await loadData(); // 强制刷新
+                renderTree();
+                populateFilter();
+                setTimeout(() => {
+                    modalNodeOverlay.classList.remove('active');
+                    resetSaveButton(modalNodeSave, nodeSaveStatus);
+                }, 3000);
             }
         } catch (e) {
             alert('保存出错: ' + e.message);
@@ -1712,10 +1652,14 @@
             alert('节点不存在');
             return;
         }
-        const success = await saveData(); // 使用合并保存
-        if (success) {
+        // 删除时直接覆盖（不检测冲突，因为删除是管理操作）
+        try {
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
             renderTree();
             populateFilter();
+        } catch (e) {
+            alert('删除失败: ' + e.message);
+            await loadData();
         }
     }
 
@@ -1723,7 +1667,7 @@
     window.deleteNode = deleteNode;
     modalNodeSave.addEventListener('click', saveNode);
 
-    // 库存操作
+    // ---------- 库存操作 ----------
     function openItemModal(mode, parentCode, itemCode) {
         modalItemParentCode.value = parentCode;
         if (mode === 'add') {
@@ -1738,6 +1682,7 @@
             modalItemQrlinks.value = '';
             modalItemRemark.value = '';
             modalItemOriginalCode.value = '';
+            _originalItemData = null;
         } else {
             const parent = findNodeByCode(parentCode);
             if (!parent || !parent.items) { alert('库存不存在'); return; }
@@ -1753,6 +1698,7 @@
             modalItemQrlinks.value = (item.qrLinks && item.qrLinks.length) ? item.qrLinks.join(', ') : '';
             modalItemRemark.value = item.remark || '';
             modalItemOriginalCode.value = itemCode;
+            _originalItemData = JSON.parse(JSON.stringify(item));
         }
         modalItemOverlay.classList.add('active');
         resetSaveButton(modalItemSave, itemSaveStatus);
@@ -1805,7 +1751,15 @@
                 parent.items.push(itemData);
             }
 
-            const success = await saveData(); // 使用合并保存
+            // 调用合并保存
+            const success = await mergeAndSave(
+                code,
+                itemData,
+                _originalItemData,
+                true,
+                parentCode
+            );
+
             if (success) {
                 itemSaveStatus.innerHTML = '✓ 已保存';
                 modalItemSave.textContent = '已保存';
@@ -1815,7 +1769,14 @@
                     resetSaveButton(modalItemSave, itemSaveStatus);
                 }, 3000);
             } else {
-                resetSaveButton(modalItemSave, itemSaveStatus);
+                itemSaveStatus.innerHTML = '⚠️ 已取消，数据已恢复最新';
+                modalItemSave.textContent = '取消';
+                await loadData();
+                renderTree();
+                setTimeout(() => {
+                    modalItemOverlay.classList.remove('active');
+                    resetSaveButton(modalItemSave, itemSaveStatus);
+                }, 3000);
             }
         } catch (e) {
             alert('保存出错: ' + e.message);
@@ -1835,8 +1796,13 @@
         const idx = parent.items.findIndex(it => it.code === itemCode);
         if (idx === -1) { alert('库存项不存在'); return; }
         parent.items.splice(idx, 1);
-        const success = await saveData();
-        if (success) renderTree();
+        try {
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+            renderTree();
+        } catch (e) {
+            alert('删除失败: ' + e.message);
+            await loadData();
+        }
     }
 
     window.openItemModal = openItemModal;
@@ -1844,7 +1810,7 @@
     window.deleteItem = deleteItem;
     modalItemSave.addEventListener('click', saveItem);
 
-    // 批量操作
+    // ---------- 批量操作 ----------
     function getSelectedItems(parentCode) {
         const checkboxes = document.querySelectorAll(`.item-checkbox[data-parent="${parentCode}"]:checked`);
         return Array.from(checkboxes).map(cb => cb.dataset.itemCode);
@@ -1893,14 +1859,17 @@
             const item = parent.items.find(it => it.code === code);
             if (item) item.status = newStatus;
         });
-        const success = await saveData();
-        if (success) {
+        try {
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
             batchStatusOverlay.classList.remove('active');
             renderTree();
+        } catch (e) {
+            alert('批量修改失败: ' + e.message);
+            await loadData();
         }
     });
 
-    // 搜索和过滤
+    // ---------- 搜索和过滤 ----------
     searchBtn.addEventListener('click', renderTree);
     clearSearchBtn.addEventListener('click', function() {
         searchInput.value = '';
@@ -2377,7 +2346,7 @@
         }
     })();
 
-    console.log('管理后台已加载（带合并冲突处理）');
+    console.log('管理后台已加载（智能冲突检测版）');
 </script>
 </body>
 </html>
