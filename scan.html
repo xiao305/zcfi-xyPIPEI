@@ -534,7 +534,7 @@
     }
 
     // 深度合并函数：递归合并两个对象，确保嵌套数据不被覆盖
-    function deepMerge(target, source) {
+    function deepMerge(target, source, modifiedKeys = null) {
         if (!source || typeof source !== 'object') return source;
         if (!target || typeof target !== 'object') return source;
         
@@ -542,6 +542,11 @@
         
         for (const key in source) {
             if (source.hasOwnProperty(key)) {
+                // 如果传入了 modifiedKeys，只合并被修改的键
+                if (modifiedKeys && !modifiedKeys.has(key)) {
+                    continue;
+                }
+                
                 if (Array.isArray(source[key]) && Array.isArray(target[key])) {
                     // 数组合并：去重合并
                     const targetArr = target[key];
@@ -569,7 +574,7 @@
                     result[key] = merged;
                 } else if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
                     // 对象递归合并
-                    result[key] = deepMerge(target[key], source[key]);
+                    result[key] = deepMerge(target[key], source[key], modifiedKeys ? new Set(modifiedKeys) : null);
                 } else {
                     // 原始值：优先使用 source 的值（最新修改）
                     result[key] = source[key];
@@ -1096,7 +1101,7 @@
     // ---------- 确认关联（最终版） ----------
     confirmAssociateBtn.addEventListener('click', async function() {
         if (!currentAssociateData || !currentProductInfo) {
-            alert('关联数据已失效，请重新扫描');
+            alert('关联数据已失效，请重新扫码');
             return;
         }
 
@@ -1104,7 +1109,6 @@
         if (currentAssociateData.isSameValue) {
             alert('该信息已关联，无需重复操作。');
             associateOverlay.classList.remove('active');
-            // 保持关联模式，但清空当前关联数据，以便下次扫描能重新检测
             currentAssociateData = null;
             associateSaveStatus.innerHTML = '';
             return;
@@ -1112,35 +1116,59 @@
 
         const selectedType = associateTypeSelect.value;
         const rawText = currentAssociateData.rawText;
-        const target = currentAssociateData.target; // 直接操作 gistData 中的对象
+        
+        // 从 gistData 中重新获取最新的目标对象引用
+        let target = null;
+        if (currentProductInfo.type === 'node') {
+            target = findNodeByCode(currentProductInfo.code);
+        } else if (currentProductInfo.type === 'item') {
+            const parent = findNodeByCode(currentProductInfo.parentCode);
+            if (parent && parent.items) {
+                target = parent.items.find(it => it.code === currentProductInfo.itemCode);
+            }
+        }
 
         if (!target) {
             alert('目标商品已失效，请重新扫码');
             return;
         }
 
+        // 记录要更新的字段
+        const updates = {};
+        
         // 更新字段
         if (selectedType === 'tracking') {
-            target.trackingNumber = rawText;
+            updates.trackingNumber = rawText;
         } else if (selectedType === 'order') {
-            target.orderNumber = rawText;
+            updates.orderNumber = rawText;
         } else if (selectedType === 'link') {
             if (!target.qrLinks) target.qrLinks = [];
             if (!target.qrLinks.includes(rawText)) {
                 target.qrLinks.push(rawText);
+                updates.qrLinks = [...target.qrLinks];
             } else {
                 alert('链接已存在');
                 return;
             }
         }
 
-        // 处理状态变更：如果用户勾选了“标记为已售”，强制设为“已售”
+        // 处理状态变更
         const markAsSold = markAsSoldCheckbox.checked;
         let statusChanged = false;
-        if (markAsSold) {
-            if (target.status !== '已售') {
-                target.status = '已售';
-                statusChanged = true;
+        if (markAsSold && target.status !== '已售') {
+            updates.status = '已售';
+            statusChanged = true;
+        }
+
+        // 构建只包含修改部分的内容对象
+        const modifiedContent = { products: {} };
+        if (currentProductInfo.type === 'node') {
+            modifiedContent.products[currentProductInfo.code] = updates;
+        } else if (currentProductInfo.type === 'item') {
+            const parent = findNodeByCode(currentProductInfo.parentCode);
+            if (parent) {
+                modifiedContent.products[currentProductInfo.parentCode] = { children: {} };
+                modifiedContent.products[currentProductInfo.parentCode].children[currentProductInfo.itemCode] = updates;
             }
         }
 
@@ -1149,46 +1177,25 @@
         confirmAssociateBtn.textContent = '保存中...';
         associateSaveStatus.innerHTML = '<span class="spinner"></span> 保存中...';
         try {
-            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+            await updateGistContent(currentToken, currentGistId, currentFilename, modifiedContent);
             associateSaveStatus.className = 'save-status success';
-            associateSaveStatus.innerHTML = '✓ 关联成功';
-            if (statusChanged) {
-                associateSaveStatus.innerHTML += ' (状态已变更为已售)';
-            }
+            associateSaveStatus.innerHTML = '✓ 关联成功' + (statusChanged ? ' (状态已变更为已售)' : '');
 
-            // 刷新详情：从 gistData 重新获取最新数据
+            // 刷新详情
+            await loadFreshData();
             const latestMatch = getLatestMatchFromCurrent();
-            if (latestMatch) {
-                renderProductDetail(latestMatch);
-            } else {
-                // 如果获取失败，尝试重新加载数据
-                await loadFreshData();
-                const freshMatch = getLatestMatchFromCurrent();
-                if (freshMatch) renderProductDetail(freshMatch);
-            }
+            if (latestMatch) renderProductDetail(latestMatch);
 
-            // 关闭关联弹窗，回到详情
-            associateOverlay.classList.remove('active');
-            // 清空当前关联数据，以便下次重新检测
-            currentAssociateData = null;
-            // 退出关联模式（停止扫描，隐藏提示条）
-            exitAssociateMode();
-            // 重新显示详情弹窗
-            productDetailOverlay.classList.add('active');
-
-            // 记录历史
-            let detail = `关联${selectedType}: ${rawText}`;
-            history.push({ time: new Date(), typeLabel: '关联', detail: detail, debug: '关联成功' });
-            renderHistory();
-
-            // 恢复按钮
-            confirmAssociateBtn.disabled = false;
-            confirmAssociateBtn.textContent = '确认关联';
-            associateSaveStatus.innerHTML = '';
+            setTimeout(() => {
+                associateOverlay.classList.remove('active');
+                currentAssociateData = null;
+                confirmAssociateBtn.disabled = false;
+                confirmAssociateBtn.textContent = '确认关联';
+            }, 800);
         } catch (e) {
             console.error('保存失败:', e);
             associateSaveStatus.className = 'save-status error';
-            associateSaveStatus.textContent = '✗ 保存失败: ' + e.message;
+            associateSaveStatus.innerHTML = '✗ 保存失败：' + e.message;
             confirmAssociateBtn.disabled = false;
             confirmAssociateBtn.textContent = '确认关联';
         }
