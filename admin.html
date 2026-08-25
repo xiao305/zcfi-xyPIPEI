@@ -13,7 +13,7 @@
         }
 
         :root {
-            --color-primary: #4f46e5;        /* 靛蓝 */
+            --color-primary: #4f46e5;
             --color-primary-light: #818cf8;
             --color-primary-dark: #4338ca;
             --color-success: #10b981;
@@ -46,7 +46,6 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* 滚动条美化 */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -319,7 +318,7 @@
             border-left: 2px dashed var(--color-gray-200);
         }
         .tree-node.expanded > .children {
-            max-height: 5000px; /* 足够大 */
+            max-height: 5000px;
             opacity: 1;
             margin-top: 6px;
         }
@@ -991,10 +990,10 @@
     });
 </script>
 
-<!-- ========== 主脚本（功能逻辑完全保留，仅优化了渲染中的状态标签） ========== -->
+<!-- ========== 主脚本（带合并逻辑） ========== -->
 <script>
     // ============================================================
-    // 全局状态与存储（未修改）
+    // 全局状态与存储
     // ============================================================
     const STORAGE_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
     let gistData = { products: {} };
@@ -1169,8 +1168,37 @@
         }
     }
 
+    // ---------- 【核心】带合并逻辑的保存函数 ----------
     async function saveData() {
         try {
+            // 1. 先拉取最新的远程数据
+            let remoteData;
+            try {
+                remoteData = await getGistContent(currentToken, currentGistId, currentFilename);
+            } catch (e) {
+                // 拉取失败则直接提交（风险较高，但可保底）
+                console.warn('拉取远程数据失败，强制覆盖提交', e);
+                await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+                return true;
+            }
+
+            // 2. 如果没有远程数据，直接提交本地
+            if (!remoteData || !remoteData.products || Object.keys(remoteData.products).length === 0) {
+                await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
+                return true;
+            }
+
+            // 3. 执行深度合并与冲突检测
+            const merged = deepMergeAndConflict(gistData.products, remoteData.products);
+
+            // 4. 如果合并函数返回 null，表示有冲突且用户取消了（或选择了放弃），则保存取消
+            if (merged === null) {
+                console.log('用户取消了保存');
+                return false;
+            }
+
+            // 5. 将合并结果赋给当前内存，并提交
+            gistData.products = merged;
             await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
             return true;
         } catch (e) {
@@ -1179,6 +1207,113 @@
         }
     }
 
+    // ---------- 合并与冲突处理函数 ----------
+    function deepMergeAndConflict(local, remote) {
+        const result = {};
+        const allKeys = new Set([...Object.keys(local), ...Object.keys(remote)]);
+
+        for (const key of allKeys) {
+            const localNode = local[key];
+            const remoteNode = remote[key];
+
+            if (localNode && !remoteNode) {
+                result[key] = JSON.parse(JSON.stringify(localNode));
+                continue;
+            }
+            if (!localNode && remoteNode) {
+                result[key] = JSON.parse(JSON.stringify(remoteNode));
+                continue;
+            }
+            if (localNode && remoteNode) {
+                const mergedNode = mergeNode(localNode, remoteNode, key);
+                if (mergedNode === null) return null;
+                result[key] = mergedNode;
+            }
+        }
+        return result;
+    }
+
+    function mergeNode(localNode, remoteNode, nodeKey) {
+        const merged = {};
+
+        // 字段列表
+        const fields = ['name', 'unified', 'cost', 'trackingNumber', 'orderNumber', 'remark', 'qrLinks'];
+        let hasConflict = false;
+        let conflictFields = [];
+
+        for (const field of fields) {
+            const localVal = localNode[field];
+            const remoteVal = remoteNode[field];
+            if (JSON.stringify(localVal) !== JSON.stringify(remoteVal)) {
+                if (localVal !== undefined && remoteVal !== undefined && localVal !== null && remoteVal !== null) {
+                    hasConflict = true;
+                    conflictFields.push(field);
+                    merged[field] = localVal; // 默认本地，后面可改
+                } else {
+                    merged[field] = localVal !== undefined ? localVal : remoteVal;
+                }
+            } else {
+                merged[field] = localVal;
+            }
+        }
+
+        // children 递归
+        const mergedChildren = deepMergeAndConflict(localNode.children || {}, remoteNode.children || {});
+        if (mergedChildren === null) return null;
+        merged.children = mergedChildren;
+
+        // items 合并
+        const localItems = localNode.items || [];
+        const remoteItems = remoteNode.items || [];
+        const itemMap = new Map();
+        remoteItems.forEach(item => itemMap.set(item.code, { source: 'remote', data: JSON.parse(JSON.stringify(item)) }));
+        localItems.forEach(item => {
+            const existing = itemMap.get(item.code);
+            if (!existing) {
+                itemMap.set(item.code, { source: 'local', data: JSON.parse(JSON.stringify(item)) });
+            } else {
+                // 比较字段
+                const localData = item;
+                const remoteData = existing.data;
+                const fieldsItem = ['name', 'cost', 'trackingNumber', 'orderNumber', 'status', 'qrLinks', 'remark'];
+                let itemConflict = false;
+                for (const f of fieldsItem) {
+                    if (JSON.stringify(localData[f]) !== JSON.stringify(remoteData[f])) {
+                        itemConflict = true;
+                        break;
+                    }
+                }
+                if (itemConflict) {
+                    const choice = confirm(
+                        `⚠️ 库存项 "${item.code}" 在本地和远程都被修改。\n` +
+                        `点击“确定”使用本地版本，点击“取消”使用远程版本。`
+                    );
+                    if (choice) {
+                        existing.data = JSON.parse(JSON.stringify(localData));
+                    } // 否则保留远程
+                }
+            }
+        });
+        merged.items = Array.from(itemMap.values()).map(entry => entry.data);
+
+        // 处理字段冲突（用户选择）
+        if (hasConflict) {
+            const fieldStr = conflictFields.join(', ');
+            const choice = confirm(
+                `⚠️ 节点 "${nodeKey}" 的以下字段在本地和远程不一致：\n${fieldStr}\n\n` +
+                `点击“确定”使用本地版本，点击“取消”使用远程版本。`
+            );
+            if (!choice) {
+                for (const field of conflictFields) {
+                    merged[field] = remoteNode[field];
+                }
+            }
+        }
+
+        return merged;
+    }
+
+    // ---------- 其余辅助函数（findNodeByCode, renderNode 等）与原先完全相同 ----------
     function findNodeByCode(code, obj) {
         if (!obj) obj = gistData.products;
         if (obj[code]) return obj[code];
@@ -1205,14 +1340,6 @@
         return null;
     }
 
-    function findItemByCode(itemCode) {
-        for (let rootKey in gistData.products) {
-            const found = findItemInNode(gistData.products[rootKey], itemCode);
-            if (found) return found;
-        }
-        return null;
-    }
-
     function findItemInNode(node, itemCode) {
         if (node.items) {
             const item = node.items.find(it => it.code === itemCode);
@@ -1227,7 +1354,6 @@
         return null;
     }
 
-    // ---------- 编码生成 ----------
     function generateRootCode() {
         const keys = Object.keys(gistData.products).filter(k => /^A\d{3}$/.test(k));
         let maxNum = 0;
@@ -1274,7 +1400,7 @@
         return parentCode + '/' + String(next).padStart(3, '0');
     }
 
-    // ---------- 渲染树 ----------
+    // 渲染（与原版一致，只是使用了新的状态标签）
     function statusColor(status) {
         if (status === '待售') return '#f59e0b';
         if (status === '在售') return '#22c55e';
@@ -1423,7 +1549,7 @@
         });
     }
 
-    // ---------- 节点操作 ----------
+    // 节点操作
     function openNodeModal(mode, code, parentCode) {
         if (mode === 'add') {
             modalNodeMode.value = 'add';
@@ -1551,7 +1677,7 @@
                 }
             }
 
-            const success = await saveData();
+            const success = await saveData(); // 使用合并后的保存
             if (success) {
                 nodeSaveStatus.innerHTML = '✓ 已保存';
                 modalNodeSave.textContent = '已保存';
@@ -1586,7 +1712,7 @@
             alert('节点不存在');
             return;
         }
-        const success = await saveData();
+        const success = await saveData(); // 使用合并保存
         if (success) {
             renderTree();
             populateFilter();
@@ -1597,7 +1723,7 @@
     window.deleteNode = deleteNode;
     modalNodeSave.addEventListener('click', saveNode);
 
-    // ---------- 库存操作 ----------
+    // 库存操作
     function openItemModal(mode, parentCode, itemCode) {
         modalItemParentCode.value = parentCode;
         if (mode === 'add') {
@@ -1679,7 +1805,7 @@
                 parent.items.push(itemData);
             }
 
-            const success = await saveData();
+            const success = await saveData(); // 使用合并保存
             if (success) {
                 itemSaveStatus.innerHTML = '✓ 已保存';
                 modalItemSave.textContent = '已保存';
@@ -1718,7 +1844,7 @@
     window.deleteItem = deleteItem;
     modalItemSave.addEventListener('click', saveItem);
 
-    // ---------- 批量操作 ----------
+    // 批量操作
     function getSelectedItems(parentCode) {
         const checkboxes = document.querySelectorAll(`.item-checkbox[data-parent="${parentCode}"]:checked`);
         return Array.from(checkboxes).map(cb => cb.dataset.itemCode);
@@ -1774,7 +1900,7 @@
         }
     });
 
-    // ---------- 搜索和过滤 ----------
+    // 搜索和过滤
     searchBtn.addEventListener('click', renderTree);
     clearSearchBtn.addEventListener('click', function() {
         searchInput.value = '';
@@ -2251,7 +2377,7 @@
         }
     })();
 
-    console.log('管理后台已加载（现代风格视觉升级版）');
+    console.log('管理后台已加载（带合并冲突处理）');
 </script>
 </body>
 </html>
