@@ -533,76 +533,10 @@
         try { return JSON.parse(files[filename].content); } catch { return {}; }
     }
 
-    // 深度合并函数：递归合并两个对象，确保嵌套数据不被覆盖
-    function deepMerge(target, source, modifiedKeys = null) {
-        if (!source || typeof source !== 'object') return source;
-        if (!target || typeof target !== 'object') return source;
-        
-        const result = {...target};
-        
-        for (const key in source) {
-            if (source.hasOwnProperty(key)) {
-                // 如果传入了 modifiedKeys，只合并被修改的键
-                if (modifiedKeys && !modifiedKeys.has(key)) {
-                    continue;
-                }
-                
-                if (Array.isArray(source[key]) && Array.isArray(target[key])) {
-                    // 数组合并：去重合并
-                    const targetArr = target[key];
-                    const sourceArr = source[key];
-                    const merged = [...targetArr];
-                    for (const item of sourceArr) {
-                        // 简单去重：如果数组元素是对象，比较关键属性；如果是原始值，直接比较
-                        let exists = false;
-                        if (typeof item === 'object' && item !== null) {
-                            // 对于对象，尝试用 code 或 id 作为唯一标识
-                            const identifier = item.code || item.id || JSON.stringify(item);
-                            exists = merged.some(m => {
-                                if (typeof m === 'object' && m !== null) {
-                                    return (m.code || m.id || JSON.stringify(m)) === identifier;
-                                }
-                                return false;
-                            });
-                        } else {
-                            exists = merged.includes(item);
-                        }
-                        if (!exists) {
-                            merged.push(item);
-                        }
-                    }
-                    result[key] = merged;
-                } else if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-                    // 对象递归合并
-                    result[key] = deepMerge(target[key], source[key], modifiedKeys ? new Set(modifiedKeys) : null);
-                } else {
-                    // 原始值：优先使用 source 的值（最新修改）
-                    result[key] = source[key];
-                }
-            }
-        }
-        
-        return result;
-    }
-
-    async function updateGistContent(token, gistId, filename, content, retryCount = 0) {
-        const MAX_RETRIES = 3;
-        
-        // 每次都先获取最新数据，确保基于最新版本进行合并更新
-        let finalContent = content;
-        try {
-            const freshData = await getGistContent(token, gistId, filename);
-            // 深度合并数据：以远程最新数据为基础，融入本地修改
-            finalContent = deepMerge(freshData, content);
-        } catch (e) {
-            console.error('获取最新数据失败:', e);
-            // 如果获取失败，继续使用原始内容
-        }
-        
-        const contentStr = JSON.stringify(finalContent, null, 2);
+    async function updateGistContent(token, gistId, filename, content) {
+        const contentStr = JSON.stringify(content, null, 2);
         const url = `https://api.github.com/gists/${gistId}`;
         const payload = { files: { [filename]: { content: contentStr } } };
-        
         const resp = await fetch(url, {
             method: 'PATCH',
             headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
@@ -610,14 +544,7 @@
         });
         if (!resp.ok) {
             const err = await resp.json();
-            // 如果是并发冲突（403 或特定错误），递归重试
-            if (resp.status === 403 && retryCount < MAX_RETRIES) {
-                console.log(`并发冲突，重试 ${retryCount + 1}/${MAX_RETRIES}...`);
-                await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)));
-                // 重试时重新传入原始 content，函数开头会再次获取最新数据并合并
-                return await updateGistContent(token, gistId, filename, content, retryCount + 1);
-            }
-            throw new Error(`更新失败：${err.message || resp.statusText}`);
+            throw new Error(`更新失败: ${err.message || resp.statusText}`);
         }
         return await resp.json();
     }
@@ -1101,7 +1028,7 @@
     // ---------- 确认关联（最终版） ----------
     confirmAssociateBtn.addEventListener('click', async function() {
         if (!currentAssociateData || !currentProductInfo) {
-            alert('关联数据已失效，请重新扫码');
+            alert('关联数据已失效，请重新扫描');
             return;
         }
 
@@ -1109,6 +1036,7 @@
         if (currentAssociateData.isSameValue) {
             alert('该信息已关联，无需重复操作。');
             associateOverlay.classList.remove('active');
+            // 保持关联模式，但清空当前关联数据，以便下次扫描能重新检测
             currentAssociateData = null;
             associateSaveStatus.innerHTML = '';
             return;
@@ -1116,59 +1044,35 @@
 
         const selectedType = associateTypeSelect.value;
         const rawText = currentAssociateData.rawText;
-        
-        // 从 gistData 中重新获取最新的目标对象引用
-        let target = null;
-        if (currentProductInfo.type === 'node') {
-            target = findNodeByCode(currentProductInfo.code);
-        } else if (currentProductInfo.type === 'item') {
-            const parent = findNodeByCode(currentProductInfo.parentCode);
-            if (parent && parent.items) {
-                target = parent.items.find(it => it.code === currentProductInfo.itemCode);
-            }
-        }
+        const target = currentAssociateData.target; // 直接操作 gistData 中的对象
 
         if (!target) {
             alert('目标商品已失效，请重新扫码');
             return;
         }
 
-        // 记录要更新的字段
-        const updates = {};
-        
         // 更新字段
         if (selectedType === 'tracking') {
-            updates.trackingNumber = rawText;
+            target.trackingNumber = rawText;
         } else if (selectedType === 'order') {
-            updates.orderNumber = rawText;
+            target.orderNumber = rawText;
         } else if (selectedType === 'link') {
             if (!target.qrLinks) target.qrLinks = [];
             if (!target.qrLinks.includes(rawText)) {
                 target.qrLinks.push(rawText);
-                updates.qrLinks = [...target.qrLinks];
             } else {
                 alert('链接已存在');
                 return;
             }
         }
 
-        // 处理状态变更
+        // 处理状态变更：如果用户勾选了“标记为已售”，强制设为“已售”
         const markAsSold = markAsSoldCheckbox.checked;
         let statusChanged = false;
-        if (markAsSold && target.status !== '已售') {
-            updates.status = '已售';
-            statusChanged = true;
-        }
-
-        // 构建只包含修改部分的内容对象
-        const modifiedContent = { products: {} };
-        if (currentProductInfo.type === 'node') {
-            modifiedContent.products[currentProductInfo.code] = updates;
-        } else if (currentProductInfo.type === 'item') {
-            const parent = findNodeByCode(currentProductInfo.parentCode);
-            if (parent) {
-                modifiedContent.products[currentProductInfo.parentCode] = { children: {} };
-                modifiedContent.products[currentProductInfo.parentCode].children[currentProductInfo.itemCode] = updates;
+        if (markAsSold) {
+            if (target.status !== '已售') {
+                target.status = '已售';
+                statusChanged = true;
             }
         }
 
@@ -1177,25 +1081,46 @@
         confirmAssociateBtn.textContent = '保存中...';
         associateSaveStatus.innerHTML = '<span class="spinner"></span> 保存中...';
         try {
-            await updateGistContent(currentToken, currentGistId, currentFilename, modifiedContent);
+            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
             associateSaveStatus.className = 'save-status success';
-            associateSaveStatus.innerHTML = '✓ 关联成功' + (statusChanged ? ' (状态已变更为已售)' : '');
+            associateSaveStatus.innerHTML = '✓ 关联成功';
+            if (statusChanged) {
+                associateSaveStatus.innerHTML += ' (状态已变更为已售)';
+            }
 
-            // 刷新详情
-            await loadFreshData();
+            // 刷新详情：从 gistData 重新获取最新数据
             const latestMatch = getLatestMatchFromCurrent();
-            if (latestMatch) renderProductDetail(latestMatch);
+            if (latestMatch) {
+                renderProductDetail(latestMatch);
+            } else {
+                // 如果获取失败，尝试重新加载数据
+                await loadFreshData();
+                const freshMatch = getLatestMatchFromCurrent();
+                if (freshMatch) renderProductDetail(freshMatch);
+            }
 
-            setTimeout(() => {
-                associateOverlay.classList.remove('active');
-                currentAssociateData = null;
-                confirmAssociateBtn.disabled = false;
-                confirmAssociateBtn.textContent = '确认关联';
-            }, 800);
+            // 关闭关联弹窗，回到详情
+            associateOverlay.classList.remove('active');
+            // 清空当前关联数据，以便下次重新检测
+            currentAssociateData = null;
+            // 退出关联模式（停止扫描，隐藏提示条）
+            exitAssociateMode();
+            // 重新显示详情弹窗
+            productDetailOverlay.classList.add('active');
+
+            // 记录历史
+            let detail = `关联${selectedType}: ${rawText}`;
+            history.push({ time: new Date(), typeLabel: '关联', detail: detail, debug: '关联成功' });
+            renderHistory();
+
+            // 恢复按钮
+            confirmAssociateBtn.disabled = false;
+            confirmAssociateBtn.textContent = '确认关联';
+            associateSaveStatus.innerHTML = '';
         } catch (e) {
             console.error('保存失败:', e);
             associateSaveStatus.className = 'save-status error';
-            associateSaveStatus.innerHTML = '✗ 保存失败：' + e.message;
+            associateSaveStatus.textContent = '✗ 保存失败: ' + e.message;
             confirmAssociateBtn.disabled = false;
             confirmAssociateBtn.textContent = '确认关联';
         }

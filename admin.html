@@ -520,71 +520,10 @@
         try { return JSON.parse(files[filename].content); } catch { return {}; }
     }
 
-    // 深度合并函数：递归合并两个对象，确保嵌套数据不被覆盖
-    function deepMerge(target, source) {
-        if (!source || typeof source !== 'object') return source;
-        if (!target || typeof target !== 'object') return source;
-        
-        const result = {...target};
-        
-        for (const key in source) {
-            if (source.hasOwnProperty(key)) {
-                if (Array.isArray(source[key]) && Array.isArray(target[key])) {
-                    // 数组合并：去重合并
-                    const targetArr = target[key];
-                    const sourceArr = source[key];
-                    const merged = [...targetArr];
-                    for (const item of sourceArr) {
-                        // 简单去重：如果数组元素是对象，比较关键属性；如果是原始值，直接比较
-                        let exists = false;
-                        if (typeof item === 'object' && item !== null) {
-                            // 对于对象，尝试用 code 或 id 作为唯一标识
-                            const identifier = item.code || item.id || JSON.stringify(item);
-                            exists = merged.some(m => {
-                                if (typeof m === 'object' && m !== null) {
-                                    return (m.code || m.id || JSON.stringify(m)) === identifier;
-                                }
-                                return false;
-                            });
-                        } else {
-                            exists = merged.includes(item);
-                        }
-                        if (!exists) {
-                            merged.push(item);
-                        }
-                    }
-                    result[key] = merged;
-                } else if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-                    // 对象递归合并
-                    result[key] = deepMerge(target[key], source[key]);
-                } else {
-                    // 原始值：优先使用 source 的值（最新修改）
-                    result[key] = source[key];
-                }
-            }
-        }
-        
-        return result;
-    }
-
-    async function updateGistContent(token, gistId, filename, content, retryCount = 0) {
-        const MAX_RETRIES = 3;
-        
-        // 每次都先获取最新数据，确保基于最新版本进行合并更新
-        let finalContent = content;
-        try {
-            const freshData = await getGistContent(token, gistId, filename);
-            // 深度合并数据：以远程最新数据为基础，融入本地修改
-            finalContent = deepMerge(freshData, content);
-        } catch (e) {
-            console.error('获取最新数据失败:', e);
-            // 如果获取失败，继续使用原始内容
-        }
-        
-        const contentStr = JSON.stringify(finalContent, null, 2);
+    async function updateGistContent(token, gistId, filename, content) {
+        const contentStr = JSON.stringify(content, null, 2);
         const url = `https://api.github.com/gists/${gistId}`;
         const payload = { files: { [filename]: { content: contentStr } } };
-        
         const resp = await fetch(url, {
             method: 'PATCH',
             headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
@@ -592,14 +531,7 @@
         });
         if (!resp.ok) {
             const err = await resp.json();
-            // 如果是并发冲突（403 或特定错误），递归重试
-            if (resp.status === 403 && retryCount < MAX_RETRIES) {
-                console.log(`并发冲突，重试 ${retryCount + 1}/${MAX_RETRIES}...`);
-                await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)));
-                // 重试时重新传入原始 content，函数开头会再次获取最新数据并合并
-                return await updateGistContent(token, gistId, filename, content, retryCount + 1);
-            }
-            throw new Error(`更新失败：${err.message || resp.statusText}`);
+            throw new Error(`更新失败: ${err.message || resp.statusText}`);
         }
         return await resp.json();
     }
