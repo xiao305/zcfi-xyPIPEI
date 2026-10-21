@@ -367,9 +367,6 @@
             font-weight: 600;
             display: inline-block;
         }
-        .status-badge.待售 { background: #fef3c7; color: #92400e; }
-        .status-badge.在售 { background: #d1fae5; color: #065f46; }
-        .status-badge.售出 { background: #e2e8f0; color: #475569; }
 
         /* ===== 批量操作栏 ===== */
         .batch-actions {
@@ -677,6 +674,56 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
+        .print-preview-note {
+            font-size: 12px;
+            line-height: 1.7;
+            color: var(--color-gray-500);
+            margin-top: 6px;
+        }
+        #print-template-meta {
+            font-size: 12px;
+            color: var(--color-gray-500);
+            margin: -6px 0 10px;
+        }
+        .print-summary {
+            font-size: 12px;
+            line-height: 1.8;
+            color: var(--color-gray-500);
+        }
+        .print-summary strong { color: var(--color-gray-800); }
+        .print-option-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-gray-700);
+            cursor: pointer;
+        }
+        .print-option-row input {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            accent-color: var(--color-primary);
+        }
+        #print-status {
+            min-height: 18px;
+            font-size: 13px;
+            color: var(--color-danger);
+            margin-top: 10px;
+        }
+        .template-card .template-meta {
+            font-size: 11px;
+            color: var(--color-gray-500);
+            margin-top: 2px;
+            white-space: nowrap;
+        }
+        .template-card .template-desc {
+            font-size: 10px;
+            color: var(--color-gray-400);
+            margin-top: 1px;
+        }
 
         /* ===== 加载动画 & 刷新按钮 ===== */
         .refresh-btn .refresh-icon {
@@ -729,7 +776,7 @@
         .status-badge.status-pending { background: #fef3c7; color: #92400e; }
         .status-badge.status-onsale { background: #d1fae5; color: #065f46; }
         .status-badge.status-sold { background: #e2e8f0; color: #475569; }
-        .status-badge.status-unknown { background: #fee2e2; color: #991b1b; }
+        .status-badge.status-unknown { background: #e2e8f0; color: #475569; }
 
         /* ===== 顶栏同步信息 ===== */
         .sync-meta {
@@ -1441,6 +1488,7 @@
                 <label class="global-select"><input type="checkbox" id="global-select-all" /> 全选当前筛选结果</label>
                 <span id="global-selected-count">已选 0 项</span>
                 <button type="button" class="btn btn-secondary btn-sm" id="global-batch-status-btn">跨节点批量改状态</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="global-batch-print-btn">跨节点批量打印</button>
             </div>
             <div class="card-body-wrap" style="position:relative;">
                 <div id="tree-saving-mask" class="tree-saving-mask"><span class="spinner"></span> 保存中…</div>
@@ -1608,21 +1656,26 @@
 <div id="print-preview-overlay">
     <div class="print-preview-box">
         <h3>🖨️ 打印标签</h3>
+        <p id="print-template-meta"></p>
         <div class="print-info" id="print-info"></div>
+        <div class="print-summary" id="print-summary"></div>
         <div class="print-settings">
             <label>标签模板</label>
             <div id="template-select-container" class="template-select-container"></div>
 
-            <label>内置预览（所见即所得）</label>
+            <label>内置预览（示意图，实际以打印机为准）</label>
             <div id="inner-preview-container"></div>
+            <p class="print-preview-note">示意图（实际以打印机为准）：canvas 中的条码为条纹示意，真实条码由 LODOP/打印机生成；模板切换会即时重绘。</p>
 
             <label>选择打印机</label>
             <select id="printer-select"></select>
             <label>打印份数</label>
             <input type="number" id="print-copies" value="1" min="1" max="100" />
-            <div class="btn-group" style="margin-top:20px; justify-content:flex-end;">
+            <label class="print-option-row"><input type="checkbox" id="print-preview-mode" /> 直接打印前先调用系统预览（LODOP PREVIEW）</label>
+            <div id="print-status"></div>
+            <div class="btn-group" style="margin-top:14px; justify-content:flex-end;">
                 <button class="btn btn-secondary" id="print-preview-cancel">取消</button>
-                <button class="btn btn-secondary" id="print-preview-btn">预览（无水印）</button>
+                <button class="btn btn-secondary" id="print-preview-btn">系统预览</button>
                 <button class="btn btn-primary" id="print-execute">直接打印</button>
             </div>
         </div>
@@ -1771,6 +1824,11 @@ var searchDebounceTimer = null;
 var expandedSet = null;                 // null = 按默认策略（数据量大时只展开第一层）
 var globalSelectAll = false;
 
+// R3 打印设置（模板/打印机/份数/是否预览）
+var PRINT_SETTINGS_KEY = 'zcfi_print_settings_v1';
+var printSettings = { templateIndex: 0, printerName: '', copies: 1, previewBeforePrint: false };
+var printBusy = false;
+
 // 编码规范
 var CODE_RE = {
     root: /^A\d{3}$/,
@@ -1832,6 +1890,7 @@ var collapseAllBtn = $('collapse-all-btn');
 var globalSelectAllEl = $('global-select-all');
 var globalSelectedCount = $('global-selected-count');
 var globalBatchStatusBtn = $('global-batch-status-btn');
+var globalBatchPrintBtn = $('global-batch-print-btn');
 var treeSavingMask = $('tree-saving-mask');
 var appVersionEl = $('app-version');
 
@@ -1920,10 +1979,15 @@ var confirmStatus = $('confirm-status');
 var confirmCancel = $('confirm-cancel');
 var confirmOk = $('confirm-ok');
 
-// 打印模块使用的 DOM 引用（打印函数本轮不改，变量名保持原样）
+// 打印模块使用的 DOM 引用
 var printPreviewOverlay = $('print-preview-overlay');
 var printInfoDiv = $('print-info');
+var printSummaryDiv = $('print-summary');
+var printTemplateMeta = $('print-template-meta');
+var printStatusDiv = $('print-status');
+var printPreviewMode = $('print-preview-mode');
 var templateSelectContainer = $('template-select-container');
+var innerPreviewContainer = $('inner-preview-container');
 var printerSelect = $('printer-select');
 var printCopiesInput = $('print-copies');
 var printPreviewCancel = $('print-preview-cancel');
@@ -2278,8 +2342,8 @@ function performCopyNode(code, parentCode, node) {
             do {
                 seq += 1;
                 candidate = currentNodeCode + '/' + String(seq).padStart(3, '0');
-            } while (findCodeCollision(candidate, null) || allocated[candidate]);
-            allocated[candidate] = true;
+            } while (findCodeCollision(candidate, null) || allocated[String(candidate).toLowerCase()]);
+            allocated[String(candidate).toLowerCase()] = true;
             ops.push({
                 type: 'item.upsert',
                 parentCode: currentNodeCode,
@@ -2341,8 +2405,8 @@ function generateItemCodes(parentCode, count) {
         num += 1;
         if (num > 999) break;
         var candidate = parentCode + '/' + String(num).padStart(3, '0');
-        if (allCodes[candidate]) continue;
-        allCodes[candidate] = true;
+        if (allCodes[String(candidate).toLowerCase()]) continue;
+        allCodes[String(candidate).toLowerCase()] = true;
         codes.push(candidate);
     }
     return codes;
@@ -2537,12 +2601,15 @@ function takeSnapshotBeforeSave() {
 }
 
 // ---------- 编码规范与全局唯一校验 ----------
+/** 编码唯一性集合：统一小写（与 core/scan 的 sameCode 忽略大小写保持一致） */
 function collectAllCodes() {
     var set = Object.create(null);
     Z.walk(gistData.products, function (node, key) {
-        set[key] = true;
+        set[String(key).toLowerCase()] = key;
         if (Array.isArray(node.items)) {
-            node.items.forEach(function (item) { if (item && item.code) set[item.code] = true; });
+            node.items.forEach(function (item) {
+                if (item && item.code) set[String(item.code).toLowerCase()] = item.code;
+            });
         }
     });
     return set;
@@ -2580,21 +2647,44 @@ function validateItemCodeFormat(code, parentCode) {
 }
 function findCodeCollision(code, ignoreCode) {
     var set = collectAllCodes();
-    if (ignoreCode) delete set[ignoreCode];
-    return !!set[code];
+    if (ignoreCode) delete set[String(ignoreCode).toLowerCase()];
+    return !!set[String(code).toLowerCase()];
 }
-/** 节点改名：检查新节点码与级联后的所有子/库存码是否与其它记录冲突 */
+/** 节点改名：检查新节点码与级联后的所有子/库存码是否与其它记录冲突（忽略大小写） */
 function findNodeRenameCollision(newCode, oldCode, node) {
     var oldCodes = collectSubtreeCodes(node, oldCode);
     var newCodes = oldCodes.map(function (code) {
         return code === oldCode ? newCode : newCode + code.slice(oldCode.length);
     });
     var set = collectAllCodes();
-    oldCodes.forEach(function (code) { delete set[code]; });
+    oldCodes.forEach(function (code) { delete set[String(code).toLowerCase()]; });
     for (var i = 0; i < newCodes.length; i++) {
-        if (set[newCodes[i]]) return newCodes[i];
+        var existed = set[String(newCodes[i]).toLowerCase()];
+        if (existed) return existed;
     }
     return '';
+}
+/** 编码大小写规范检查：返回 { errors, warnings }（用于导入/体检） */
+function collectCodeCaseIssues(doc) {
+    var result = { errors: [], warnings: [] };
+    var seen = Object.create(null);
+    var products = doc && doc.products ? doc.products : {};
+    Z.walk(products, function (node, key) {
+        var lower = String(key).toLowerCase();
+        if (seen[lower] && seen[lower] !== key) result.errors.push('编码大小写重复：' + seen[lower] + ' 与 ' + key);
+        else seen[lower] = key;
+        if (key !== String(key).toUpperCase()) result.warnings.push('节点编码建议统一大写：' + key);
+        if (Array.isArray(node.items)) {
+            node.items.forEach(function (item) {
+                if (!item || !item.code) return;
+                var itemLower = String(item.code).toLowerCase();
+                if (seen[itemLower] && seen[itemLower] !== item.code) result.errors.push('编码大小写重复：' + seen[itemLower] + ' 与 ' + item.code);
+                else seen[itemLower] = item.code;
+                if (item.code !== String(item.code).toUpperCase()) result.warnings.push('库存编码建议统一大写：' + item.code);
+            });
+        }
+    });
+    return result;
 }
 function updateNodeCodeUI() {
     var custom = !!(modalNodeCodeCustom && modalNodeCodeCustom.checked);
@@ -2807,6 +2897,10 @@ function exportBackupFile(reason) {
 }
 function runInspect() {
     var report = Z.validateDocDeep(gistData);
+    var caseIssues = collectCodeCaseIssues(gistData);
+    report.errors = report.errors.concat(caseIssues.errors);
+    report.warnings = report.warnings.concat(caseIssues.warnings);
+    report.ok = report.errors.length === 0;
     var activeStats = countActiveStats(gistData);
     var recycle = collectRecycleEntries();
     openDataModal({
@@ -2842,6 +2936,14 @@ function runInspect() {
         ]
     });
 }
+function buildImportReport(doc) {
+    var report = Z.validateDocDeep(doc);
+    var caseIssues = collectCodeCaseIssues(doc);
+    report.errors = report.errors.concat(caseIssues.errors);
+    report.warnings = report.warnings.concat(caseIssues.warnings);
+    report.ok = report.errors.length === 0;
+    return report;
+}
 function handleImportFile(file) {
     if (!file) return;
     var reader = new FileReader();
@@ -2856,7 +2958,7 @@ function handleImportFile(file) {
         }
         pendingImport = {
             doc: doc,
-            report: Z.validateDocDeep(doc),
+            report: buildImportReport(doc),
             fileName: file.name || 'import.json',
             confirmed: false
         };
@@ -3637,6 +3739,7 @@ function buildNodeHtml(code, node, depth, term, ctx) {
             ? '<button type="button" class="btn btn-secondary btn-sm" data-action="add-node" data-parent="' + esc(code) + '">添加子类</button>'
             : '<button type="button" class="btn btn-success btn-sm" data-action="add-item" data-parent="' + esc(code) + '">添加库存</button>',
         '<button type="button" class="btn btn-primary btn-sm" data-action="print-node" data-code="' + esc(code) + '">打印标签</button>',
+        '<button type="button" class="btn btn-secondary btn-sm" data-action="print-node-items" data-code="' + esc(code) + '">打印全部库存</button>',
         '<button type="button" class="btn btn-danger btn-sm" data-action="delete-node" data-code="' + esc(code) + '">删除</button>'
     ].join('');
 
@@ -3791,6 +3894,7 @@ function onTreeClick(event) {
             window.printNodeLabel(code);
             break;
         }
+        case 'print-node-items': window.printNodeItems(code); break;
         case 'delete-node': deleteNode(code); break;
         case 'edit-item': openItemModal('edit', parent, itemCode); break;
         case 'copy-item': requestCopyItem(parent, itemCode); break;
@@ -4499,28 +4603,6 @@ function toggleSelectAll(checkbox, parentCode) {
     });
 }
 
-function batchPrintItems(parentCode) {
-    var selected = getSelectedItems(parentCode);
-    if (!selected.length) { toast('请先选择要打印的库存项', 'warn'); return; }
-    var parent = findNodeByCode(parentCode);
-    if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'warn'); return; }
-    var dataList = [];
-    selected.forEach(function (itemCode) {
-        var item = Z.findItem(parent, itemCode);
-        if (!item || Z.isDeleted(item)) return;
-        dataList.push({
-            code: itemCode,
-            name: item.name || parent.name || '',
-            cost: item.cost,
-            orderNumber: item.orderNumber,
-            trackingNumber: item.trackingNumber,
-            qrLinks: item.qrLinks
-        });
-    });
-    if (!dataList.length) { toast('所选库存均已在回收站，无法打印', 'warn'); return; }
-    openPrintPreview(dataList);
-}
-
 function openBatchStatus(parentCode) {
     if (readOnly) { toast('当前为只读保护状态，无法修改。请先重试加载。', 'error'); return; }
     if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
@@ -4751,7 +4833,7 @@ document.addEventListener('keydown', function (event) {
         if (modalItemOverlay.classList.contains('active')) { closeItemModal(); return; }
         if (batchStatusOverlay.classList.contains('active')) { batchStatusOverlay.classList.remove('active'); return; }
         if (dataModalOverlay.classList.contains('active')) { closeDataModal(); return; }
-        if (printPreviewOverlay.classList.contains('active')) { printPreviewOverlay.classList.remove('active'); return; }
+        if (printPreviewOverlay.classList.contains('active')) { closePrintPreview(); return; }
         return;
     }
     if (key === 'Enter' && !event.isComposing) {
@@ -4778,51 +4860,165 @@ window.deleteNode = deleteNode;
 window.deleteItem = deleteItem;
 window.openBatchStatus = openBatchStatus;
 
-    // ---------- 打印相关（完全保留） ----------
+    // ---------- 打印 v2（模板 / 顺序 / 设置记忆 / 预览 / 守卫） ----------
+    // 默认「50*30 内部编码」模板的字段、坐标、字号与现网保持完全一致。
     const printTemplates = [
         {
-            name: '50*30标签',
+            id: 'tpl-50x30-code',
+            name: '50*30 内部编码',
+            desc: '现网默认模板（内容不变）',
             paperWidth: 50,
             paperHeight: 30,
             elements: [
-                { 
-                    type: 'text', 
-                    field: 'code', 
-                    x: 1,          
-                    y: 1,          
-                    width: 48,     
-                    height: 8.5,   
-                    fontSize: 24,  
-                    fontName: '黑体', 
-                    bold: true, 
-                    align: 'center', 
+                {
+                    type: 'text',
+                    field: 'code',
+                    x: 1,
+                    y: 1,
+                    width: 48,
+                    height: 8.5,
+                    fontSize: 24,
+                    fontName: '黑体',
+                    bold: true,
+                    align: 'center',
                     prefix: '内部编码: ',
                     wordWrap: true,
                     dynamicSize: true,
                     showLastLevelOnly: true
                 },
-                { 
-                    type: 'text', 
-                    field: 'static', 
-                    text: '仅供内部查询使用', 
-                    x: 1, 
-                    y: 9.5,      
-                    width: 48, 
-                    height: 3.5, 
-                    fontSize: 11,  
-                    fontName: '黑体', 
-                    bold: true, 
-                    align: 'center' 
+                {
+                    type: 'text',
+                    field: 'static',
+                    text: '仅供内部查询使用',
+                    x: 1,
+                    y: 9.5,
+                    width: 48,
+                    height: 3.5,
+                    fontSize: 11,
+                    fontName: '黑体',
+                    bold: true,
+                    align: 'center'
                 },
-                { 
-                    type: 'barcode', 
-                    field: 'code', 
-                    x: 2, 
-                    y: 14,       
-                    width: 46, 
-                    height: 14,    
-                    barcodeType: 'PDF417', 
-                    align: 'center' 
+                {
+                    type: 'barcode',
+                    field: 'code',
+                    x: 2,
+                    y: 14,
+                    width: 46,
+                    height: 14,
+                    barcodeType: 'PDF417',
+                    align: 'center'
+                }
+            ]
+        },
+        {
+            id: 'tpl-50x30-info',
+            name: '50*30 编码+名称+快递单号',
+            desc: '信息更全，适合贴箱',
+            paperWidth: 50,
+            paperHeight: 30,
+            elements: [
+                {
+                    type: 'text',
+                    field: 'code',
+                    x: 1,
+                    y: 1,
+                    width: 48,
+                    height: 7,
+                    fontSize: 16,
+                    fontName: '黑体',
+                    bold: true,
+                    align: 'center',
+                    prefix: '内部编码: ',
+                    wordWrap: true,
+                    dynamicSize: true,
+                    showLastLevelOnly: true
+                },
+                {
+                    type: 'text',
+                    field: 'name',
+                    x: 2,
+                    y: 8.5,
+                    width: 46,
+                    height: 5,
+                    fontSize: 10,
+                    fontName: '黑体',
+                    bold: false,
+                    align: 'center',
+                    wordWrap: true
+                },
+                {
+                    type: 'text',
+                    field: 'trackingNumber',
+                    x: 2,
+                    y: 14,
+                    width: 46,
+                    height: 4,
+                    fontSize: 8,
+                    fontName: '黑体',
+                    bold: false,
+                    align: 'center',
+                    prefix: '快递: ',
+                    wordWrap: true
+                },
+                {
+                    type: 'barcode',
+                    field: 'code',
+                    x: 2,
+                    y: 18.5,
+                    width: 46,
+                    height: 9.5,
+                    barcodeType: 'PDF417',
+                    align: 'center'
+                }
+            ]
+        },
+        {
+            id: 'tpl-40x30-order',
+            name: '40*30 编码+订单号',
+            desc: '小标签，突出订单号',
+            paperWidth: 40,
+            paperHeight: 30,
+            elements: [
+                {
+                    type: 'text',
+                    field: 'code',
+                    x: 1,
+                    y: 1,
+                    width: 38,
+                    height: 7,
+                    fontSize: 16,
+                    fontName: '黑体',
+                    bold: true,
+                    align: 'center',
+                    prefix: '内部编码: ',
+                    wordWrap: true,
+                    dynamicSize: true,
+                    showLastLevelOnly: true
+                },
+                {
+                    type: 'text',
+                    field: 'orderNumber',
+                    x: 2,
+                    y: 9,
+                    width: 36,
+                    height: 5,
+                    fontSize: 9,
+                    fontName: '黑体',
+                    bold: false,
+                    align: 'center',
+                    prefix: '订单: ',
+                    wordWrap: true
+                },
+                {
+                    type: 'barcode',
+                    field: 'code',
+                    x: 2,
+                    y: 15.5,
+                    width: 36,
+                    height: 12.5,
+                    barcodeType: 'PDF417',
+                    align: 'center'
                 }
             ]
         }
@@ -4831,27 +5027,148 @@ window.openBatchStatus = openBatchStatus;
     function escapeHtml(text) {
         if (typeof text !== 'string') return text;
         return text
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
+    // ---------- 打印设置（模板/打印机/份数/是否预览） ----------
+    function clampInt(value, min, max, fallback) {
+        var n = parseInt(value, 10);
+        if (isNaN(n)) return fallback;
+        return Math.max(min, Math.min(max, n));
+    }
+    function loadPrintSettings() {
+        var raw = Z.storage.getJson(PRINT_SETTINGS_KEY, null);
+        if (!raw || typeof raw !== 'object') return printSettings;
+        printSettings = {
+            templateIndex: clampInt(raw.templateIndex, 0, printTemplates.length - 1, 0),
+            printerName: typeof raw.printerName === 'string' ? raw.printerName : '',
+            copies: clampInt(raw.copies, 1, 100, 1),
+            previewBeforePrint: !!raw.previewBeforePrint
+        };
+        return printSettings;
+    }
+    function savePrintSettings() {
+        printSettings = {
+            templateIndex: clampInt(selectedTemplateIndex, 0, printTemplates.length - 1, 0),
+            printerName: getSelectedPrinterName(),
+            copies: clampInt(printCopiesInput.value, 1, 100, 1),
+            previewBeforePrint: !!(printPreviewMode && printPreviewMode.checked)
+        };
+        Z.storage.setJson(PRINT_SETTINGS_KEY, printSettings);
+    }
+    function getSelectedPrinterName() {
+        var idx = printerSelect.value;
+        if (idx === '' || idx === null || idx === undefined) return '';
+        var opt = printerSelect.options[printerSelect.selectedIndex];
+        return opt && !opt.disabled ? (opt.textContent || '').trim() : '';
+    }
+
+    // ---------- 打印数据解析（打开预览/打印前都从当前 gistData 重新解析） ----------
+    function nodePrintData(node, code) {
+        return {
+            code: code,
+            name: node.name || '',
+            cost: node.cost,
+            orderNumber: node.orderNumber,
+            trackingNumber: node.trackingNumber,
+            qrLinks: node.qrLinks
+        };
+    }
+    function itemPrintData(parent, item) {
+        return {
+            code: item.code,
+            name: item.name || parent.name || '',
+            cost: item.cost,
+            orderNumber: item.orderNumber,
+            trackingNumber: item.trackingNumber,
+            qrLinks: item.qrLinks
+        };
+    }
+    function resolvePrintEntry(entry, doc) {
+        if (!entry || !entry.code) return { ok: false, reason: '打印数据缺少编码' };
+        var rootDoc = doc && doc.products ? doc : gistData;
+        if (entry.type === 'node') {
+            var node = Z.findNodeByCode(rootDoc.products, entry.code);
+            if (!node) return { ok: false, reason: '节点不存在：' + entry.code };
+            if (Z.isDeleted(node)) return { ok: false, reason: '节点已在回收站：' + entry.code };
+            return { ok: true, data: nodePrintData(node, entry.code) };
+        }
+        var parent = Z.findNodeByCode(rootDoc.products, entry.parentCode);
+        if (!parent) return { ok: false, reason: '父节点不存在：' + (entry.parentCode || '') };
+        if (Z.isDeleted(parent)) return { ok: false, reason: '父节点已在回收站：' + entry.parentCode };
+        var item = Z.findItem(parent, entry.code);
+        if (!item) return { ok: false, reason: '库存不存在：' + entry.code };
+        if (Z.isDeleted(item)) return { ok: false, reason: '库存已在回收站：' + entry.code };
+        return { ok: true, data: itemPrintData(parent, item) };
+    }
+    function normalizePrintEntries(entries) {
+        return (Array.isArray(entries) ? entries : []).filter(function (entry) {
+            return entry && entry.code;
+        }).map(function (entry) {
+            return { type: entry.type === 'node' ? 'node' : 'item', code: entry.code, parentCode: entry.parentCode || null };
+        });
+    }
+    /** 解析并去重；strict=true 时任何无效项都会让整体失败 */
+    function resolvePrintEntries(entries, options) {
+        options = options || {};
+        var rootDoc = options.doc && options.doc.products ? options.doc : gistData;
+        var list = normalizePrintEntries(entries);
+        var resolvedEntries = [];
+        var dataList = [];
+        var errors = [];
+        var dropped = 0;
+        var seen = Object.create(null);
+        list.forEach(function (entry) {
+            var key = entry.type + '|' + (entry.parentCode || '') + '|' + entry.code;
+            if (seen[key]) return;
+            seen[key] = true;
+            var result = resolvePrintEntry(entry, rootDoc);
+            if (result.ok) {
+                resolvedEntries.push(entry);
+                dataList.push(result.data);
+            } else {
+                errors.push(result.reason);
+                dropped += 1;
+            }
+        });
+        return { entries: resolvedEntries, dataList: dataList, errors: errors, dropped: dropped };
+    }
+    function setPrintStatus(text, isError) {
+        if (!printStatusDiv) return;
+        printStatusDiv.textContent = text || '';
+        printStatusDiv.style.color = isError === false ? 'var(--color-gray-500)' : '';
+    }
+    function setPrintBusy(busy) {
+        printBusy = !!busy;
+        [printPreviewBtn, printExecute, printPreviewCancel, printerSelect, printCopiesInput, printPreviewMode].forEach(function (el) {
+            if (!el) return;
+            if (busy) el.disabled = true;
+            else el.disabled = false;
+        });
+        if (printPreviewBtn) printPreviewBtn.textContent = busy ? '处理中…' : '系统预览';
+        if (printExecute) printExecute.textContent = busy ? '处理中…' : '直接打印';
+    }
+
+    // ---------- 预览绘制 ----------
+    var previewMeasureCanvas = null;
     function getTextLines(text, fontSizePt, fontName, bold, maxWidthPx) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        if (!previewMeasureCanvas) previewMeasureCanvas = document.createElement('canvas');
+        const ctx = previewMeasureCanvas.getContext('2d');
         const fontSizePx = fontSizePt * 1.3333;
         ctx.font = `${bold ? 'bold ' : ''}${fontSizePx}px ${fontName || 'SimHei'}`;
-        
+
         const lines = [];
         let currentLine = '';
-        
+
         for (let i = 0; i < text.length; i++) {
             const char = text[i];
             const testLine = currentLine + char;
             const metrics = ctx.measureText(testLine);
-            
+
             if (metrics.width > maxWidthPx && currentLine !== '') {
                 lines.push(currentLine);
                 currentLine = char;
@@ -4859,28 +5176,26 @@ window.openBatchStatus = openBatchStatus;
                 currentLine = testLine;
             }
         }
-        if (currentLine) {
-            lines.push(currentLine);
-        }
+        if (currentLine) lines.push(currentLine);
         return lines;
     }
 
-    function calcDynamicFontSize(text, maxWidthMm, maxHeightMm, baseSize, fontName, bold) {
-        const displayText = '内部编码: ' + (text || '').toString();
+    function calcDynamicFontSize(text, maxWidthMm, maxHeightMm, baseSize, fontName, bold, prefix) {
+        const displayText = (prefix === undefined ? '内部编码: ' : prefix) + (text || '').toString();
         const maxWidthPx = maxWidthMm * 3.7795;
         const maxHeightPx = maxHeightMm * 3.7795;
         const lineHeightRatio = 1.05;
-        
+
         let low = 2;
         let high = 40;
         let bestSize = low;
-        
+
         while (high - low > 0.05) {
             const mid = (low + high) / 2;
             const lines = getTextLines(displayText, mid, fontName, bold, maxWidthPx);
             const fontSizePx = mid * 1.3333;
             const totalHeightPx = lines.length * fontSizePx * lineHeightRatio;
-            
+
             if (totalHeightPx <= maxHeightPx) {
                 bestSize = mid;
                 low = mid;
@@ -4891,21 +5206,20 @@ window.openBatchStatus = openBatchStatus;
         return bestSize;
     }
 
-    function getLodopInstance() {
+    function getLodopInstance(notify) {
         if (typeof getLodop === 'function') {
-            return getLodop();
-        } else if (window.LODOP) {
-            return window.LODOP;
-        } else if (window.CLodop) {
-            return window.CLodop;
-        } else {
-            alert('打印服务未加载，请确保已安装 C-Lodop 并刷新页面。');
-            return null;
+            try { var instance = getLodop(); if (instance) return instance; } catch (e) { /* ignore */ }
         }
+        if (window.LODOP) return window.LODOP;
+        if (window.CLodop) return window.CLodop;
+        if (notify) {
+            toast('未检测到 C-Lodop 打印服务：请安装并启动 C-Lodop 后刷新页面；当前可用内置预览查看版式。', { type: 'error', duration: 7000 });
+        }
+        return null;
     }
 
     function getPrinterList() {
-        const LODOP = getLodopInstance();
+        const LODOP = getLodopInstance(false);
         if (!LODOP) return [];
         try {
             const count = LODOP.GET_PRINTER_COUNT();
@@ -4918,6 +5232,51 @@ window.openBatchStatus = openBatchStatus;
             console.error('获取打印机列表失败:', e);
             return [];
         }
+    }
+
+    /** 在 canvas 上画条码纹理示意（真实条码由 LODOP 生成） */
+    function drawBarcodeStripes(ctx, x, y, width, height, value) {
+        const text = String(value || '');
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeStyle = '#d1d5db';
+        ctx.lineWidth = Math.max(1, width * 0.006);
+        ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+
+        const captionH = Math.max(height * 0.18, Math.min(12, height * 0.28));
+        const pad = Math.max(2, width * 0.02);
+        const innerX = x + pad;
+        const innerY = y + pad;
+        const innerW = Math.max(1, width - pad * 2);
+        const innerH = Math.max(1, height - pad * 2 - captionH);
+        const rows = 7;
+        const rowH = innerH / rows;
+        let seed = 0;
+        for (let i = 0; i < text.length; i++) seed = (seed * 31 + text.charCodeAt(i)) % 2147483647;
+        if (!seed) seed = 12345;
+        ctx.fillStyle = '#111827';
+        for (let row = 0; row < rows; row++) {
+            let barX = innerX;
+            let state = seed + row * 37;
+            while (barX < innerX + innerW) {
+                state = (state * 1103515245 + 12345) & 0x7fffffff;
+                let barW = Math.max(1, Math.min(innerW * 0.06, innerW * (0.01 + (state % 4) * 0.01)));
+                if (barX + barW > innerX + innerW) barW = innerX + innerW - barX;
+                if (barW > 0 && ((state >> 7) % 2 === 0)) {
+                    ctx.fillRect(barX, innerY + row * rowH, barW, Math.max(1, rowH - 1));
+                }
+                barX += barW + Math.max(0.6, innerW * 0.008);
+            }
+        }
+        ctx.fillStyle = '#111827';
+        ctx.font = Math.max(height * 0.13, 7) + 'px ui-monospace, Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        let caption = text;
+        if (caption.length > 26) caption = caption.slice(0, 23) + '...';
+        ctx.fillText(caption, x + width / 2, y + height - Math.max(1, pad * 0.6));
+        ctx.restore();
     }
 
     function drawTemplatePreview(canvas, template, data) {
@@ -4950,20 +5309,20 @@ window.openBatchStatus = openBatchStatus;
                     text = rawData;
                     if (el.prefix) text = el.prefix + text;
                 } else {
-                    text = (el.prefix || '') + 'C001'; 
+                    text = (el.prefix || '') + 'C001';
                 }
-                
+
                 let fontSize = el.fontSize;
                 if (el.dynamicSize) {
                     const demoText = text.replace(el.prefix || '', '');
-                    fontSize = calcDynamicFontSize(demoText, el.width, el.height, el.fontSize, el.fontName, el.bold);
+                    fontSize = calcDynamicFontSize(demoText, el.width, el.height, el.fontSize, el.fontName, el.bold, el.prefix || '');
                 }
-                const fontSizePx = fontSize * 0.3528 * scale; 
+                const fontSizePx = fontSize * 0.3528 * scale;
                 ctx.font = `${el.bold ? 'bold ' : ''}${fontSizePx}px ${el.fontName || 'SimHei'}, sans-serif`;
-                
+
                 const maxWidthPx = el.width * scale;
                 const lineHeightPx = fontSizePx * 1.05;
-                
+
                 const lines = [];
                 let currentLine = '';
                 const chars = text.split('');
@@ -4977,48 +5336,55 @@ window.openBatchStatus = openBatchStatus;
                     }
                 }
                 if (currentLine) lines.push(currentLine);
-                
+
                 const totalTextHeightPx = lines.length * lineHeightPx;
                 const startY = y + (height - totalTextHeightPx) / 2;
-                
+
                 ctx.textAlign = el.align === 'center' ? 'center' : 'left';
                 ctx.textBaseline = 'middle';
-                
+
                 lines.forEach((line, index) => {
                     const drawX = el.align === 'center' ? (x + width / 2) : x;
                     const drawY = startY + (index * lineHeightPx) + (lineHeightPx / 2);
                     ctx.fillText(line, drawX, drawY);
                 });
             } else if (el.type === 'barcode') {
-                ctx.fillStyle = '#e0e0e0';
-                ctx.fillRect(x, y, width, height);
-                ctx.fillStyle = '#333333';
-                ctx.font = `${Math.max(scale * 2, 8)}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                const codeText = data && data[el.field] ? data[el.field] : '条码区域';
-                let displayText = codeText;
-                if (displayText.length > 15) {
-                    displayText = displayText.substring(0, 12) + '...';
-                }
-                ctx.fillText(displayText, x + width / 2, y + height / 2);
+                const codeText = data && data[el.field] ? data[el.field] : 'C001';
+                drawBarcodeStripes(ctx, x, y, width, height, codeText);
             }
         });
     }
 
     function renderInnerPreview(dataList, template) {
-        const container = document.getElementById('inner-preview-container');
+        const container = innerPreviewContainer || document.getElementById('inner-preview-container');
         container.innerHTML = '';
-        
         dataList.forEach(data => {
             const canvas = document.createElement('canvas');
-            canvas.width = template.paperWidth * 3.78; 
+            canvas.width = template.paperWidth * 3.78;
             drawTemplatePreview(canvas, template, data);
             container.appendChild(canvas);
         });
     }
 
-    function openPrintPreview(dataList) {
+    function refreshPrintInfo() {
+        const dataList = window.currentPrintDataList || [];
+        const template = printTemplates[selectedTemplateIndex] || printTemplates[0];
+        const copies = clampInt(printCopiesInput.value, 1, 100, 1);
+        if (dataList.length === 1) {
+            const d = dataList[0];
+            printInfoDiv.innerHTML = `<p><strong>编码：</strong>${escapeHtml(String(d.code || ''))}</p><p><strong>名称：</strong>${escapeHtml(String(d.name || ''))}</p>`;
+        } else {
+            printInfoDiv.innerHTML = `<p><strong>批量打印：</strong>已选 ${dataList.length} 个标签</p>`;
+        }
+        if (printSummaryDiv) {
+            printSummaryDiv.innerHTML = '将打印 <strong>' + dataList.length + '</strong> 条标签 · 每份 <strong>' + copies + '</strong> 份 · 预估纸张 <strong>' + (dataList.length * copies) + '</strong> 张';
+        }
+        if (printTemplateMeta) {
+            printTemplateMeta.textContent = '模板：' + template.name + ' · 纸张 ' + template.paperWidth + '×' + template.paperHeight + 'mm';
+        }
+    }
+
+    function renderTemplateCards() {
         templateSelectContainer.innerHTML = '';
         printTemplates.forEach((tpl, idx) => {
             const card = document.createElement('div');
@@ -5032,24 +5398,29 @@ window.openBatchStatus = openBatchStatus;
             nameDiv.className = 'template-name';
             nameDiv.textContent = tpl.name;
             card.appendChild(nameDiv);
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'template-meta';
+            metaDiv.textContent = tpl.paperWidth + '×' + tpl.paperHeight + 'mm';
+            card.appendChild(metaDiv);
+            if (tpl.desc) {
+                const descDiv = document.createElement('div');
+                descDiv.className = 'template-desc';
+                descDiv.textContent = tpl.desc;
+                card.appendChild(descDiv);
+            }
             card.addEventListener('click', () => {
                 document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
                 card.classList.add('selected');
                 selectedTemplateIndex = idx;
-                renderInnerPreview(window.currentPrintDataList, printTemplates[idx]);
+                savePrintSettings();
+                renderInnerPreview(window.currentPrintDataList || [], printTemplates[idx]);
+                refreshPrintInfo();
             });
             templateSelectContainer.appendChild(card);
         });
+    }
 
-        if (dataList.length === 1) {
-            const d = dataList[0];
-            printInfoDiv.innerHTML = `<p><strong>编码：</strong>${escapeHtml(String(d.code || ''))}</p><p><strong>名称：</strong>${escapeHtml(String(d.name || ''))}</p>`;
-        } else {
-            printInfoDiv.innerHTML = `<p><strong>批量打印：</strong>已选 ${dataList.length} 个标签</p>`;
-        }
-
-        printPreviewOverlay.classList.add('active');
-
+    function populatePrinters() {
         const printers = getPrinterList();
         printerSelect.innerHTML = '';
         if (printers.length === 0) {
@@ -5057,34 +5428,78 @@ window.openBatchStatus = openBatchStatus;
             option.textContent = '未检测到打印机';
             option.disabled = true;
             printerSelect.appendChild(option);
-        } else {
-            let defaultIndex = 0;
-            const virtualKeywords = ['pdf', 'wps', 'fax', 'virtual', 'one note', 'onenote', 'microsoft print to pdf', 'print to pdf'];
-            for (let i = 0; i < printers.length; i++) {
-                const name = printers[i].toLowerCase();
-                if (!virtualKeywords.some(k => name.includes(k))) {
-                    defaultIndex = i;
-                    break;
-                }
-            }
-            printers.forEach((name, index) => {
-                const option = document.createElement('option');
-                option.value = index;
-                option.textContent = name;
-                printerSelect.appendChild(option);
-            });
-            printerSelect.value = defaultIndex;
+            return { printers: printers, fallback: false };
         }
-
-        printCopiesInput.value = 1;
-        window.currentPrintDataList = dataList;
-        
-        renderInnerPreview(dataList, printTemplates[selectedTemplateIndex]);
+        const virtualKeywords = ['pdf', 'wps', 'fax', 'virtual', 'one note', 'onenote', 'microsoft print to pdf', 'print to pdf'];
+        let defaultIndex = 0;
+        for (let i = 0; i < printers.length; i++) {
+            const name = printers[i].toLowerCase();
+            if (!virtualKeywords.some(k => name.includes(k))) {
+                defaultIndex = i;
+                break;
+            }
+        }
+        printers.forEach((name, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = name;
+            printerSelect.appendChild(option);
+        });
+        let fallback = false;
+        if (printSettings.printerName) {
+            const savedIndex = printers.indexOf(printSettings.printerName);
+            if (savedIndex !== -1) defaultIndex = savedIndex;
+            else fallback = true;
+        }
+        printerSelect.value = defaultIndex;
+        return { printers: printers, fallback: fallback };
     }
 
-    function buildLodopPrintData(LODOP, dataList, template, printerIndex) {
+    /** 打开打印预览；entries: [{type:'node'|'item', code, parentCode}] */
+    function openPrintPreview(entries, options) {
+        options = options || {};
+        if (readOnly) { toast('当前为只读保护状态，无法打印', 'error'); return false; }
+        loadPrintSettings();
+        var resolved = resolvePrintEntries(entries, {});
+        if (!resolved.dataList.length) {
+            toast('无法打印：' + (resolved.errors[0] || '没有可打印的库存/节点'), { type: 'error', duration: 7000 });
+            return false;
+        }
+        if (resolved.dropped > 0) {
+            toast('已跳过 ' + resolved.dropped + ' 个已删除/不存在的条目：' + resolved.errors[0], { type: 'warn', duration: 6000 });
+        }
+        window.currentPrintEntries = resolved.entries;
+        window.currentPrintDataList = resolved.dataList;
+
+        selectedTemplateIndex = clampInt(printSettings.templateIndex, 0, printTemplates.length - 1, 0);
+        renderTemplateCards();
+        var printerResult = populatePrinters();
+        if (printerResult.fallback) {
+            toast('上次使用的打印机「' + printSettings.printerName + '」不可用，已回落到默认打印机', { type: 'warn', duration: 5000 });
+        }
+        printCopiesInput.value = clampInt(printSettings.copies, 1, 100, 1);
+        if (printPreviewMode) printPreviewMode.checked = !!printSettings.previewBeforePrint;
+
+        refreshPrintInfo();
+        setPrintStatus(getLodopInstance(false) ? '' : '未检测到 C-Lodop：系统预览/打印不可用，可用内置示意图查看版式。', false);
+        printPreviewOverlay.classList.add('active');
+        renderInnerPreview(resolved.dataList, printTemplates[selectedTemplateIndex]);
+        setTimeout(function () { printExecute.focus(); }, 40);
+        return true;
+    }
+
+    function closePrintPreview() {
+        printPreviewOverlay.classList.remove('active');
+        window.currentPrintEntries = null;
+        window.currentPrintDataList = null;
+        setPrintStatus('');
+    }
+
+    function buildLodopPrintData(LODOP, dataList, template, printerIndex, copies) {
+        // 指令顺序：PRINT_INIT → SET_PRINT_PAGESIZE → SET_PRINT_COPIES → 内容 → PRINT/PREVIEW
         LODOP.PRINT_INIT(template.name || '标签打印');
         LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
+        LODOP.SET_PRINT_COPIES(copies);
         if (!isNaN(printerIndex) && printerIndex >= 0) {
             LODOP.SET_PRINTER_INDEX(printerIndex);
         }
@@ -5115,9 +5530,9 @@ window.openBatchStatus = openBatchStatus;
                     let finalFontSize = el.fontSize;
                     if (el.dynamicSize && value) {
                         const codeText = data[el.field] || '';
-                        finalFontSize = calcDynamicFontSize(codeText, el.width, el.height, el.fontSize, el.fontName, el.bold);
+                        finalFontSize = calcDynamicFontSize(codeText, el.width, el.height, el.fontSize, el.fontName, el.bold, el.prefix || '');
                     }
-                    
+
                     const htmlContent = `
                         <div style="
                             width: ${el.width}mm; 
@@ -5134,14 +5549,14 @@ window.openBatchStatus = openBatchStatus;
                             padding: 0;
                         ">
                             <div style="display: table-cell; vertical-align: middle;">
-                                ${escapeHtml(value)}
+                                ${escapeHtml(String(value))}
                             </div>
                         </div>
                     `;
                     LODOP.ADD_PRINT_HTM(y, x, width, height, htmlContent);
                 } else if (el.type === 'barcode') {
                     let barcodeValue = data[el.field] !== undefined ? data[el.field] : '';
-                    LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, barcodeValue);
+                    LODOP.ADD_PRINT_BARCODE(y, x, width, height, el.barcodeType, String(barcodeValue));
                     LODOP.SET_PRINT_STYLEA(0, "Horient", 2);
                     LODOP.SET_PRINT_STYLEA(0, "Alignment", 2);
                 }
@@ -5152,76 +5567,183 @@ window.openBatchStatus = openBatchStatus;
         });
     }
 
-    function executePrint() {
-        const LODOP = getLodopInstance();
-        if (!LODOP) return;
+    /** 打印/系统预览前：先读远端最新数据，再按 code 重新解析；已删除/改名/不存在则中止 */
+    async function revalidatePrintData() {
+        var remoteDoc = null;
+        try {
+            var remote = await Z.get(currentToken, currentGistId, currentFilename);
+            remoteDoc = remote && remote.data ? remote.data : null;
+        } catch (e) {
+            console.warn('打印前读取远端最新数据失败，使用本地缓存校验', e);
+        }
+        var doc = remoteDoc || gistData;
+        var resolved = resolvePrintEntries(window.currentPrintEntries, { doc: doc });
+        var errors = resolved.errors.slice();
+        if (!resolved.dataList.length) {
+            if (!errors.length) errors.push('没有可打印的数据');
+            var reason = '打印已中止：' + (remoteDoc ? '远端数据已变更（可能已改名或删除：' : '') + errors[0] + '），请刷新后重试';
+            setPrintStatus(reason, true);
+            toast(reason, { type: 'error', duration: 7000 });
+            return null;
+        }
+        if (resolved.dropped > 0) {
+            var skipReason = '已跳过 ' + resolved.dropped + ' 个已删除/不存在的条目（' + errors[0] + '）';
+            setPrintStatus(skipReason, true);
+            toast(skipReason, { type: 'warn', duration: 6000 });
+        }
+        if (!remoteDoc) setPrintStatus('无法读取远端最新数据，已使用本地缓存校验并继续打印', false);
+        window.currentPrintEntries = resolved.entries;
+        window.currentPrintDataList = resolved.dataList;
+        renderInnerPreview(resolved.dataList, printTemplates[selectedTemplateIndex]);
+        refreshPrintInfo();
+        return resolved;
+    }
 
-        const dataList = window.currentPrintDataList;
-        if (!dataList || dataList.length === 0) return;
+    async function executePrint() {
+        if (printBusy) return;
+        var LODOP = getLodopInstance(true);
+        if (!LODOP) { setPrintStatus('未检测到 C-Lodop 打印服务，请安装并启动后刷新页面', true); return; }
+        setPrintBusy(true);
+        try {
+            var resolved = await revalidatePrintData();
+            if (!resolved) return;
+            var template = printTemplates[selectedTemplateIndex] || printTemplates[0];
+            var printerIndex = parseInt(printerSelect.value, 10);
+            var copies = clampInt(printCopiesInput.value, 1, 100, 1);
+            var printerName = getSelectedPrinterName();
+            if (isNaN(printerIndex)) {
+                setPrintStatus('请选择打印机', true);
+                toast('请选择打印机', 'warn');
+                return;
+            }
+            savePrintSettings();
+            buildLodopPrintData(LODOP, resolved.dataList, template, printerIndex, copies);
+            var usePreview = !!(printPreviewMode && printPreviewMode.checked);
+            if (usePreview) {
+                var previewResult = LODOP.PREVIEW();
+                if (previewResult === false) throw new Error('LODOP.PREVIEW() 返回 false');
+                setPrintStatus('已调用系统预览，请确认后关闭预览再决定是否打印。', false);
+                toast('已调用系统预览（设置中勾选了“打印前先预览”）', 'success');
+                return;
+            }
+            var printResult = LODOP.PRINT();
+            if (printResult === false) throw new Error('LODOP.PRINT() 返回 false');
+            savePrintSettings();
+            toast('已发送 ' + (resolved.dataList.length * copies) + ' 份到 ' + (printerName || '默认打印机'), 'success');
+            closePrintPreview();
+        } catch (e) {
+            var message = e && e.message ? e.message : String(e);
+            setPrintStatus('打印失败：' + message, true);
+            toast('打印失败：' + message, { type: 'error', duration: 7000 });
+        } finally {
+            setPrintBusy(false);
+        }
+    }
 
-        const template = printTemplates[selectedTemplateIndex];
-        const printerIndex = parseInt(printerSelect.value);
-        const copies = parseInt(printCopiesInput.value) || 1;
-
-        if (isNaN(printerIndex)) {
-            alert('请选择打印机');
+    async function showLodopPreview() {
+        if (printBusy) return;
+        var LODOP = getLodopInstance(true);
+        if (!LODOP) {
+            setPrintStatus('未检测到 C-Lodop，已回退内置示意图预览', true);
+            toast('未检测到 C-Lodop，已回退内置示意图预览', 'warn');
+            if (window.currentPrintDataList) renderInnerPreview(window.currentPrintDataList, printTemplates[selectedTemplateIndex]);
             return;
         }
-
-        LODOP.SET_PRINT_COPIES(copies);
-        buildLodopPrintData(LODOP, dataList, template, printerIndex);
-        LODOP.PRINT();
-
-        printPreviewOverlay.classList.remove('active');
+        setPrintBusy(true);
+        try {
+            var resolved = await revalidatePrintData();
+            if (!resolved) return;
+            var template = printTemplates[selectedTemplateIndex] || printTemplates[0];
+            var printerIndex = parseInt(printerSelect.value, 10);
+            var copies = clampInt(printCopiesInput.value, 1, 100, 1);
+            savePrintSettings();
+            buildLodopPrintData(LODOP, resolved.dataList, template, printerIndex, copies);
+            var result = LODOP.PREVIEW();
+            if (result === false) throw new Error('LODOP.PREVIEW() 返回 false');
+            setPrintStatus('已调用系统预览。', false);
+            toast('已调用系统预览', 'success');
+        } catch (e) {
+            var message = e && e.message ? e.message : String(e);
+            setPrintStatus('系统预览失败，已回退内置示意图：' + message, true);
+            toast('系统预览失败，已回退内置示意图预览', { type: 'warn', duration: 6000 });
+            if (window.currentPrintDataList) renderInnerPreview(window.currentPrintDataList, printTemplates[selectedTemplateIndex]);
+        } finally {
+            setPrintBusy(false);
+        }
     }
 
-    function showLodopPreview() {
-        const LODOP = getLodopInstance();
-        if (!LODOP) return;
+    // ---------- 打印入口（全部带软删除/存在性守卫） ----------
+    window.printNodeLabel = function (code) {
+        var node = findNodeByCode(code);
+        if (!node) { toast('节点不存在：' + code, 'warn'); return false; }
+        if (Z.isDeleted(node)) { toast('节点已在回收站，无法打印：' + code, 'warn'); return false; }
+        return openPrintPreview([{ type: 'node', code: code }], { title: '节点标签' });
+    };
 
-        const dataList = window.currentPrintDataList;
-        if (!dataList || dataList.length === 0) return;
+    window.printItemLabel = function (parentCode, itemCode) {
+        var parent = findNodeByCode(parentCode);
+        if (!parent) { toast('父节点不存在：' + parentCode, 'warn'); return false; }
+        if (Z.isDeleted(parent)) { toast('父节点已在回收站，无法打印库存：' + parentCode, 'warn'); return false; }
+        var item = Z.findItem(parent, itemCode);
+        if (!item) { toast('库存不存在：' + itemCode, 'warn'); return false; }
+        if (Z.isDeleted(item)) { toast('库存已在回收站，无法打印：' + itemCode, 'warn'); return false; }
+        return openPrintPreview([{ type: 'item', code: itemCode, parentCode: parentCode }], { title: '库存标签' });
+    };
 
-        const template = printTemplates[selectedTemplateIndex];
-        const printerIndex = parseInt(printerSelect.value);
-
-        buildLodopPrintData(LODOP, dataList, template, printerIndex);
-        LODOP.PREVIEW();
+    function collectNodeItemEntries(node, code) {
+        var entries = [];
+        (Array.isArray(node.items) ? node.items : []).forEach(function (item) {
+            if (item && item.code && !Z.isDeleted(item)) entries.push({ type: 'item', code: item.code, parentCode: code });
+        });
+        if (node.children && typeof node.children === 'object') {
+            Object.keys(node.children).forEach(function (childCode) {
+                var child = node.children[childCode];
+                if (child && !Z.isDeleted(child)) entries = entries.concat(collectNodeItemEntries(child, childCode));
+            });
+        }
+        return entries;
     }
 
-    window.printNodeLabel = function(code) {
-        const node = findNodeByCode(code);
-        if (!node) { alert('节点不存在'); return; }
-        const data = {
-            code: code,
-            name: node.name || '',
-            cost: node.cost,
-            orderNumber: node.orderNumber,
-            trackingNumber: node.trackingNumber,
-            qrLinks: node.qrLinks
-        };
-        openPrintPreview([data]);
+    window.printNodeItems = function (code) {
+        var node = findNodeByCode(code);
+        if (!node || Z.isDeleted(node)) { toast('节点不存在或已在回收站：' + code, 'warn'); return false; }
+        var entries = collectNodeItemEntries(node, code);
+        if (!entries.length) { toast('该节点下没有可打印的库存', 'warn'); return false; }
+        return openPrintPreview(entries, { title: '打印全部库存' });
     };
 
-    window.printItemLabel = function(parentCode, itemCode) {
-        const parent = findNodeByCode(parentCode);
-        if (!parent) { alert('父节点不存在'); return; }
-        const item = parent.items ? parent.items.find(it => it.code === itemCode) : null;
-        if (!item) { alert('库存项不存在'); return; }
-        const data = {
-            code: itemCode,
-            name: item.name || parent.name || '',
-            cost: item.cost,
-            orderNumber: item.orderNumber,
-            trackingNumber: item.trackingNumber,
-            qrLinks: item.qrLinks
-        };
-        openPrintPreview([data]);
-    };
+    function batchPrintItems(parentCode) {
+        var selected = getSelectedItems(parentCode);
+        if (!selected.length) { toast('请先选择要打印的库存项', 'warn'); return; }
+        var entries = selected.map(function (itemCode) {
+            return { type: 'item', code: itemCode, parentCode: parentCode };
+        });
+        openPrintPreview(entries, { title: '批量打印' });
+    }
+    window.batchPrintItems = batchPrintItems;
 
-    printPreviewCancel.addEventListener('click', () => printPreviewOverlay.classList.remove('active'));
+    function globalBatchPrintItems() {
+        var entries = [];
+        collectCheckedItemEntries().forEach(function (entry) {
+            entry.itemCodes.forEach(function (itemCode) {
+                entries.push({ type: 'item', code: itemCode, parentCode: entry.parentCode });
+            });
+        });
+        if (!entries.length) { toast('请先勾选要打印的库存项（可用“全选当前筛选结果”）', 'warn'); return; }
+        openPrintPreview(entries, { title: '跨节点批量打印' });
+    }
+
+    printPreviewCancel.addEventListener('click', closePrintPreview);
     printPreviewBtn.addEventListener('click', showLodopPreview);
     printExecute.addEventListener('click', executePrint);
+    printCopiesInput.addEventListener('change', function () {
+        printCopiesInput.value = clampInt(printCopiesInput.value, 1, 100, 1);
+        savePrintSettings();
+        refreshPrintInfo();
+    });
+    if (printPreviewMode) printPreviewMode.addEventListener('change', function () { savePrintSettings(); });
+    printerSelect.addEventListener('change', function () { savePrintSettings(); });
+    if (globalBatchPrintBtn) globalBatchPrintBtn.addEventListener('click', globalBatchPrintItems);
 
     // ---------- 初始化与自动登录 ----------
     (function initAdmin() {
@@ -5259,7 +5781,7 @@ window.openBatchStatus = openBatchStatus;
         }
     })();
 
-    console.log('管理后台已加载（ZCFI R2b：搜索防抖/高亮、排序、汇总、复制、批量新增、视图持久化、响应式）');
+    console.log('管理后台已加载（ZCFI R3：打印 v2 模板/顺序/设置记忆/预览/守卫）');
 </script>
 </body>
 </html>
