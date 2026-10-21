@@ -1,4 +1,6 @@
-```
+# ===== 本地开发/测试/备份（不参与站点发布，也不要提交仓库）=====
+local_dev/
+
 # Compiled and build artifacts
 *.pyc
 __pycache__/
@@ -69,4 +71,3 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
