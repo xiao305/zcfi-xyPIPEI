@@ -63,16 +63,17 @@
 
 1. 选择要查看的提交版本。
 2. 查看节点/库存统计与字段差异概览。
-3. 点「恢复此版本…」确认。
-4. 恢复前会自动下载当前数据备份。
+3. 点「恢复此版本…」确认（按提示输入 `RESTORE`）。
+4. 恢复前会自动下载当前数据备份；恢复只替换 `products`，根级其它字段保留。
 
 也可以在 GitHub Gist 网页的 **Revisions** 里查看历史（更底层，不推荐普通用户直接改）。
 
-### 2.5 扫码历史
+### 2.5 扫码历史与本地偏好
 
 - 扫码历史只在本机，不是商品数据。
 - 「更多 → 清空历史」需确认；清空后 12 秒内可撤销（保留最近 20 条）。
 - 换手机/清理浏览器会丢失，且不同步。
+- 视图状态（`zcfi_admin_view_v1`）、打印设置（`zcfi_print_settings_v1`）、scan 设置（`zcfi_scan_settings_v1`）也是本机偏好，不在 Gist 中；清理浏览器后需要重新设置。
 
 ---
 
@@ -124,6 +125,10 @@
 | `backup-r1-core21` | 核心 2.1.0 |
 | `backup-r2a` | 后台 R2a |
 | `backup-r2-scan` | 扫码端 R2 |
+| `backup-r2b` | 后台 R2b（搜索/排序/汇总/复制/批量/响应式） |
+| `backup-scan-fix` | 扫码端一致性修复（凭据/历史已删除标记） |
+| `backup-r3` | 后台 R3 打印 v2 + 一致性修复 |
+| `backup-docs` | 文档终稿（README/CHANGELOG/docs） |
 
 查看：
 
@@ -136,9 +141,9 @@ git -C "E:\脚本存放\自动扫码系统" log --oneline -10
 
 ```powershell
 cd "E:\脚本存放\自动扫码系统"
-git checkout backup-r2-scan -- scan.html
+git checkout backup-r3 -- admin.html
 # 或
-git checkout backup-r2a -- admin.html
+git checkout backup-scan-fix -- scan.html
 # 核心
 git checkout backup-r1-core21 -- js/core.js
 ```
@@ -151,14 +156,14 @@ git checkout backup-r1-core21 -- js/core.js
 cd "E:\脚本存放\自动扫码系统"
 git status                 # 先确认没有未提交的重要改动
 git log --oneline -5       # 确认目标提交
-git reset --hard backup-r2-scan
+git reset --hard backup-r3
 ```
 
 - `reset --hard` 会丢弃当前未提交改动，**执行前务必确认**。
 - 如果只想看旧版本而不改动工作区：
 
   ```powershell
-  git show backup-r2-scan:scan.html | Out-File -Encoding utf8 "local_dev\backups\scan-r2-history.html"
+  git show backup-r3:admin.html | Out-File -Encoding utf8 "local_dev\backups\admin-r3-history.html"
   ```
 
 ### 4.5 回滚后检查

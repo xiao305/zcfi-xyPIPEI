@@ -2,11 +2,11 @@
 
 本文面向维护者/开发者，说明页面、数据层和 GitHub Gist 的关系。最终用户请读 [用户手册](USER-GUIDE.md)。
 
-当前基线（2026-10-21）：
+当前基线（2026-10-21 最终）：
 
 - 核心：`js/core.js` **v2.1.0**
-- 管理后台：R2a（提交 `6922a6e`）
-- 扫码端：R2（提交 `9dc7bcf`）
+- 管理后台：**R3**（R2b 提交 `65b8713` + R3 提交 `63c9ca8`）
+- 扫码端：**R2 + 一致性修复**（`9dc7bcf` + `09afad0`）
 - 站点：GitHub Pages 静态站，自定义域名 `xypipei.zcfi.cn`
 
 ---
@@ -216,15 +216,15 @@ ZCFI.save()
 
 | 能力 | admin.html | scan.html |
 | --- | --- | --- |
-| 登录（Token/Gist） | ✅ 可选记住（local/session） | ✅ 固定 localStorage |
-| 商品树/搜索/筛选 | ✅ | 只读查询（按编码/单号/链接匹配） |
-| 新增/编辑/删除/回收站 | ✅ | ❌（只能备注/关联/标售出） |
-| 批量状态/批量打印 | ✅ | ❌ |
+| 登录（Token/Gist） | ✅ 可选记住（local/session，默认勾选） | ✅ 可选记住（local/session，默认勾选） |
+| 商品树/搜索/筛选/排序/汇总 | ✅（R2b） | 只读查询（按编码/单号/链接匹配） |
+| 新增/编辑/删除/复制/添加 N 件/回收站 | ✅ | ❌（只能备注/关联/标售出） |
+| 批量状态/批量打印/跨节点批量 | ✅ | ❌ |
 | 导出/导入/体检/历史版本/本地快照 | ✅ | ❌ |
 | 连续扫码/相册识别/手电筒/震动提示音 | ❌ | ✅ |
 | 关联快递/订单/链接 | ✅（编辑弹窗手填） | ✅（扫码/手动） |
-| 历史记录 | Gist 历史版本 | 本机扫码流水（localStorage） |
-| 打印（CLodop） | ✅ | ❌ |
+| 历史记录 | Gist 历史版本 | 本机扫码流水（localStorage，含已删除标记） |
+| 打印（CLodop，3 模板/份数/设置记忆/打印前复核） | ✅（R3） | ❌ |
 
 两端共享 `js/core.js`，因此状态词表、转义、Gist 读写、保存合并、软删除判断、错误提示保持一致。
 
@@ -234,13 +234,15 @@ ZCFI.save()
 
 | 键 | 页面 | 内容 |
 | --- | --- | --- |
-| `github_token` / `gist_id` / `gist_filename` | 两端 | 登录凭据（admin 可能放 sessionStorage） |
+| `github_token` / `gist_id` / `gist_filename` | 两端 | 登录凭据；默认勾选写 localStorage，取消后写 sessionStorage |
 | `zcfi_admin_snapshots_v1` | admin | 自动本地快照（最多 3 份） |
-| `zcfi_scan_history_v1` | scan | 扫码历史（最近 200 条） |
+| `zcfi_admin_view_v1` | admin | 搜索/筛选/排序/展开视图记忆 |
+| `zcfi_print_settings_v1` | admin | 打印模板/打印机/份数/预览偏好 |
+| `zcfi_scan_history_v1` | scan | 扫码历史（最近 200 条，含 ref） |
 | `zcfi_scan_history_backup_v1` | scan | 清空历史撤销备份（最近 20 条） |
 | `zcfi_scan_settings_v1` | scan | 连续模式/震动/提示音设置 |
 
-> 已知差异：admin 支持 sessionStorage（不记住登录），scan 只读写 localStorage，且退出时只清 localStorage。详见 [一致性审查](CONSISTENCY-REVIEW.md)。
+> 凭据读取均以 sessionStorage 优先、localStorage 兜底；退出同时清理两处（R2b/09afad0 起两端一致）。详见 [一致性审查](CONSISTENCY-REVIEW.md)。
 
 ---
 
@@ -259,11 +261,13 @@ ZCFI.save()
 ## 9. 已知限制 / 后续
 
 - Gist 单文件约 1 MB 限制；超大数据的拆分/压缩策略尚未实现。
-- R2b（admin 搜索/排序/汇总/复制/响应式）与 R3（打印 v2）仍在进行。
-- 打印效果受本机 C-Lodop/打印机/驱动影响，需现场验证。
-- 扫码历史仅本机，不跨设备同步。
-- admin/scan 的凭据读写存在 sessionStorage/localStorage 差异（待统一）。
+- 打印效果受本机 C-Lodop/打印机/驱动影响，需**真实打印机现场验收**；内置 canvas 预览只是示意图。
+- 扫码历史仅本机，不跨设备同步；已删除商品记录会显示「已删除」徽章但保留审计痕迹。
+- 编码大小写/重复：后台导入/体检会拦截大小写重复、提示非大写；历史遗留数据仍建议规范化。
+- 默认 Gist ID 在两端登录框硬编码为示例值（P3-3 未修，可接受；使用自己的 Gist 时必须改）。
+- R2b 搜索为保持展开/滚动性能，未命中节点可能保留在 DOM 中（隐藏 class 控制显示）。
 - 没有 Service Worker/PWA 离线包。
 - 没有多用户账号/权限体系，依赖共用 Token 的信任模型。
+- 真机打印与用户真实 Gist 数据验收仍待完成。
 
-相关审查问题见 [docs/CONSISTENCY-REVIEW.md](CONSISTENCY-REVIEW.md)。
+相关审查问题与修复状态见 [docs/CONSISTENCY-REVIEW.md](CONSISTENCY-REVIEW.md)。
