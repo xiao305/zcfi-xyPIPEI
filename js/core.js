@@ -1,0 +1,908 @@
+/*!
+ * zcfi-core.js v2.0.0
+ * 共享核心：状态词表 / 转义 / 编码规范化 / GitHub Gist 严格读写 / 并发安全三方合并保存引擎 / 通用工具
+ *
+ * 用法：在页面业务脚本之前引入
+ *   <script src="js/core.js"></script>
+ * 之后使用 window.ZCFI
+ *
+ * 保存示例：
+ *   const result = await ZCFI.save({
+ *     token, gistId, filename,
+ *     baseDoc,                 // 上次成功读取/保存的完整文档快照（用于三方合并基准）
+ *     ops: [
+ *       { type: 'node.upsert', code, parentCode, originalCode, baseNode, fields },
+ *       { type: 'item.upsert', parentCode, code, originalCode, baseItem, fields },
+ *       { type: 'node.delete', code, baseNode },
+ *       { type: 'item.delete', parentCode, code, baseItem }
+ *     ],
+ *     onConflict: async (conflicts) => ['mine', 'theirs', ...], // 与 conflicts 等长；返回 null 表示放弃
+ *     onRetry: async (err, attempt) => { ... }
+ *   });
+ *   gistData = result.data;
+ *
+ * 设计原则：
+ *   1. 写之前必须重新 GET 远端，把本次 ops 应用到“远端副本”上再 PATCH，绝不整库覆盖；
+ *   2. 每个字段以 baseDoc 为基准做三方比较，远端被别人改过就产生冲突交给页面确认；
+ *   3. 同一个 gist+file 的写操作串行化；
+ *   4. 读取失败（文件不存在 / JSON 损坏 / 内容截断 / 结构异常）一律抛错，绝不静默返回空数据。
+ */
+(function (global) {
+    'use strict';
+
+    var VERSION = '2.0.0';
+    var API_ROOT = 'https://api.github.com';
+    var INVISIBLE_RE = /[\u200B-\u200D\u2060\uFEFF]/g;
+    var DEFAULT_TIMEOUT = 15000;
+    var DEFAULT_SAVE_TIMEOUT = 25000;
+
+    /* ============================================================
+     * 一、状态词表
+     * 业务统一为 待售 / 在售 / 售出；兼容历史数据里的“已售”等写法
+     * ============================================================ */
+    var STATUS = { PENDING: '待售', ON_SALE: '在售', SOLD: '售出' };
+    var STATUS_LIST = [STATUS.PENDING, STATUS.ON_SALE, STATUS.SOLD];
+    var STATUS_ALIASES = {
+        '已售': STATUS.SOLD,
+        '已卖出': STATUS.SOLD,
+        '已售出': STATUS.SOLD,
+        '已卖': STATUS.SOLD,
+        'sold': STATUS.SOLD,
+        'sale': STATUS.SOLD,
+        'onsale': STATUS.ON_SALE,
+        'on_sale': STATUS.ON_SALE,
+        '在售中': STATUS.ON_SALE,
+        '待出售': STATUS.PENDING,
+        'pending': STATUS.PENDING
+    };
+
+    function normalizeStatus(value) {
+        if (value === null || value === undefined) return STATUS.ON_SALE;
+        var raw = String(value).replace(INVISIBLE_RE, '').trim();
+        if (!raw) return STATUS.ON_SALE;
+        if (STATUS_ALIASES[raw]) return STATUS_ALIASES[raw];
+        var lower = raw.toLowerCase();
+        if (STATUS_ALIASES[lower]) return STATUS_ALIASES[lower];
+        return raw;
+    }
+
+    function statusClass(value) {
+        var s = normalizeStatus(value);
+        if (s === STATUS.SOLD) return 'status-sold';
+        if (s === STATUS.PENDING) return 'status-pending';
+        if (s === STATUS.ON_SALE) return 'status-onsale';
+        return 'status-unknown';
+    }
+
+    /* ============================================================
+     * 二、转义与规范化
+     * ============================================================ */
+    var HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' };
+
+    function escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value).replace(/[&<>"'`]/g, function (ch) { return HTML_ESCAPES[ch]; });
+    }
+
+    function escapeAttr(value) {
+        return escapeHtml(value);
+    }
+
+    /** 编码/单号规范：去零宽字符、BOM，去掉所有空白（含全角空格） */
+    function normalizeCode(value) {
+        if (value === null || value === undefined) return '';
+        return String(value).replace(INVISIBLE_RE, '').replace(/[\s\u3000]+/g, '');
+    }
+
+    /** 搜索关键词规范：去零宽，首尾 trim，小写；保留内部空格 */
+    function normalizeQuery(value) {
+        if (value === null || value === undefined) return '';
+        return String(value).replace(INVISIBLE_RE, '').trim().toLowerCase();
+    }
+
+    function sameCode(a, b) {
+        var x = normalizeCode(a).toLowerCase();
+        var y = normalizeCode(b).toLowerCase();
+        return !!x && x === y;
+    }
+
+    function normalizeUrl(value) {
+        if (value === null || value === undefined) return '';
+        return String(value).replace(INVISIBLE_RE, '').trim();
+    }
+
+    function sameUrl(a, b) {
+        var x = normalizeUrl(a).replace(/\/+$/, '').toLowerCase();
+        var y = normalizeUrl(b).replace(/\/+$/, '').toLowerCase();
+        return !!x && x === y;
+    }
+
+    function isHttpUrl(value) {
+        return /^https?:\/\//i.test(normalizeUrl(value));
+    }
+
+    function isPlainObject(value) {
+        return !!value && typeof value === 'object' && !Array.isArray(value);
+    }
+
+    function clone(value) {
+        if (value === null || value === undefined) return value;
+        if (typeof structuredClone === 'function') {
+            try { return structuredClone(value); } catch (e) { /* 回退到 JSON */ }
+        }
+        return JSON.parse(JSON.stringify(value));
+    }
+
+    function valuesEqual(a, b) {
+        var x = a === undefined ? null : a;
+        var y = b === undefined ? null : b;
+        if (x === y) return true;
+        if (typeof x !== 'object' || typeof y !== 'object' || x === null || y === null) return false;
+        try { return JSON.stringify(x) === JSON.stringify(y); } catch (e) { return false; }
+    }
+
+    /* ============================================================
+     * 三、错误与提示
+     * ============================================================ */
+    function makeError(code, message, extra) {
+        var err = new Error(message);
+        err.code = code;
+        if (extra) {
+            for (var k in extra) {
+                if (Object.prototype.hasOwnProperty.call(extra, k)) err[k] = extra[k];
+            }
+        }
+        return err;
+    }
+
+    function isRetryableError(err) {
+        return !!err && (err.code === 'NETWORK' || err.code === 'SERVER');
+    }
+
+    function friendlyError(err) {
+        if (!err) return '未知错误';
+        if (err.code === 'FILE_MISSING') return 'Gist 中找不到数据文件，请检查“文件名”是否正确（默认 data.json）。';
+        if (err.code === 'TRUNCATED') return '数据文件过大，GitHub 只返回了部分内容。已停止加载以避免数据损坏，请先备份并拆分/压缩数据。';
+        if (err.code === 'PARSE') return '数据文件不是合法 JSON，可能已损坏。已停止进入编辑状态，请先用备份恢复。';
+        if (err.code === 'SCHEMA') return '数据结构异常（缺少 products 对象）。已停止进入编辑状态，避免误写。';
+        if (err.code === 'EMPTY') return '数据文件内容为空。已停止加载，避免用空数据覆盖。';
+        if (err.code === 'AUTH') return err.message || '登录凭证无效或权限不足，请重新登录。';
+        if (err.code === 'NETWORK') return '网络请求超时或失败，请检查网络后重试。';
+        if (err.code === 'RATE_LIMIT') return 'GitHub API 频率超限，请稍后再试。';
+        if (err.code === 'CONFLICT_ABORTED') return '检测到他人同时修改，已取消本次保存。可刷新后重试。';
+        if (err.code === 'CONFLICT_UNRESOLVED') return '冲突未能解决，已取消保存。';
+        if (err.code === 'CODE_EXISTS') return err.message || '编码已存在。';
+        if (err.code === 'PARENT_MISSING') return err.message || '父节点不存在，请刷新后重试。';
+        return err.message || String(err);
+    }
+
+    /* ============================================================
+     * 四、本地存储 / 下载 / 时间 / Toast
+     * ============================================================ */
+    var storage = {
+        get: function (key, fallback) {
+            try {
+                var v = global.localStorage.getItem(key);
+                return v === null ? fallback : v;
+            } catch (e) { return fallback; }
+        },
+        set: function (key, value) {
+            try { global.localStorage.setItem(key, String(value)); return true; } catch (e) { return false; }
+        },
+        remove: function (key) {
+            try { global.localStorage.removeItem(key); } catch (e) { /* ignore */ }
+        },
+        getJson: function (key, fallback) {
+            var raw = storage.get(key, null);
+            if (raw === null) return fallback;
+            try { return JSON.parse(raw); } catch (e) { return fallback; }
+        },
+        setJson: function (key, value) {
+            try { return storage.set(key, JSON.stringify(value)); } catch (e) { return false; }
+        }
+    };
+
+    function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+    function formatDateTime(ts) {
+        var d = ts instanceof Date ? ts : new Date(ts);
+        if (isNaN(d.getTime())) return '';
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' +
+            pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+    }
+
+    function formatTime(ts) {
+        var d = ts instanceof Date ? ts : new Date(ts);
+        if (isNaN(d.getTime())) return '';
+        return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    }
+
+    function downloadJson(filename, data) {
+        var text = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+        var blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename || ('zcfi-backup-' + Date.now() + '.json');
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () {
+            URL.revokeObjectURL(url);
+            if (a.parentNode) a.parentNode.removeChild(a);
+        }, 0);
+    }
+
+    var toastHost = null;
+    function ensureToastHost() {
+        if (typeof document === 'undefined' || !document.body) return null;
+        if (toastHost && toastHost.parentNode) return toastHost;
+        toastHost = document.createElement('div');
+        toastHost.id = 'zcfi-toast-host';
+        toastHost.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:2147483647;' +
+            'display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;max-width:92vw;';
+        document.body.appendChild(toastHost);
+        return toastHost;
+    }
+
+    function toast(message, options) {
+        options = options || {};
+        var host = ensureToastHost();
+        if (!host) {
+            try { console.log('[toast]', message); } catch (e) { /* ignore */ }
+            return null;
+        }
+        var type = options.type || 'info';
+        var colors = { success: '#16a34a', error: '#dc2626', warn: '#d97706', info: '#2563eb' };
+        var el = document.createElement('div');
+        el.setAttribute('role', 'status');
+        el.style.cssText = 'pointer-events:auto;background:#fff;color:#0f172a;border-left:4px solid ' +
+            (colors[type] || colors.info) + ';box-shadow:0 8px 24px rgba(15,23,42,.18);border-radius:10px;' +
+            'padding:10px 16px;font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;max-width:100%;' +
+            'white-space:pre-wrap;word-break:break-word;opacity:0;transition:opacity .18s ease,transform .18s ease;' +
+            'transform:translateY(6px);';
+        el.textContent = message === null || message === undefined ? '' : String(message);
+        host.appendChild(el);
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(function () { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+        } else {
+            el.style.opacity = '1';
+        }
+        var duration = typeof options.duration === 'number' ? options.duration : (type === 'error' ? 5200 : 2600);
+        setTimeout(function () {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(6px)';
+            setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+        }, duration);
+        return el;
+    }
+
+    /* ============================================================
+     * 五、文档查询
+     * ============================================================ */
+    function getProducts(docOrProducts) {
+        if (docOrProducts && isPlainObject(docOrProducts.products)) return docOrProducts.products;
+        if (isPlainObject(docOrProducts)) return docOrProducts;
+        return {};
+    }
+
+    function findNodeByCode(docOrProducts, code) {
+        var products = getProducts(docOrProducts);
+        if (!code) return null;
+        var target = String(code);
+        if (Object.prototype.hasOwnProperty.call(products, target)) return products[target];
+        for (var key in products) {
+            if (!Object.prototype.hasOwnProperty.call(products, key)) continue;
+            var node = products[key];
+            if (node && isPlainObject(node.children)) {
+                var found = findNodeByCode(node.children, target);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    /** 返回 { container, key, node, parentCode } */
+    function findNodeEntry(docOrProducts, code) {
+        var products = getProducts(docOrProducts);
+        if (!code) return null;
+        if (Object.prototype.hasOwnProperty.call(products, code)) {
+            return { container: products, key: code, node: products[code], parentCode: null };
+        }
+        for (var key in products) {
+            if (!Object.prototype.hasOwnProperty.call(products, key)) continue;
+            var node = products[key];
+            if (node && isPlainObject(node.children)) {
+                var found = findNodeEntry(node.children, code);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    function findParentNode(docOrProducts, code) {
+        var entry = findNodeEntry(docOrProducts, code);
+        if (!entry || !entry.parentCode) return null;
+        return findNodeByCode(docOrProducts, entry.parentCode);
+    }
+
+    function findItem(node, itemCode) {
+        if (!node || !Array.isArray(node.items)) return null;
+        for (var i = 0; i < node.items.length; i++) {
+            if (node.items[i] && node.items[i].code === itemCode) return node.items[i];
+        }
+        return null;
+    }
+
+    function walk(docOrProducts, callback) {
+        var products = getProducts(docOrProducts);
+        function visit(container, depth) {
+            for (var key in container) {
+                if (!Object.prototype.hasOwnProperty.call(container, key)) continue;
+                var node = container[key];
+                if (!node || typeof node !== 'object') continue;
+                callback(node, key, depth, container);
+                if (isPlainObject(node.children)) visit(node.children, depth + 1);
+            }
+        }
+        visit(products, 0);
+    }
+
+    function countDescendants(node) {
+        var result = { children: 0, items: 0 };
+        if (!node || typeof node !== 'object') return result;
+        if (Array.isArray(node.items)) result.items += node.items.length;
+        if (isPlainObject(node.children)) {
+            for (var key in node.children) {
+                if (!Object.prototype.hasOwnProperty.call(node.children, key)) continue;
+                result.children += 1;
+                var sub = countDescendants(node.children[key]);
+                result.children += sub.children;
+                result.items += sub.items;
+            }
+        }
+        return result;
+    }
+
+    /** 校验文档基本结构 */
+    function validateDoc(data) {
+        if (!isPlainObject(data)) throw makeError('SCHEMA', '数据结构异常：根节点不是对象');
+        if (!isPlainObject(data.products)) throw makeError('SCHEMA', '数据结构异常：缺少 products 对象');
+        return true;
+    }
+
+    /* ============================================================
+     * 六、GitHub Gist 严格读写
+     * ============================================================ */
+    function fetchWithTimeout(url, options, timeoutMs) {
+        options = options || {};
+        var controller = null;
+        if (typeof AbortController === 'function') {
+            controller = new AbortController();
+            options.signal = controller.signal;
+        }
+        var timer = null;
+        if (controller) {
+            timer = setTimeout(function () { try { controller.abort(); } catch (e) { /* ignore */ } }, timeoutMs || DEFAULT_TIMEOUT);
+        }
+        return Promise.resolve()
+            .then(function () { return fetch(url, options); })
+            .catch(function (err) {
+                if (err && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
+                    throw makeError('NETWORK', '请求超时（' + Math.round((timeoutMs || DEFAULT_TIMEOUT) / 1000) + 's），请检查网络后重试');
+                }
+                throw makeError('NETWORK', '网络请求失败：' + (err && err.message ? err.message : err));
+            })
+            .then(function (resp) {
+                if (timer) clearTimeout(timer);
+                return resp;
+            }, function (err) {
+                if (timer) clearTimeout(timer);
+                throw err;
+            });
+    }
+
+    function httpError(resp, body, action) {
+        var detail = body && body.message ? body.message : (resp.statusText || '');
+        if (resp.status === 401) return makeError('AUTH', 'GitHub Token 无效或已过期（401），请重新登录', { status: 401, detail: detail });
+        if (resp.status === 403) return makeError('AUTH', '没有访问该 Gist 的权限，或 API 频率已超限（403）：' + detail, { status: 403, detail: detail });
+        if (resp.status === 404) return makeError('FILE_MISSING', '找不到该 Gist（404），请检查 Gist ID 是否正确', { status: 404, detail: detail });
+        if (resp.status === 409) return makeError('SERVER', 'GitHub 报告版本冲突（409），请稍后重试', { status: 409, detail: detail });
+        if (resp.status === 422) return makeError('SAVE_FAILED', 'GitHub 拒绝写入（422）：' + detail, { status: 422, detail: detail });
+        if (resp.status === 429) return makeError('RATE_LIMIT', 'GitHub API 频率超限（429），请稍后再试', { status: 429, detail: detail });
+        if (resp.status >= 500) return makeError('SERVER', 'GitHub 服务异常（' + resp.status + '），请稍后重试', { status: resp.status, detail: detail });
+        return makeError('SAVE_FAILED', (action || '操作') + '失败（' + resp.status + '）：' + detail, { status: resp.status, detail: detail });
+    }
+
+    async function parseGistFileContent(file, filename) {
+        if (!file) throw makeError('FILE_MISSING', 'Gist 中找不到文件「' + filename + '」');
+        var text = file.content;
+        // GitHub 对超过约 1MB 的文件会截断 content，此时尝试用 raw_url 拉全量
+        if (file.truncated) {
+            if (file.raw_url) {
+                try {
+                    var rawResp = await fetchWithTimeout(file.raw_url, {}, DEFAULT_TIMEOUT);
+                    if (rawResp.ok) {
+                        text = await rawResp.text();
+                    }
+                } catch (e) { /* 回退到报错 */ }
+            }
+            if (typeof text !== 'string' || !text) {
+                throw makeError('TRUNCATED', '数据文件过大已被 GitHub 截断（' + (file.size || '?') + ' 字节）');
+            }
+        }
+        if (typeof text !== 'string' || !text.trim()) {
+            throw makeError('EMPTY', '数据文件「' + filename + '」内容为空，已阻止进入可编辑状态');
+        }
+        var data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            throw makeError('PARSE', '数据文件不是合法 JSON：' + e.message);
+        }
+        validateDoc(data);
+        return { data: data, size: text.length };
+    }
+
+    async function get(token, gistId, filename, options) {
+        options = options || {};
+        if (!token || !gistId) throw makeError('AUTH', '缺少 Token 或 Gist ID，请先登录');
+        if (!filename) filename = 'data.json';
+        var url = API_ROOT + '/gists/' + encodeURIComponent(gistId);
+        var resp = await fetchWithTimeout(url, {
+            headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
+        }, options.timeoutMs || DEFAULT_TIMEOUT);
+        var body = null;
+        try { body = await resp.json(); } catch (e) { body = null; }
+        if (!resp.ok) throw httpError(resp, body, '读取数据');
+        var files = body && body.files;
+        if (!files || !Object.prototype.hasOwnProperty.call(files, filename)) {
+            throw makeError('FILE_MISSING', 'Gist 中找不到文件「' + filename + '」，请确认文件名');
+        }
+        var parsed = await parseGistFileContent(files[filename], filename);
+        var revision = null;
+        if (body.history && body.history.length && body.history[0] && body.history[0].version) {
+            revision = body.history[0].version;
+        }
+        return {
+            data: parsed.data,
+            updatedAt: body.updated_at || null,
+            revision: revision,
+            size: parsed.size
+        };
+    }
+
+    async function patch(token, gistId, filename, data, options) {
+        options = options || {};
+        if (!token || !gistId) throw makeError('AUTH', '缺少 Token 或 Gist ID，请先登录');
+        if (!filename) filename = 'data.json';
+        validateDoc(data);
+        // 压缩写入，避免数据体积无谓翻倍
+        var text;
+        try {
+            text = JSON.stringify(data);
+        } catch (e) {
+            throw makeError('SAVE_FAILED', '数据无法序列化：' + e.message);
+        }
+        var url = API_ROOT + '/gists/' + encodeURIComponent(gistId);
+        var resp = await fetchWithTimeout(url, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': 'token ' + token,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ files: (function () { var f = {}; f[filename] = { content: text }; return f; })() })
+        }, options.timeoutMs || DEFAULT_SAVE_TIMEOUT);
+        var body = null;
+        try { body = await resp.json(); } catch (e) { body = null; }
+        if (!resp.ok) throw httpError(resp, body, '保存数据');
+        var revision = null;
+        if (body && body.history && body.history.length && body.history[0] && body.history[0].version) {
+            revision = body.history[0].version;
+        }
+        return { updatedAt: (body && body.updated_at) || null, revision: revision, size: text.length };
+    }
+
+    /* ============================================================
+     * 七、并发安全保存引擎（ops + 三方合并）
+     * ============================================================ */
+    var FIELD_LABELS = {
+        name: '名称',
+        unified: '统一条码',
+        cost: '成本',
+        trackingNumber: '快递单号',
+        orderNumber: '订单号',
+        remark: '备注',
+        qrLinks: '关联链接',
+        status: '状态',
+        code: '编码',
+        children: '子节点',
+        items: '库存'
+    };
+
+    function makeConflict(opIndex, key, scope, target, field, message, extra) {
+        var conflict = {
+            opIndex: opIndex,
+            key: key,
+            scope: scope,
+            target: target,
+            field: field,
+            label: FIELD_LABELS[field] || field,
+            message: message
+        };
+        if (extra) {
+            for (var k in extra) {
+                if (Object.prototype.hasOwnProperty.call(extra, k)) conflict[k] = extra[k];
+            }
+        }
+        return conflict;
+    }
+
+    function setField(target, field, value) {
+        if (value === undefined) {
+            delete target[field];
+        } else {
+            target[field] = value;
+        }
+    }
+
+    function copyEditableFields(target, fields) {
+        if (!fields) return target;
+        for (var key in fields) {
+            if (!Object.prototype.hasOwnProperty.call(fields, key)) continue;
+            if (key === 'children' || key === 'items' || key === 'code') continue;
+            setField(target, key, fields[key]);
+        }
+        return target;
+    }
+
+    function getChildrenContainer(doc, parentCode) {
+        if (!parentCode) return doc.products;
+        var parent = findNodeByCode(doc.products, parentCode);
+        if (!parent) throw makeError('PARENT_MISSING', '父节点不存在：' + parentCode);
+        if (!isPlainObject(parent.children)) parent.children = {};
+        return parent.children;
+    }
+
+    /** 节点改名后，级联替换子树 children 的 key 和 items 的 code */
+    function cascadeCodePrefix(node, oldPrefix, newPrefix) {
+        var oldSlash = oldPrefix + '/';
+        if (node && isPlainObject(node.children)) {
+            var next = {};
+            var keys = Object.keys(node.children);
+            for (var i = 0; i < keys.length; i++) {
+                var key = keys[i];
+                var child = node.children[key];
+                var newKey = key.indexOf(oldSlash) === 0 ? (newPrefix + key.slice(oldPrefix.length)) : key;
+                cascadeCodePrefix(child, oldPrefix, newPrefix);
+                next[newKey] = child;
+            }
+            node.children = next;
+        }
+        if (node && Array.isArray(node.items)) {
+            for (var j = 0; j < node.items.length; j++) {
+                var item = node.items[j];
+                if (item && typeof item.code === 'string' && item.code.indexOf(oldSlash) === 0) {
+                    item.code = newPrefix + item.code.slice(oldPrefix.length);
+                }
+            }
+        }
+    }
+
+    function entityEqual(a, b) {
+        if (a === b) return true;
+        if (!a || !b) return false;
+        try { return JSON.stringify(a) === JSON.stringify(b); } catch (e) { return false; }
+    }
+
+    function applyFieldMerge(target, fields, baseEntity, scope, targetCode, opIndex, decisions, conflicts) {
+        var keys = Object.keys(fields || {});
+        for (var i = 0; i < keys.length; i++) {
+            var field = keys[i];
+            if (field === 'children' || field === 'items' || field === 'code') continue;
+            var mine = fields[field];
+            var remoteValue = target[field];
+            var baseValue = baseEntity ? baseEntity[field] : undefined;
+            if (baseEntity && !valuesEqual(remoteValue, baseValue) && !valuesEqual(remoteValue, mine)) {
+                var conflictKey = opIndex + ':' + field;
+                var decision = decisions ? decisions[conflictKey] : null;
+                if (!decision && conflicts) {
+                    conflicts.push(makeConflict(opIndex, conflictKey, scope, targetCode, field, '该字段已被其它设备修改', {
+                        kind: 'field', base: baseValue, remote: remoteValue, mine: mine
+                    }));
+                    decision = 'mine';
+                }
+                if (decision === 'theirs') continue;
+            }
+            setField(target, field, mine);
+        }
+    }
+
+    function applyNodeUpsert(doc, op, baseDoc, decisions, conflicts, opIndex) {
+        if (!op.code) throw makeError('BAD_OP', '节点编码为空');
+        var originalCode = op.originalCode || op.code;
+        var newCode = op.code;
+        var baseNode = op.baseNode || (baseDoc ? findNodeByCode(baseDoc.products, originalCode) : null);
+        var entry = findNodeEntry(doc.products, originalCode);
+        var fields = op.fields || {};
+
+        if (!entry) {
+            // 远端不存在：新增；若 base 里存在说明被别人删了 → 冲突
+            if (baseNode) {
+                var delKey = opIndex + ':__deleted__';
+                var decision = decisions ? decisions[delKey] : null;
+                if (!decision && conflicts) {
+                    conflicts.push(makeConflict(opIndex, delKey, 'node', originalCode, '__deleted__', '该节点已被其它设备删除', {
+                        kind: 'remote-deleted', base: baseNode, remote: null, mine: true
+                    }));
+                    decision = 'mine';
+                }
+                if (decision === 'theirs') return;
+            }
+            var parentContainer = getChildrenContainer(doc, op.parentCode);
+            if (Object.prototype.hasOwnProperty.call(parentContainer, newCode)) {
+                throw makeError('CODE_EXISTS', '编码已存在：' + newCode);
+            }
+            var fresh = { name: '', unified: true, children: {}, items: [] };
+            copyEditableFields(fresh, fields);
+            if (fields.name === undefined) fresh.name = newCode;
+            parentContainer[newCode] = fresh;
+            return;
+        }
+
+        var node = entry.node;
+        applyFieldMerge(node, fields, baseNode, 'node', originalCode, opIndex, decisions, conflicts);
+
+        if (originalCode !== newCode) {
+            var container = entry.container;
+            if (Object.prototype.hasOwnProperty.call(container, newCode)) {
+                throw makeError('CODE_EXISTS', '新编码已被占用：' + newCode);
+            }
+            delete container[originalCode];
+            container[newCode] = node;
+            cascadeCodePrefix(node, originalCode, newCode);
+        }
+    }
+
+    function applyNodeDelete(doc, op, baseDoc, decisions, conflicts, opIndex) {
+        var entry = findNodeEntry(doc.products, op.code);
+        if (!entry) return; // 已经被删除，幂等
+        var baseNode = op.baseNode || (baseDoc ? findNodeByCode(baseDoc.products, op.code) : null);
+        if (baseNode && !entityEqual(entry.node, baseNode)) {
+            var modKey = opIndex + ':__modified__';
+            var decision = decisions ? decisions[modKey] : null;
+            if (!decision && conflicts) {
+                conflicts.push(makeConflict(opIndex, modKey, 'node', op.code, '__modified__', '该节点已被其它设备修改，仍要删除吗', {
+                    kind: 'remote-modified', base: baseNode, remote: entry.node, mine: null
+                }));
+                decision = 'mine';
+            }
+            if (decision === 'theirs') return;
+        }
+        delete entry.container[entry.key];
+    }
+
+    function applyItemUpsert(doc, op, baseDoc, decisions, conflicts, opIndex) {
+        var parent = findNodeByCode(doc.products, op.parentCode);
+        if (!parent) throw makeError('PARENT_MISSING', '父节点不存在：' + op.parentCode);
+        if (!Array.isArray(parent.items)) parent.items = [];
+        var originalCode = op.originalCode || op.code;
+        var baseParent = baseDoc ? findNodeByCode(baseDoc.products, op.parentCode) : null;
+        var baseItem = op.baseItem || (baseParent ? findItem(baseParent, originalCode) : null);
+        var idx = -1;
+        for (var i = 0; i < parent.items.length; i++) {
+            if (parent.items[i] && parent.items[i].code === originalCode) { idx = i; break; }
+        }
+        var fields = op.fields || {};
+
+        if (idx === -1) {
+            if (baseItem) {
+                var delKey = opIndex + ':__deleted__';
+                var decision = decisions ? decisions[delKey] : null;
+                if (!decision && conflicts) {
+                    conflicts.push(makeConflict(opIndex, delKey, 'item', originalCode, '__deleted__', '该库存项已被其它设备删除', {
+                        kind: 'remote-deleted', base: baseItem, remote: null, mine: true
+                    }));
+                    decision = 'mine';
+                }
+                if (decision === 'theirs') return;
+            }
+            if (!op.code) throw makeError('BAD_OP', '库存编码为空');
+            var fresh = { code: op.code };
+            copyEditableFields(fresh, fields);
+            parent.items.push(fresh);
+            return;
+        }
+
+        var item = parent.items[idx];
+        applyFieldMerge(item, fields, baseItem, 'item', originalCode, opIndex, decisions, conflicts);
+        if (op.code && op.code !== originalCode) {
+            for (var j = 0; j < parent.items.length; j++) {
+                if (j !== idx && parent.items[j] && parent.items[j].code === op.code) {
+                    throw makeError('CODE_EXISTS', '库存编码已存在：' + op.code);
+                }
+            }
+            item.code = op.code;
+        }
+    }
+
+    function applyItemDelete(doc, op, baseDoc, decisions, conflicts, opIndex) {
+        var parent = findNodeByCode(doc.products, op.parentCode);
+        if (!parent || !Array.isArray(parent.items)) return;
+        var idx = -1;
+        for (var i = 0; i < parent.items.length; i++) {
+            if (parent.items[i] && parent.items[i].code === op.code) { idx = i; break; }
+        }
+        if (idx === -1) return;
+        var baseParent = baseDoc ? findNodeByCode(baseDoc.products, op.parentCode) : null;
+        var baseItem = op.baseItem || (baseParent ? findItem(baseParent, op.code) : null);
+        if (baseItem && !entityEqual(parent.items[idx], baseItem)) {
+            var modKey = opIndex + ':__modified__';
+            var decision = decisions ? decisions[modKey] : null;
+            if (!decision && conflicts) {
+                conflicts.push(makeConflict(opIndex, modKey, 'item', op.code, '__modified__', '该库存项已被其它设备修改，仍要删除吗', {
+                    kind: 'remote-modified', base: baseItem, remote: parent.items[idx], mine: null
+                }));
+                decision = 'mine';
+            }
+            if (decision === 'theirs') return;
+        }
+        parent.items.splice(idx, 1);
+    }
+
+    function applyOps(doc, ops, baseDoc, decisions, conflicts) {
+        validateDoc(doc);
+        for (var i = 0; i < ops.length; i++) {
+            var op = ops[i];
+            if (!op || !op.type) throw makeError('BAD_OP', '第 ' + (i + 1) + ' 个保存操作无效');
+            if (op.type === 'node.upsert') applyNodeUpsert(doc, op, baseDoc, decisions, conflicts, i);
+            else if (op.type === 'node.delete') applyNodeDelete(doc, op, baseDoc, decisions, conflicts, i);
+            else if (op.type === 'item.upsert') applyItemUpsert(doc, op, baseDoc, decisions, conflicts, i);
+            else if (op.type === 'item.delete') applyItemDelete(doc, op, baseDoc, decisions, conflicts, i);
+            else throw makeError('BAD_OP', '未知保存操作：' + op.type);
+        }
+        return doc;
+    }
+
+    var writeQueues = Object.create(null);
+    function enqueueWrite(key, task) {
+        var previous = writeQueues[key] || Promise.resolve();
+        var run = function () { return task(); };
+        var next = previous.then(run, run);
+        writeQueues[key] = next.then(function () { }, function () { });
+        return next;
+    }
+
+    async function save(options) {
+        options = options || {};
+        var token = options.token;
+        var gistId = options.gistId;
+        var filename = options.filename || 'data.json';
+        if (!token || !gistId) throw makeError('AUTH', '缺少登录信息，请重新登录');
+        var ops = Array.isArray(options.ops) ? options.ops : [];
+        if (!ops.length) throw makeError('BAD_OP', '没有需要保存的修改');
+        var baseDoc = options.baseDoc || { products: {} };
+        var maxAttempts = Math.max(1, Math.min(5, options.maxAttempts || 3));
+        var queueKey = gistId + '|' + filename;
+
+        return enqueueWrite(queueKey, async function () {
+            var attempt = 0;
+            var lastError = null;
+            while (attempt < maxAttempts) {
+                attempt += 1;
+                // 1) 每次保存都重新读取远端最新文档
+                var remote = await get(token, gistId, filename, { timeoutMs: options.timeoutMs });
+                // 2) 在远端副本上应用本次 ops
+                var work = clone(remote.data);
+                var conflicts = [];
+                applyOps(work, ops, baseDoc, null, conflicts);
+                var resolvedConflicts = [];
+                if (conflicts.length) {
+                    var choices = null;
+                    if (typeof options.onConflict === 'function') {
+                        choices = await options.onConflict(conflicts, { attempt: attempt, remoteUpdatedAt: remote.updatedAt });
+                    }
+                    if (!choices) throw makeError('CONFLICT_ABORTED', '检测到数据冲突，已取消保存', { conflicts: conflicts });
+                    var decisions = Object.create(null);
+                    for (var c = 0; c < conflicts.length; c++) {
+                        decisions[conflicts[c].key] = choices[c] === 'theirs' ? 'theirs' : 'mine';
+                    }
+                    work = clone(remote.data);
+                    var still = [];
+                    applyOps(work, ops, baseDoc, decisions, still);
+                    if (still.length) throw makeError('CONFLICT_UNRESOLVED', '仍有冲突未解决，已取消保存', { conflicts: still });
+                    resolvedConflicts = conflicts;
+                }
+                // 3) 数据没有实际变化就不产生新版本
+                if (JSON.stringify(work) === JSON.stringify(remote.data)) {
+                    return {
+                        data: remote.data,
+                        updatedAt: remote.updatedAt,
+                        revision: remote.revision,
+                        conflicts: resolvedConflicts,
+                        unchanged: true,
+                        attempts: attempt
+                    };
+                }
+                // 4) 写入；网络/5xx 自动重试（重试会重新 GET 并重放 ops）
+                try {
+                    var patched = await patch(token, gistId, filename, work, { timeoutMs: options.timeoutMs });
+                    return {
+                        data: work,
+                        updatedAt: patched.updatedAt,
+                        revision: patched.revision,
+                        size: patched.size,
+                        conflicts: resolvedConflicts,
+                        unchanged: false,
+                        attempts: attempt
+                    };
+                } catch (err) {
+                    lastError = err;
+                    if (attempt < maxAttempts && isRetryableError(err)) {
+                        if (typeof options.onRetry === 'function') {
+                            try { await options.onRetry(err, attempt); } catch (ignore) { /* ignore */ }
+                        }
+                        continue;
+                    }
+                    throw err;
+                }
+            }
+            throw lastError || makeError('SAVE_FAILED', '保存失败');
+        });
+    }
+
+    /* ============================================================
+     * 八、导出
+     * ============================================================ */
+    global.ZCFI = {
+        VERSION: VERSION,
+        STATUS: STATUS,
+        STATUS_LIST: STATUS_LIST,
+        FIELD_LABELS: FIELD_LABELS,
+
+        normalizeStatus: normalizeStatus,
+        statusClass: statusClass,
+        escapeHtml: escapeHtml,
+        escapeAttr: escapeAttr,
+        normalizeCode: normalizeCode,
+        normalizeQuery: normalizeQuery,
+        sameCode: sameCode,
+        normalizeUrl: normalizeUrl,
+        sameUrl: sameUrl,
+        isHttpUrl: isHttpUrl,
+        isPlainObject: isPlainObject,
+        clone: clone,
+        valuesEqual: valuesEqual,
+
+        friendlyError: friendlyError,
+        isRetryableError: isRetryableError,
+
+        storage: storage,
+        formatDateTime: formatDateTime,
+        formatTime: formatTime,
+        downloadJson: downloadJson,
+        toast: toast,
+
+        getProducts: getProducts,
+        findNodeByCode: findNodeByCode,
+        findNodeEntry: findNodeEntry,
+        findParentNode: findParentNode,
+        findItem: findItem,
+        walk: walk,
+        countDescendants: countDescendants,
+        validateDoc: validateDoc,
+
+        get: get,
+        patch: patch,
+        save: save,
+
+        // 兼容旧命名
+        getGistContent: async function (token, gistId, filename) {
+            var result = await get(token, gistId, filename);
+            return result.data;
+        },
+        updateGistContent: function (token, gistId, filename, content) {
+            return patch(token, gistId, filename, content);
+        }
+    };
+})(typeof window !== 'undefined' ? window : this);

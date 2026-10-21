@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>商品管理后台（带标签打印）</title>
+    <link rel="icon" href="data:," />
     <style>
         /* ===== 全局重置与变量 ===== */
         * {
@@ -725,8 +726,184 @@
             cursor: pointer;
         }
 
+        /* ===== 状态徽章（统一词表：待售/在售/售出） ===== */
+        .status-badge.status-pending { background: #fef3c7; color: #92400e; }
+        .status-badge.status-onsale { background: #d1fae5; color: #065f46; }
+        .status-badge.status-sold { background: #e2e8f0; color: #475569; }
+        .status-badge.status-unknown { background: #fee2e2; color: #991b1b; }
+
+        /* ===== 顶栏同步信息 ===== */
+        .sync-meta {
+            font-size: 12px;
+            color: var(--color-gray-500);
+            white-space: nowrap;
+        }
+
+        /* ===== 严格加载错误遮罩 ===== */
+        #load-error-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 20px;
+        }
+        #load-error-overlay.active { display: flex; }
+        .load-error-box {
+            background: #fff;
+            border-radius: var(--radius);
+            padding: 32px 36px;
+            max-width: 560px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .load-error-box h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--color-gray-900);
+            margin-bottom: 14px;
+        }
+        .load-error-code {
+            display: inline-block;
+            font-family: ui-monospace, Consolas, monospace;
+            font-size: 12px;
+            background: var(--color-gray-100);
+            color: var(--color-gray-600);
+            border-radius: 20px;
+            padding: 2px 10px;
+            margin-bottom: 12px;
+        }
+        #load-error-message {
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--color-danger);
+            word-break: break-word;
+        }
+        #load-error-hint {
+            margin-top: 12px;
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--color-gray-500);
+        }
+        .load-error-box .btn-group {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        /* ===== 冲突处理弹窗 ===== */
+        #conflict-overlay { z-index: 1300; }
+        #conflict-overlay .modal { max-width: 720px; }
+        #conflict-summary {
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--color-gray-600);
+            margin-bottom: 4px;
+        }
+        .conflict-list {
+            max-height: 46vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 12px 0;
+            padding-right: 4px;
+        }
+        .conflict-item {
+            border: 1px solid var(--color-gray-200);
+            border-radius: 10px;
+            background: var(--color-gray-50);
+            padding: 10px 12px;
+        }
+        .conflict-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .conflict-target {
+            font-family: ui-monospace, Consolas, monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-gray-800);
+            word-break: break-all;
+        }
+        .conflict-values {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .conflict-choice {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 8px 10px;
+            border: 1.5px solid var(--color-gray-200);
+            border-radius: 8px;
+            background: #fff;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 0;
+            font-weight: 500;
+            color: var(--color-gray-700);
+        }
+        .conflict-choice input { margin-right: 4px; }
+        .conflict-choice .value {
+            font-size: 13px;
+            color: var(--color-gray-900);
+            word-break: break-all;
+            line-height: 1.5;
+        }
+        .conflict-choice:has(input:checked) {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+        }
+
+        /* ===== 删除二次确认弹窗 ===== */
+        #delete-confirm-overlay { z-index: 1300; }
+        #delete-confirm-overlay .modal { max-width: 540px; }
+        .delete-warn {
+            background: #fef2f2;
+            border-left: 4px solid var(--color-danger);
+            border-radius: 8px;
+            padding: 12px 14px;
+            color: #7f1d1d;
+            font-size: 13px;
+            line-height: 1.7;
+            margin: 12px 0;
+            word-break: break-word;
+        }
+        .delete-code {
+            font-family: ui-monospace, Consolas, monospace;
+            background: var(--color-gray-100);
+            border-radius: 6px;
+            padding: 2px 8px;
+            font-size: 13px;
+            word-break: break-all;
+        }
+        #delete-confirm-status {
+            min-height: 20px;
+            font-size: 13px;
+            color: var(--color-danger);
+            margin-top: 10px;
+        }
+        .batch-status-note {
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--color-gray-600);
+            margin-top: 10px;
+        }
+
         /* ===== 响应式微调 ===== */
         @media (max-width: 768px) {
+            .conflict-values { grid-template-columns: 1fr; }
+            .sync-meta { font-size: 11px; }
+            .load-error-box { padding: 24px 20px; }
             body { padding: 12px; }
             .top-bar { flex-direction: column; align-items: stretch; }
             .top-bar .actions { justify-content: flex-start; }
@@ -765,6 +942,20 @@
     </div>
 </div>
 
+<!-- 严格加载错误遮罩（只读保护：加载失败时禁止一切写入） -->
+<div id="load-error-overlay">
+    <div class="load-error-box">
+        <h2>数据未加载 · 只读保护</h2>
+        <div id="load-error-code" class="load-error-code">错误码：UNKNOWN</div>
+        <p id="load-error-message"></p>
+        <p id="load-error-hint"></p>
+        <div class="btn-group">
+            <button type="button" class="btn btn-secondary" id="load-error-login">返回登录</button>
+            <button type="button" class="btn btn-primary" id="load-error-retry">重试</button>
+        </div>
+    </div>
+</div>
+
 <!-- 主界面 -->
 <div id="app-container" style="display:none;">
     <div class="container">
@@ -773,6 +964,8 @@
                 <h1>📦 商品管理</h1>
                 <div class="sub">
                     <span id="user-status">已登录</span>
+                    <span id="sync-time" class="sync-meta">最后同步：—</span>
+                    <span id="data-revision" class="sync-meta">版本：未知</span>
                     <span id="lodop-status">⏳ 检测打印服务…</span>
                 </div>
             </div>
@@ -818,6 +1011,8 @@
             <option value="true">是（统一）</option>
             <option value="false">否（不统一，可添加库存）</option>
         </select>
+        <label>状态</label>
+        <select id="modal-node-status"></select>
         <label>成本</label>
         <input type="number" id="modal-node-cost" step="0.01" />
         <label>快递单号</label>
@@ -856,11 +1051,7 @@
         <label>订单号</label>
         <input type="text" id="modal-item-order" placeholder="订单编号" />
         <label>状态</label>
-        <select id="modal-item-status">
-            <option value="待售">待售</option>
-            <option value="在售" selected>在售</option>
-            <option value="售出">售出</option>
-        </select>
+        <select id="modal-item-status"></select>
         <label>QR关联链接（多个链接用逗号或换行分隔）</label>
         <textarea id="modal-item-qrlinks" rows="2" placeholder="https://link1.com, https://link2.com"></textarea>
         <label>备注</label>
@@ -882,14 +1073,42 @@
     <div class="modal">
         <h3>批量修改状态</h3>
         <label>选择新状态</label>
-        <select id="batch-status-select">
-            <option value="待售">待售</option>
-            <option value="在售" selected>在售</option>
-            <option value="售出">售出</option>
-        </select>
+        <select id="batch-status-select"></select>
+        <p class="batch-status-note" id="batch-status-note"></p>
         <div class="btn-group">
             <button class="btn btn-secondary" id="batch-status-cancel">取消</button>
             <button class="btn btn-primary" id="batch-status-save">确定修改</button>
+        </div>
+    </div>
+</div>
+
+<!-- 模态框：删除二次确认（统计数量 + 输入编码确认） -->
+<div class="modal-overlay" id="delete-confirm-overlay">
+    <div class="modal">
+        <h3 id="delete-confirm-title">确认删除</h3>
+        <div class="delete-warn" id="delete-confirm-message"></div>
+        <label>请输入要删除的编码以确认：<code class="delete-code" id="delete-confirm-code"></code></label>
+        <input type="text" id="delete-confirm-input" autocomplete="off" spellcheck="false" />
+        <div id="delete-confirm-status"></div>
+        <div class="btn-group">
+            <button type="button" class="btn btn-secondary" id="delete-confirm-cancel">取消</button>
+            <button type="button" class="btn btn-danger" id="delete-confirm-ok" disabled>确认删除</button>
+        </div>
+    </div>
+</div>
+
+<!-- 模态框：冲突处理（字段级三方合并结果由用户逐项决定） -->
+<div class="modal-overlay" id="conflict-overlay">
+    <div class="modal">
+        <h3>⚠️ 检测到并发修改冲突</h3>
+        <p id="conflict-summary"></p>
+        <div class="conflict-list" id="conflict-list"></div>
+        <div class="btn-group" style="flex-wrap: wrap; justify-content: flex-start;">
+            <button type="button" class="btn btn-secondary" id="conflict-all-mine">全部用我的</button>
+            <button type="button" class="btn btn-secondary" id="conflict-all-theirs">全部用远端</button>
+            <div style="flex:1"></div>
+            <button type="button" class="btn btn-secondary" id="conflict-cancel">取消保存</button>
+            <button type="button" class="btn btn-primary" id="conflict-confirm">确认保存</button>
         </div>
     </div>
 </div>
@@ -990,900 +1209,1350 @@
     });
 </script>
 
-<!-- ========== 主脚本（带智能冲突检测） ========== -->
+<!-- ========== 主脚本（ZCFI 核心：严格加载 / ops 保存 / 字段级三方合并） ========== -->
+<script src="js/core.js"></script>
+
+<!-- ========== 页面业务脚本（渲染 / 保存 / 交互） ========== -->
 <script>
-    // ============================================================
-    // 全局状态与存储
-    // ============================================================
-    const STORAGE_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
-    let gistData = { products: {} };
-    let currentToken = '';
-    let currentGistId = 'f13d97c430522e4851afbf3cd2331e14';
-    let currentFilename = 'data.json';
+/* ============================================================
+ * 商品管理后台 · 业务脚本
+ * 数据层：唯一入口 ZCFI.get / ZCFI.save（ops + 字段级三方合并，绝不整库覆盖）
+ * 安全：所有 HTML 插值走 ZCFI.escapeHtml；移除内联 onclick，统一 data-action 事件委托
+ * 状态：ZCFI.normalizeStatus / statusClass 统一为 待售 / 在售 / 售出
+ * 加载：失败进入只读错误态，禁止任何写操作
+ * ============================================================ */
 
-    // 编辑时的原始快照
-    let _originalNodeData = null;
-    let _originalItemData = null;
+var Z = window.ZCFI;
+if (!Z) {
+    throw new Error('缺少 js/core.js，页面无法工作');
+}
+var STATUS = Z.STATUS;
+var STATUS_LIST = Z.STATUS_LIST;
+/** 统一转义别名（打印片段内另有同名 function escapeHtml，注意不要重复声明） */
+var esc = Z.escapeHtml;
+/** Toast 包装：兼容 toast(msg, 'error') 与 toast(msg, { type, duration }) 两种写法 */
+function toast(message, options) {
+    if (typeof options === 'string') options = { type: options };
+    return Z.toast(message, options || {});
+}
 
-    // DOM 引用
-    const loginOverlay = document.getElementById('login-overlay');
-    const loginToken = document.getElementById('login-token');
-    const loginGistId = document.getElementById('login-gistid');
-    const loginFilename = document.getElementById('login-filename');
-    const loginBtn = document.getElementById('login-btn');
-    const loginError = document.getElementById('login-error');
-    const appContainer = document.getElementById('app-container');
-    const userStatus = document.getElementById('user-status');
-    const treeContainer = document.getElementById('tree-container');
-    const filterSelect = document.getElementById('filter-select');
-    const searchInput = document.getElementById('search-input');
-    const searchBtn = document.getElementById('search-btn');
-    const clearSearchBtn = document.getElementById('clear-search-btn');
-    const addRootBtn = document.getElementById('add-root-btn');
-    const refreshBtn = document.getElementById('refresh-btn');
-    const logoutBtn = document.getElementById('logout-btn');
+// ---------- 全局状态 ----------
+var STORAGE_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
+var DEFAULT_GIST_ID = 'f13d97c430522e4851afbf3cd2331e14';
 
-    const modalNodeOverlay = document.getElementById('modal-node-overlay');
-    const modalNodeTitle = document.getElementById('modal-node-title');
-    const modalNodeCode = document.getElementById('modal-node-code');
-    const modalNodeName = document.getElementById('modal-node-name');
-    const modalNodeUnified = document.getElementById('modal-node-unified');
-    const modalNodeCost = document.getElementById('modal-node-cost');
-    const modalNodeTracking = document.getElementById('modal-node-tracking');
-    const modalNodeOrder = document.getElementById('modal-node-order');
-    const modalNodeQrlinks = document.getElementById('modal-node-qrlinks');
-    const modalNodeRemark = document.getElementById('modal-node-remark');
-    const modalNodeOriginalCode = document.getElementById('modal-node-original-code');
-    const modalNodeParent = document.getElementById('modal-node-parent');
-    const modalNodeMode = document.getElementById('modal-node-mode');
-    const modalNodeSave = document.getElementById('modal-node-save');
-    const modalNodeCancel = document.getElementById('modal-node-cancel');
-    const nodeSaveStatus = document.getElementById('node-save-status');
+var gistData = { products: {} };        // 最近一次成功读取/保存的文档（展示用）
+var baseDoc = Z.clone(gistData);        // 基准快照（字段级三方合并用）
+var currentToken = '';
+var currentGistId = DEFAULT_GIST_ID;
+var currentFilename = 'data.json';
+var readOnly = true;                    // 未成功加载前一律只读
+var isLoading = false;
+var isSaving = false;
+var syncMeta = { updatedAt: null, revision: null, size: null, lastSyncAt: null };
 
-    const modalItemOverlay = document.getElementById('modal-item-overlay');
-    const modalItemTitle = document.getElementById('modal-item-title');
-    const modalItemCode = document.getElementById('modal-item-code');
-    const modalItemName = document.getElementById('modal-item-name');
-    const modalItemCost = document.getElementById('modal-item-cost');
-    const modalItemTracking = document.getElementById('modal-item-tracking');
-    const modalItemOrder = document.getElementById('modal-item-order');
-    const modalItemStatus = document.getElementById('modal-item-status');
-    const modalItemQrlinks = document.getElementById('modal-item-qrlinks');
-    const modalItemRemark = document.getElementById('modal-item-remark');
-    const modalItemParentCode = document.getElementById('modal-item-parent-code');
-    const modalItemOriginalCode = document.getElementById('modal-item-original-code');
-    const modalItemSave = document.getElementById('modal-item-save');
-    const modalItemCancel = document.getElementById('modal-item-cancel');
-    const itemSaveStatus = document.getElementById('item-save-status');
+var editContext = null;                 // 节点编辑上下文 { nodeMode, originalCode, parentCode, baseNode }
+var itemContext = null;                 // 库存编辑上下文 { itemMode, parentCode, originalCode, baseItem }
+var batchContext = null;                // 批量状态上下文 { parentCode, itemCodes }
+var deleteState = null;                 // 删除确认上下文
+var conflictState = null;               // 冲突处理上下文
 
-    const printPreviewOverlay = document.getElementById('print-preview-overlay');
-    const printInfoDiv = document.getElementById('print-info');
-    const templateSelectContainer = document.getElementById('template-select-container');
-    const printerSelect = document.getElementById('printer-select');
-    const printCopiesInput = document.getElementById('print-copies');
-    const printPreviewCancel = document.getElementById('print-preview-cancel');
-    const printPreviewBtn = document.getElementById('print-preview-btn');
-    const printExecute = document.getElementById('print-execute');
+function $(id) { return document.getElementById(id); }
+function setText(el, text) { if (el) el.textContent = text === null || text === undefined ? '' : String(text); }
+function trimOrUndefined(value) { var s = String(value === null || value === undefined ? '' : value).trim(); return s ? s : undefined; }
+function parseCost(value) {
+    var raw = String(value === null || value === undefined ? '' : value).trim();
+    if (!raw) return undefined;
+    var num = parseFloat(raw);
+    return isNaN(num) ? undefined : num;
+}
+function parseLinks(value) {
+    var list = String(value === null || value === undefined ? '' : value).split(/[,，\n]+/)
+        .map(function (s) { return Z.normalizeUrl(s); })
+        .filter(function (s) { return !!s; });
+    return list.length ? list : undefined;
+}
 
-    const batchStatusOverlay = document.getElementById('batch-status-overlay');
-    const batchStatusSelect = document.getElementById('batch-status-select');
-    const batchStatusCancel = document.getElementById('batch-status-cancel');
-    const batchStatusSave = document.getElementById('batch-status-save');
+// ---------- DOM 引用 ----------
+var loginOverlay = $('login-overlay');
+var loginToken = $('login-token');
+var loginGistId = $('login-gistid');
+var loginFilename = $('login-filename');
+var loginBtn = $('login-btn');
+var loginError = $('login-error');
+var appContainer = $('app-container');
+var userStatus = $('user-status');
+var syncTimeEl = $('sync-time');
+var revisionEl = $('data-revision');
+var treeContainer = $('tree-container');
+var filterSelect = $('filter-select');
+var searchInput = $('search-input');
+var searchBtn = $('search-btn');
+var clearSearchBtn = $('clear-search-btn');
+var addRootBtn = $('add-root-btn');
+var refreshBtn = $('refresh-btn');
+var logoutBtn = $('logout-btn');
 
-    let selectedTemplateIndex = 0;
+var modalNodeOverlay = $('modal-node-overlay');
+var modalNodeTitle = $('modal-node-title');
+var modalNodeCode = $('modal-node-code');
+var modalNodeName = $('modal-node-name');
+var modalNodeUnified = $('modal-node-unified');
+var modalNodeStatus = $('modal-node-status');
+var modalNodeCost = $('modal-node-cost');
+var modalNodeTracking = $('modal-node-tracking');
+var modalNodeOrder = $('modal-node-order');
+var modalNodeQrlinks = $('modal-node-qrlinks');
+var modalNodeRemark = $('modal-node-remark');
+var modalNodeOriginalCode = $('modal-node-original-code');
+var modalNodeParent = $('modal-node-parent');
+var modalNodeMode = $('modal-node-mode');
+var modalNodeSave = $('modal-node-save');
+var modalNodeCancel = $('modal-node-cancel');
+var nodeSaveStatus = $('node-save-status');
 
-    // ---------- GitHub API ----------
-    async function getGistContent(token, gistId, filename) {
-        const url = `https://api.github.com/gists/${gistId}`;
-        const resp = await fetch(url, {
-            headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
-        });
-        if (!resp.ok) {
-            const err = await resp.json();
-            throw new Error(`GitHub API 错误: ${err.message || resp.statusText}`);
-        }
-        const data = await resp.json();
-        const files = data.files;
-        if (!files || !files[filename]) return {};
-        try { return JSON.parse(files[filename].content); } catch { return {}; }
+var modalItemOverlay = $('modal-item-overlay');
+var modalItemTitle = $('modal-item-title');
+var modalItemCode = $('modal-item-code');
+var modalItemName = $('modal-item-name');
+var modalItemCost = $('modal-item-cost');
+var modalItemTracking = $('modal-item-tracking');
+var modalItemOrder = $('modal-item-order');
+var modalItemStatus = $('modal-item-status');
+var modalItemQrlinks = $('modal-item-qrlinks');
+var modalItemRemark = $('modal-item-remark');
+var modalItemParentCode = $('modal-item-parent-code');
+var modalItemOriginalCode = $('modal-item-original-code');
+var modalItemSave = $('modal-item-save');
+var modalItemCancel = $('modal-item-cancel');
+var itemSaveStatus = $('item-save-status');
+
+var batchStatusOverlay = $('batch-status-overlay');
+var batchStatusSelect = $('batch-status-select');
+var batchStatusNote = $('batch-status-note');
+var batchStatusCancel = $('batch-status-cancel');
+var batchStatusSave = $('batch-status-save');
+
+var deleteConfirmOverlay = $('delete-confirm-overlay');
+var deleteConfirmTitle = $('delete-confirm-title');
+var deleteConfirmMessage = $('delete-confirm-message');
+var deleteConfirmCode = $('delete-confirm-code');
+var deleteConfirmInput = $('delete-confirm-input');
+var deleteConfirmStatus = $('delete-confirm-status');
+var deleteConfirmCancel = $('delete-confirm-cancel');
+var deleteConfirmOk = $('delete-confirm-ok');
+
+var conflictOverlay = $('conflict-overlay');
+var conflictSummary = $('conflict-summary');
+var conflictList = $('conflict-list');
+var conflictAllMine = $('conflict-all-mine');
+var conflictAllTheirs = $('conflict-all-theirs');
+var conflictCancel = $('conflict-cancel');
+var conflictConfirm = $('conflict-confirm');
+
+var loadErrorOverlay = $('load-error-overlay');
+var loadErrorCode = $('load-error-code');
+var loadErrorMessage = $('load-error-message');
+var loadErrorHint = $('load-error-hint');
+var loadErrorRetry = $('load-error-retry');
+var loadErrorLogin = $('load-error-login');
+
+// 打印模块使用的 DOM 引用（打印函数本轮不改，变量名保持原样）
+var printPreviewOverlay = $('print-preview-overlay');
+var printInfoDiv = $('print-info');
+var templateSelectContainer = $('template-select-container');
+var printerSelect = $('printer-select');
+var printCopiesInput = $('print-copies');
+var printPreviewCancel = $('print-preview-cancel');
+var printPreviewBtn = $('print-preview-btn');
+var printExecute = $('print-execute');
+var selectedTemplateIndex = 0;
+
+// ============================================================
+// 状态词表与统一展示
+// ============================================================
+function fillStatusSelect(select, selected) {
+    if (!select) return;
+    while (select.firstChild) select.removeChild(select.firstChild);
+    STATUS_LIST.forEach(function (s) {
+        var opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        select.appendChild(opt);
+    });
+    var value = Z.normalizeStatus(selected === undefined || selected === null ? STATUS.ON_SALE : selected);
+    if (STATUS_LIST.indexOf(value) === -1) {
+        var legacy = document.createElement('option');
+        legacy.value = value;
+        legacy.textContent = value + '（历史值）';
+        select.appendChild(legacy);
     }
+    select.value = value;
+}
 
-    async function updateGistContent(token, gistId, filename, content) {
-        const contentStr = JSON.stringify(content, null, 2);
-        const url = `https://api.github.com/gists/${gistId}`;
-        const payload = { files: { [filename]: { content: contentStr } } };
-        const resp = await fetch(url, {
-            method: 'PATCH',
-            headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+/** 读取/保存后的文档在内存里统一状态词表（兼容历史“已售”） */
+function normalizeDoc(doc) {
+    if (!doc || !Z.isPlainObject(doc.products)) return;
+    Z.walk(doc.products, function (node) {
+        if (node.status !== undefined) node.status = Z.normalizeStatus(node.status);
+        if (Array.isArray(node.items)) {
+            node.items.forEach(function (item) {
+                if (item && item.status !== undefined) item.status = Z.normalizeStatus(item.status);
+            });
+        }
+    });
+}
+
+// ============================================================
+// 登录 / 加载 / 同步元信息 / 错误态
+// ============================================================
+function updateSyncMeta() {
+    var ts = syncMeta.updatedAt || syncMeta.lastSyncAt;
+    setText(syncTimeEl, '最后同步：' + (ts ? Z.formatDateTime(ts) : '—'));
+    var rev = syncMeta.revision ? String(syncMeta.revision) : '';
+    setText(revisionEl, '版本：' + (rev ? rev.slice(0, 7) : '未知'));
+    refreshBtn.title = ts ? '最后同步：' + Z.formatDateTime(ts) : '刷新数据';
+}
+
+function setRefreshing(on) {
+    if (!refreshBtn) return;
+    refreshBtn.classList.toggle('loading', !!on);
+    refreshBtn.disabled = !!on;
+    refreshBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+}
+
+function applyLoaded(result) {
+    // baseDoc 保留远端原始值（例如历史“已售”），用于字段级 diff / 冲突检测；
+    // gistData 做展示态归一（“已售”显示为“售出”）。
+    var rawDoc = Z.clone(result.data);
+    normalizeDoc(result.data);
+    gistData = result.data;
+    baseDoc = rawDoc;
+    syncMeta = {
+        updatedAt: result.updatedAt || null,
+        revision: result.revision || null,
+        size: result.size || null,
+        lastSyncAt: Date.now()
+    };
+    readOnly = false;
+    hideLoadError();
+    updateSyncMeta();
+    populateFilter();
+    renderTree();
+    setText(userStatus, '已连接 (' + currentGistId + ')');
+    setRefreshing(false);
+}
+
+function showLoadError(err, context) {
+    readOnly = true;
+    var code = err && err.code ? err.code : 'UNKNOWN';
+    setText(loadErrorCode, '错误码：' + code);
+    setText(loadErrorMessage, Z.friendlyError(err));
+    loadErrorHint.textContent = (context === 'refresh' ? '刷新失败。' : '数据未能加载。') +
+        '当前处于只读保护状态：在重新加载成功之前，页面不会写入任何数据，避免覆盖远端内容。';
+    loginOverlay.classList.remove('active');
+    loadErrorOverlay.classList.add('active');
+    setText(userStatus, '未连接（只读保护）');
+    setRefreshing(false);
+}
+
+function hideLoadError() {
+    loadErrorOverlay.classList.remove('active');
+}
+
+function showLoginForm() {
+    readOnly = true;
+    hideLoadError();
+    appContainer.style.display = 'none';
+    loginOverlay.classList.add('active');
+    setText(userStatus, '未连接');
+}
+
+function refreshFromRemote() {
+    if (isLoading || isSaving) return Promise.resolve(false);
+    if (!currentToken) { showLoginForm(); return Promise.resolve(false); }
+    isLoading = true;
+    setRefreshing(true);
+    return Z.get(currentToken, currentGistId, currentFilename)
+        .then(function (result) {
+            applyLoaded(result);
+            toast('已刷新到最新数据', 'success');
+            return true;
+        })
+        .catch(function (err) {
+            readOnly = true;
+            showLoadError(err, 'refresh');
+            toast('刷新失败：' + Z.friendlyError(err), { type: 'error', duration: 7000 });
+            return false;
+        })
+        .finally(function () {
+            isLoading = false;
+            setRefreshing(false);
         });
-        if (!resp.ok) {
-            const err = await resp.json();
-            throw new Error(`更新失败: ${err.message || resp.statusText}`);
-        }
-        return await resp.json();
-    }
+}
 
-    // ---------- 登录/登出 ----------
-    async function performLogin() {
-        const token = loginToken.value.trim();
-        const gistId = loginGistId.value.trim();
-        const filename = loginFilename.value.trim() || 'data.json';
-        if (!token || !gistId) {
-            loginError.textContent = '请填写 Token 和 Gist ID';
-            return;
-        }
-        loginError.textContent = '';
-        try {
-            const data = await getGistContent(token, gistId, filename);
-            if (!data.products) data.products = {};
-            localStorage.setItem(STORAGE_KEYS.TOKEN, token);
-            localStorage.setItem(STORAGE_KEYS.GIST_ID, gistId);
-            localStorage.setItem(STORAGE_KEYS.FILENAME, filename);
+function performLogin(options) {
+    options = options || {};
+    var token = loginToken.value.trim();
+    var gistId = loginGistId.value.trim();
+    var filename = loginFilename.value.trim() || 'data.json';
+    loginError.textContent = '';
+    if (!token || !gistId) {
+        loginError.textContent = '请填写 Token 和 Gist ID';
+        showLoginForm();
+        return Promise.resolve(false);
+    }
+    loginBtn.disabled = true;
+    loginBtn.textContent = '连接中…';
+    return Z.get(token, gistId, filename)
+        .then(function (result) {
             currentToken = token;
             currentGistId = gistId;
             currentFilename = filename;
-            gistData = data;
+            Z.storage.set(STORAGE_KEYS.TOKEN, token);
+            Z.storage.set(STORAGE_KEYS.GIST_ID, gistId);
+            Z.storage.set(STORAGE_KEYS.FILENAME, filename);
             loginOverlay.classList.remove('active');
             appContainer.style.display = 'block';
-            userStatus.textContent = `已连接 (${gistId})`;
-            renderTree();
-            populateFilter();
-        } catch (e) {
-            loginError.textContent = `登录失败: ${e.message}`;
-        }
-    }
-
-    function logout() {
-        localStorage.removeItem(STORAGE_KEYS.TOKEN);
-        localStorage.removeItem(STORAGE_KEYS.GIST_ID);
-        localStorage.removeItem(STORAGE_KEYS.FILENAME);
-        currentToken = '';
-        currentGistId = '';
-        currentFilename = 'data.json';
-        gistData = { products: {} };
-        appContainer.style.display = 'none';
-        loginOverlay.classList.add('active');
-        loginError.textContent = '';
-        loginToken.value = '';
-        loginGistId.value = 'f13d97c430522e4851afbf3cd2331e14';
-        loginFilename.value = 'data.json';
-    }
-
-    loginBtn.addEventListener('click', performLogin);
-    document.querySelectorAll('#login-token, #login-gistid, #login-filename').forEach(el => {
-        el.addEventListener('keydown', e => { if (e.key === 'Enter') performLogin(); });
-    });
-    logoutBtn.addEventListener('click', logout);
-
-    // ---------- 数据加载与渲染 ----------
-    async function loadData() {
-        try {
-            const data = await getGistContent(currentToken, currentGistId, currentFilename);
-            if (!data.products) data.products = {};
-            gistData = data;
-            renderTree();
-            populateFilter();
-            userStatus.textContent = `已连接 (${currentGistId})`;
+            applyLoaded(result);
+            if (!options.silent) toast('已连接，数据加载成功', 'success');
             return true;
-        } catch (e) {
-            alert(`加载数据失败: ${e.message}`);
+        })
+        .catch(function (err) {
+            loginError.textContent = '登录失败：' + Z.friendlyError(err);
+            if (options.silent) showLoadError(err, 'login');
+            else showLoginForm();
             return false;
-        }
-    }
-
-    // ---------- 辅助查找函数 ----------
-    function findNodeByCode(code, obj) {
-        if (!obj) obj = gistData.products;
-        if (obj[code]) return obj[code];
-        for (let key in obj) {
-            if (obj[key].children) {
-                const found = findNodeByCode(code, obj[key].children);
-                if (found) return found;
-            }
-        }
-        return null;
-    }
-
-    function findParentNode(code, parentObj) {
-        if (!parentObj) parentObj = gistData.products;
-        for (let key in parentObj) {
-            if (parentObj[key].children && parentObj[key].children[code]) {
-                return parentObj[key];
-            }
-            if (parentObj[key].children) {
-                const found = findParentNode(code, parentObj[key].children);
-                if (found) return found;
-            }
-        }
-        return null;
-    }
-
-    function findItemInNode(node, itemCode) {
-        if (node.items) {
-            const item = node.items.find(it => it.code === itemCode);
-            if (item) return item;
-        }
-        if (node.children) {
-            for (let childKey in node.children) {
-                const found = findItemInNode(node.children[childKey], itemCode);
-                if (found) return found;
-            }
-        }
-        return null;
-    }
-
-    // ---------- 编码生成 ----------
-    function generateRootCode() {
-        const keys = Object.keys(gistData.products).filter(k => /^A\d{3}$/.test(k));
-        let maxNum = 0;
-        keys.forEach(k => { const num = parseInt(k.substring(1)); if (num > maxNum) maxNum = num; });
-        const next = maxNum + 1;
-        if (next > 999) { alert('达到上限'); return null; }
-        return 'A' + String(next).padStart(3, '0');
-    }
-
-    function generateChildCode(parentCode) {
-        const parent = findNodeByCode(parentCode);
-        if (!parent) return null;
-        if (!parent.children) parent.children = {};
-        const children = parent.children;
-        const keys = Object.keys(children).filter(k => k.startsWith(parentCode + '/B'));
-        let maxNum = 0;
-        keys.forEach(k => {
-            const parts = k.split('/');
-            const last = parts[parts.length - 1];
-            if (last.startsWith('B')) {
-                const num = parseInt(last.substring(1));
-                if (num > maxNum) maxNum = num;
-            }
+        })
+        .finally(function () {
+            loginBtn.disabled = false;
+            loginBtn.textContent = '登录';
         });
-        const next = maxNum + 1;
-        if (next > 999) { alert('子编码超过 B999'); return null; }
-        return parentCode + '/B' + String(next).padStart(3, '0');
-    }
+}
 
-    function generateItemCode(parentCode) {
-        const parent = findNodeByCode(parentCode);
-        if (!parent) return null;
-        if (!parent.items) parent.items = [];
-        const items = parent.items;
-        let maxNum = 0;
-        items.forEach(item => {
-            const parts = item.code.split('/');
-            const last = parts[parts.length - 1];
-            const num = parseInt(last);
-            if (!isNaN(num) && num > maxNum) maxNum = num;
-        });
-        const next = maxNum + 1;
-        if (next > 999) { alert('库存编码超过 999'); return null; }
-        return parentCode + '/' + String(next).padStart(3, '0');
-    }
+function retryLoad() {
+    hideLoadError();
+    var token = currentToken || loginToken.value.trim();
+    var gistId = currentGistId || loginGistId.value.trim();
+    var filename = currentFilename || loginFilename.value.trim() || 'data.json';
+    if (!token || !gistId) { showLoginForm(); return; }
+    loginToken.value = token;
+    loginGistId.value = gistId;
+    loginFilename.value = filename;
+    loadErrorRetry.disabled = true;
+    loadErrorRetry.textContent = '重试中…';
+    var task = currentToken ? refreshFromRemote() : performLogin({ silent: true });
+    Promise.resolve(task).finally(function () {
+        loadErrorRetry.disabled = false;
+        loadErrorRetry.textContent = '重试';
+    });
+}
 
-    // ---------- 渲染 ----------
-    function renderNode(code, node, depth) {
-        const hasChildren = node.children && Object.keys(node.children).length > 0;
-        const hasItems = node.items && node.items.length > 0;
-        const unified = node.unified !== false;
-        const badge = unified ? '统一' : '不统一';
-        const badgeColor = unified ? '#dbeafe' : '#fef3c7';
+function logout() {
+    Z.storage.remove(STORAGE_KEYS.TOKEN);
+    Z.storage.remove(STORAGE_KEYS.GIST_ID);
+    Z.storage.remove(STORAGE_KEYS.FILENAME);
+    currentToken = '';
+    currentGistId = DEFAULT_GIST_ID;
+    currentFilename = 'data.json';
+    gistData = { products: {} };
+    baseDoc = Z.clone(gistData);
+    syncMeta = { updatedAt: null, revision: null, size: null, lastSyncAt: null };
+    readOnly = true;
+    hideLoadError();
+    updateSyncMeta();
+    ['modal-node-overlay', 'modal-item-overlay', 'batch-status-overlay', 'delete-confirm-overlay',
+        'conflict-overlay', 'print-preview-overlay'].forEach(function (id) {
+        var el = $(id);
+        if (el) el.classList.remove('active');
+    });
+    appContainer.style.display = 'none';
+    loginOverlay.classList.add('active');
+    loginError.textContent = '';
+    loginToken.value = '';
+    loginGistId.value = DEFAULT_GIST_ID;
+    loginFilename.value = 'data.json';
+    setText(userStatus, '未连接');
+    setRefreshing(false);
+}
 
-        let childrenHtml = '';
-        if (hasChildren) {
-            const childKeys = Object.keys(node.children).sort();
-            childrenHtml = childKeys.map(c => renderNode(c, node.children[c], depth + 1)).join('');
-        }
+// ============================================================
+// 查询辅助（打印模块沿用 findNodeByCode 名称，故此处保留包装）
+// ============================================================
+function findNodeByCode(code) { return Z.findNodeByCode(gistData.products, code); }
+function findNodeEntry(code) { return Z.findNodeEntry(gistData.products, code); }
+function findParentNode(code) { return Z.findParentNode(gistData.products, code); }
+function baseNodeOf(code) { return Z.findNodeByCode(baseDoc.products, code); }
+function baseItemOf(parentCode, itemCode) {
+    var parent = Z.findNodeByCode(baseDoc.products, parentCode);
+    return parent ? Z.findItem(parent, itemCode) : null;
+}
 
-        let itemsHtml = '';
-        if (hasItems) {
-            itemsHtml = `
-                <div class="batch-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="batchPrintItems('${code}')">批量打印</button>
-                    <button class="btn btn-secondary btn-sm" onclick="openBatchStatus('${code}')">批量修改状态</button>
-                </div>
-                <table class="items-table">
-                    <thead><tr>
-                        <th><input type="checkbox" class="select-all" data-parent="${code}" onchange="toggleSelectAll(this, '${code}')"></th>
-                        <th>库存编码</th><th>名称</th><th>成本</th><th>快递单号</th><th>订单号</th><th>状态</th><th>操作</th>
-                    </tr></thead>
-                    <tbody>
-                        ${node.items.map((item, idx) => `
-                            <tr>
-                                <td><input type="checkbox" class="item-checkbox" data-parent="${code}" data-item-code="${item.code}"></td>
-                                <td>${item.code}</td>
-                                <td>${item.name || ''}</td>
-                                <td>${item.cost !== undefined ? item.cost : ''}</td>
-                                <td>${item.trackingNumber || ''}</td>
-                                <td>${item.orderNumber || ''}</td>
-                                <td><span class="status-badge ${item.status || '在售'}">${item.status || '在售'}</span></td>
-                                <td class="actions">
-                                    <button class="btn btn-primary btn-sm" onclick="editItem('${code}','${item.code}')">编辑</button>
-                                    <button class="btn btn-primary btn-sm" onclick="printItemLabel('${code}','${item.code}')">打印标签</button>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteItem('${code}','${item.code}')">删除</button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>`;
-        }
+// ============================================================
+// 编码生成
+// ============================================================
+function generateRootCode() {
+    var products = gistData.products || {};
+    var maxNum = 0;
+    Object.keys(products).forEach(function (key) {
+        var code = Z.normalizeCode(key);
+        if (!/^A\d{3}$/.test(code)) return;
+        var num = parseInt(code.slice(1), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+    });
+    var next = maxNum + 1;
+    if (next > 999) { toast('大类编码已达 A999 上限', 'error'); return null; }
+    return 'A' + String(next).padStart(3, '0');
+}
 
-        const actions = `
-            <button class="btn btn-secondary btn-sm" onclick="openNodeModal('edit','${code}')">编辑</button>
-            ${unified ? `<button class="btn btn-secondary btn-sm" onclick="openNodeModal('add','','${code}')">添加子类</button>` :
-                        `<button class="btn btn-success btn-sm" onclick="openItemModal('add','${code}')">添加库存</button>`}
-            <button class="btn btn-primary btn-sm" onclick="printNodeLabel('${code}')">打印标签</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteNode('${code}')">删除</button>
-        `;
+function generateChildCode(parentCode) {
+    var parent = findNodeByCode(parentCode);
+    if (!parent) return null;
+    var children = (parent.children && typeof parent.children === 'object') ? parent.children : {};
+    var maxNum = 0;
+    Object.keys(children).forEach(function (key) {
+        var last = String(key).split('/').pop();
+        if (!/^B\d+$/.test(last)) return;
+        var num = parseInt(last.slice(1), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+    });
+    var next = maxNum + 1;
+    if (next > 999) { toast('子类编码已达 B999 上限', 'error'); return null; }
+    return parentCode + '/B' + String(next).padStart(3, '0');
+}
 
-        const toggleIcon = (hasChildren || hasItems) ? `<span class="toggle" onclick="toggleNode('${code}')">▼</span>` : '';
+function generateItemCode(parentCode) {
+    var parent = findNodeByCode(parentCode);
+    if (!parent) return null;
+    var items = Array.isArray(parent.items) ? parent.items : [];
+    var maxNum = 0;
+    items.forEach(function (item) {
+        if (!item || !item.code) return;
+        var last = String(item.code).split('/').pop();
+        if (!/^\d+$/.test(last)) return;
+        var num = parseInt(last, 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+    });
+    var next = maxNum + 1;
+    if (next > 999) { toast('库存编码已达 999 上限', 'error'); return null; }
+    return parentCode + '/' + String(next).padStart(3, '0');
+}
 
-        return `
-            <div class="tree-node" data-code="${code}" data-depth="${depth}">
-                <div class="node-content">
-                    ${toggleIcon}
-                    <span class="name" onclick="toggleNode('${code}')">${node.name || code}</span>
-                    <span class="code">${code}</span>
-                    <span class="badge" style="background:${badgeColor};">${badge}</span>
-                    ${node.orderNumber ? `<span class="badge" style="background:#e0e7ff;">📋${node.orderNumber}</span>` : ''}
-                    <span class="actions">${actions}</span>
-                </div>
-                ${hasChildren ? `<div class="children">${childrenHtml}</div>` : ''}
-                ${hasItems ? `<div class="children">${itemsHtml}</div>` : ''}
-            </div>
-        `;
-    }
+// ============================================================
+// 树渲染（数据层过滤 + 全量转义 + data-action）
+// ============================================================
+function includesTerm(value, term) {
+    if (value === null || value === undefined) return false;
+    return String(value).toLowerCase().indexOf(term) !== -1;
+}
 
-    function buildTreeHtml() {
-        const products = gistData.products || {};
-        const codes = Object.keys(products).sort();
-        if (codes.length === 0) return '<p style="color:var(--color-gray-400);">暂无商品，请添加大类</p>';
-        return codes.map(code => renderNode(code, products[code], 0)).join('');
-    }
+function nodeMatchesTerm(node, code, term) {
+    if (includesTerm(code, term) || includesTerm(node.name, term)) return true;
+    if (includesTerm(node.orderNumber, term) || includesTerm(node.trackingNumber, term) || includesTerm(node.remark, term)) return true;
+    if (includesTerm(Z.normalizeStatus(node.status), term)) return true;
+    if (Array.isArray(node.qrLinks) && node.qrLinks.some(function (link) { return includesTerm(link, term); })) return true;
+    return false;
+}
 
-    function renderTree() {
-        const filter = filterSelect.value;
-        const searchTerm = searchInput.value.trim().toLowerCase();
-        let fullHtml = buildTreeHtml();
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = fullHtml;
-        if (filter !== 'all') {
-            const rootNodes = tempDiv.querySelectorAll('.tree-node[data-depth="0"]');
-            rootNodes.forEach(node => {
-                const code = node.dataset.code;
-                if (code !== filter) {
-                    node.style.display = 'none';
-                } else {
-                    node.classList.add('expanded');
-                    const allChildren = node.querySelectorAll('.tree-node');
-                    allChildren.forEach(c => c.style.display = '');
-                    allChildren.forEach(c => c.classList.add('expanded'));
-                }
-            });
-        } else {
-            tempDiv.querySelectorAll('.tree-node').forEach(n => n.classList.add('expanded'));
-        }
-        if (searchTerm) {
-            const allNodes = tempDiv.querySelectorAll('.tree-node');
-            allNodes.forEach(node => {
-                const name = node.querySelector('.name')?.textContent?.toLowerCase() || '';
-                const code = node.dataset.code?.toLowerCase() || '';
-                if (name.includes(searchTerm) || code.includes(searchTerm)) {
-                    node.style.display = '';
-                    let parent = node.parentElement.closest('.tree-node');
-                    while (parent) {
-                        parent.classList.add('expanded');
-                        parent.style.display = '';
-                        parent = parent.parentElement.closest('.tree-node');
-                    }
-                } else {
-                    const hasMatch = node.querySelector('.tree-node') &&
-                        Array.from(node.querySelectorAll('.tree-node')).some(child => child.style.display !== 'none');
-                    if (!hasMatch) {
-                        node.style.display = 'none';
-                    }
-                }
-            });
-        }
-        treeContainer.innerHTML = tempDiv.innerHTML;
-    }
+function itemMatchesTerm(item, term) {
+    if (!item) return false;
+    if (includesTerm(item.code, term) || includesTerm(item.name, term)) return true;
+    if (includesTerm(item.orderNumber, term) || includesTerm(item.trackingNumber, term) || includesTerm(item.remark, term)) return true;
+    if (includesTerm(Z.normalizeStatus(item.status), term)) return true;
+    if (Array.isArray(item.qrLinks) && item.qrLinks.some(function (link) { return includesTerm(link, term); })) return true;
+    return false;
+}
 
-    window.toggleNode = function(code) {
-        const el = document.querySelector(`.tree-node[data-code="${code}"]`);
-        if (el) el.classList.toggle('expanded');
-    };
+function buildNodeHtml(code, node, depth, term, expandAll, forceShow) {
+    var children = (node.children && typeof node.children === 'object' && !Array.isArray(node.children)) ? node.children : {};
+    var items = Array.isArray(node.items) ? node.items : [];
+    var selfMatch = term ? nodeMatchesTerm(node, code, term) : false;
+    var showAll = !!forceShow || !term || selfMatch;
 
-    function populateFilter() {
-        const products = gistData.products || {};
-        const codes = Object.keys(products).sort();
-        filterSelect.innerHTML = '<option value="all">全部展开</option>';
-        codes.forEach(code => {
-            const name = products[code].name || code;
-            filterSelect.innerHTML += `<option value="${code}">${name} (${code})</option>`;
-        });
-    }
-
-    // ---------- 核心保存函数（智能合并） ----------
-    async function mergeAndSave(nodeKey, newNodeData, originalData, isItem, parentCode) {
-        // 拉取远程最新数据
-        let remoteData;
-        try {
-            remoteData = await getGistContent(currentToken, currentGistId, currentFilename);
-        } catch (e) {
-            console.warn('拉取远程失败，强制覆盖', e);
-            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-            return true;
-        }
-        if (!remoteData || !remoteData.products) {
-            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-            return true;
-        }
-
-        // 获取远程对应的节点/库存数据
-        let remoteNode = null;
-        if (isItem) {
-            const parent = findNodeByCode(parentCode, remoteData.products);
-            if (parent && parent.items) {
-                remoteNode = parent.items.find(it => it.code === nodeKey);
-            }
-        } else {
-            remoteNode = findNodeByCode(nodeKey, remoteData.products);
-        }
-
-        // 如果没有远程数据（新增），直接提交
-        if (!remoteNode) {
-            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-            return true;
-        }
-
-        // 检测冲突：只比较修改过的字段（与原始快照对比）
-        const fields = ['name', 'unified', 'cost', 'trackingNumber', 'orderNumber', 'remark', 'qrLinks'];
-        let conflict = false;
-        if (originalData) {
-            for (const f of fields) {
-                const origVal = originalData[f];
-                const remoteVal = remoteNode[f];
-                if (origVal !== undefined && origVal !== null) {
-                    if (JSON.stringify(remoteVal) !== JSON.stringify(origVal)) {
-                        conflict = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        // 如果有冲突，弹窗询问
-        if (conflict) {
-            const choice = confirm(
-                `⚠️ 远程数据已被其他设备修改，与您的修改有冲突。\n点击“确定”使用您的版本覆盖远程，点击“取消”放弃本次修改并恢复远程数据。`
-            );
-            if (!choice) {
-                // 放弃本地修改，恢复远程数据到内存
-                gistData = remoteData;
-                return false;
-            }
-        }
-
-        // 无冲突或用户确定覆盖，提交本地数据
-        await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-        return true;
-    }
-
-    // ---------- 节点操作 ----------
-    function openNodeModal(mode, code, parentCode) {
-        if (mode === 'add') {
-            modalNodeMode.value = 'add';
-            modalNodeParent.value = parentCode || '';
-            modalNodeTitle.textContent = parentCode ? '添加子类' : '添加大类';
-            let defaultCode = parentCode ? generateChildCode(parentCode) : generateRootCode();
-            modalNodeCode.value = defaultCode || '';
-            modalNodeName.value = '';
-            modalNodeUnified.value = 'true';
-            modalNodeCost.value = '';
-            modalNodeTracking.value = '';
-            modalNodeOrder.value = '';
-            modalNodeQrlinks.value = '';
-            modalNodeRemark.value = '';
-            modalNodeOriginalCode.value = '';
-            _originalNodeData = null;
-        } else {
-            const node = findNodeByCode(code);
-            if (!node) { alert('节点不存在'); return; }
-            modalNodeMode.value = 'edit';
-            modalNodeOriginalCode.value = code;
-            modalNodeParent.value = '';
-            modalNodeTitle.textContent = '编辑节点';
-            modalNodeCode.value = code;
-            modalNodeName.value = node.name || '';
-            modalNodeUnified.value = node.unified !== false ? 'true' : 'false';
-            modalNodeCost.value = node.cost !== undefined ? node.cost : '';
-            modalNodeTracking.value = node.trackingNumber || '';
-            modalNodeOrder.value = node.orderNumber || '';
-            modalNodeQrlinks.value = (node.qrLinks && node.qrLinks.length) ? node.qrLinks.join(', ') : '';
-            modalNodeRemark.value = node.remark || '';
-            // 保存原始快照
-            _originalNodeData = JSON.parse(JSON.stringify(node));
-        }
-        modalNodeOverlay.classList.add('active');
-        resetSaveButton(modalNodeSave, nodeSaveStatus);
-    }
-
-    function resetSaveButton(btn, statusDiv) {
-        btn.disabled = false;
-        btn.textContent = '保存';
-        statusDiv.innerHTML = '';
-    }
-
-    async function saveNode() {
-        const mode = modalNodeMode.value;
-        let code = modalNodeCode.value.trim();
-        const name = modalNodeName.value.trim();
-        if (!name) { alert('名称不能为空'); return; }
-        const unified = modalNodeUnified.value === 'true';
-        const cost = parseFloat(modalNodeCost.value);
-        const tracking = modalNodeTracking.value.trim();
-        const order = modalNodeOrder.value.trim();
-        const qrLinks = modalNodeQrlinks.value.split(/[,，\n]+/).map(s => s.trim()).filter(s => s);
-        const remark = modalNodeRemark.value.trim();
-
-        if (!code) {
-            if (mode === 'add') {
-                const parentCode = modalNodeParent.value;
-                code = parentCode ? generateChildCode(parentCode) : generateRootCode();
-                if (!code) { alert('编码生成失败'); return; }
-            } else {
-                alert('编码不能为空');
-                return;
-            }
-        }
-
-        const originalCode = modalNodeOriginalCode.value;
-
-        modalNodeSave.disabled = true;
-        modalNodeSave.textContent = '保存中…';
-        nodeSaveStatus.innerHTML = '<div class="spinner"></div>';
-
-        try {
-            // 构建新节点数据
-            const newNodeData = {
-                name: name,
-                unified: unified,
-                children: {},
-                cost: isNaN(cost) ? undefined : cost,
-                trackingNumber: tracking || undefined,
-                orderNumber: order || undefined,
-                qrLinks: qrLinks.length ? qrLinks : undefined,
-                remark: remark || undefined
-            };
-
-            // 如果是新增，直接添加到 gistData
-            if (mode === 'add') {
-                if (findNodeByCode(code)) { alert('编码已存在'); resetSaveButton(modalNodeSave, nodeSaveStatus); return; }
-                const newNode = { ...newNodeData };
-                const parentCode = modalNodeParent.value;
-                if (!parentCode) {
-                    gistData.products[code] = newNode;
-                } else {
-                    const parent = findNodeByCode(parentCode);
-                    if (parent) {
-                        if (!parent.children) parent.children = {};
-                        parent.children[code] = newNode;
-                    } else {
-                        alert('父节点不存在');
-                        resetSaveButton(modalNodeSave, nodeSaveStatus);
-                        return;
-                    }
-                }
-            } else {
-                // 编辑模式
-                const node = findNodeByCode(originalCode);
-                if (!node) { alert('节点不存在'); resetSaveButton(modalNodeSave, nodeSaveStatus); return; }
-                // 处理编码重命名
-                if (code !== originalCode) {
-                    if (findNodeByCode(code)) { alert('新编码已被占用'); resetSaveButton(modalNodeSave, nodeSaveStatus); return; }
-                    const parent = findParentNode(originalCode);
-                    if (parent) {
-                        delete parent.children[originalCode];
-                        parent.children[code] = node;
-                    } else if (gistData.products[originalCode]) {
-                        delete gistData.products[originalCode];
-                        gistData.products[code] = node;
-                    } else {
-                        alert('未找到父节点');
-                        resetSaveButton(modalNodeSave, nodeSaveStatus);
-                        return;
-                    }
-                    if (node.children && Object.keys(node.children).length > 0) {
-                        alert('⚠️ 编码已更改，但子节点编码未自动更新，请手动调整子节点编码以避免数据混乱。');
-                    }
-                }
-                // 应用新数据
-                Object.assign(node, newNodeData);
-            }
-
-            // 调用合并保存
-            const success = await mergeAndSave(
-                code,
-                newNodeData,
-                mode === 'edit' ? _originalNodeData : null,
-                false,
-                null
-            );
-
-            if (success) {
-                nodeSaveStatus.innerHTML = '✓ 已保存';
-                modalNodeSave.textContent = '已保存';
-                renderTree();
-                populateFilter();
-                setTimeout(() => {
-                    modalNodeOverlay.classList.remove('active');
-                    resetSaveButton(modalNodeSave, nodeSaveStatus);
-                }, 3000);
-            } else {
-                // 用户取消
-                nodeSaveStatus.innerHTML = '⚠️ 已取消，数据已恢复最新';
-                modalNodeSave.textContent = '取消';
-                await loadData(); // 强制刷新
-                renderTree();
-                populateFilter();
-                setTimeout(() => {
-                    modalNodeOverlay.classList.remove('active');
-                    resetSaveButton(modalNodeSave, nodeSaveStatus);
-                }, 3000);
-            }
-        } catch (e) {
-            alert('保存出错: ' + e.message);
-            resetSaveButton(modalNodeSave, nodeSaveStatus);
-        }
-    }
-
-    modalNodeCancel.addEventListener('click', () => {
-        modalNodeOverlay.classList.remove('active');
-        resetSaveButton(modalNodeSave, nodeSaveStatus);
+    var childParts = [];
+    Object.keys(children).sort().forEach(function (childCode) {
+        var child = children[childCode];
+        if (!child || typeof child !== 'object') return;
+        var result = buildNodeHtml(childCode, child, depth + 1, term, expandAll, showAll);
+        if (result.visible) childParts.push(result.html);
     });
 
-    async function deleteNode(code) {
-        if (!confirm(`确定删除节点 "${code}" 及其所有子项/库存吗？`)) return;
-        const parent = findParentNode(code);
-        if (parent) {
-            delete parent.children[code];
-        } else if (gistData.products[code]) {
-            delete gistData.products[code];
+    var visibleItems = [];
+    items.forEach(function (item) {
+        if (!item) return;
+        if (showAll || itemMatchesTerm(item, term)) visibleItems.push(item);
+    });
+
+    var visible = !term || selfMatch || childParts.length > 0 || visibleItems.length > 0;
+    if (!visible) return { html: '', visible: false };
+
+    var expanded = expandAll || (term && (selfMatch || childParts.length > 0 || visibleItems.length > 0));
+    var unified = node.unified !== false;
+    var nodeStatus = Z.normalizeStatus(node.status);
+    var hasToggle = Object.keys(children).length > 0 || items.length > 0;
+
+    var toggleIcon = hasToggle
+        ? '<span class="toggle" data-action="toggle" data-code="' + esc(code) + '" title="展开/收起">▼</span>'
+        : '';
+
+    var actions = [
+        '<button type="button" class="btn btn-secondary btn-sm" data-action="edit-node" data-code="' + esc(code) + '">编辑</button>',
+        unified
+            ? '<button type="button" class="btn btn-secondary btn-sm" data-action="add-node" data-parent="' + esc(code) + '">添加子类</button>'
+            : '<button type="button" class="btn btn-success btn-sm" data-action="add-item" data-parent="' + esc(code) + '">添加库存</button>',
+        '<button type="button" class="btn btn-primary btn-sm" data-action="print-node" data-code="' + esc(code) + '">打印标签</button>',
+        '<button type="button" class="btn btn-danger btn-sm" data-action="delete-node" data-code="' + esc(code) + '">删除</button>'
+    ].join('');
+
+    var itemsHtml = '';
+    if (visibleItems.length) {
+        var rows = visibleItems.map(function (item) {
+            var itemCode = item.code === undefined || item.code === null ? '' : String(item.code);
+            var itemStatus = Z.normalizeStatus(item.status);
+            var costText = (item.cost === undefined || item.cost === null || item.cost === '') ? '' : esc(item.cost);
+            var parentAttr = esc(code);
+            var itemAttr = esc(itemCode);
+            return '<tr>'
+                + '<td><input type="checkbox" class="item-checkbox" data-parent="' + parentAttr + '" data-item-code="' + itemAttr + '"></td>'
+                + '<td>' + esc(itemCode) + '</td>'
+                + '<td>' + esc(item.name || '') + '</td>'
+                + '<td>' + costText + '</td>'
+                + '<td>' + esc(item.trackingNumber || '') + '</td>'
+                + '<td>' + esc(item.orderNumber || '') + '</td>'
+                + '<td><span class="status-badge ' + Z.statusClass(itemStatus) + '">' + esc(itemStatus) + '</span></td>'
+                + '<td class="actions">'
+                + '<button type="button" class="btn btn-primary btn-sm" data-action="edit-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">编辑</button>'
+                + '<button type="button" class="btn btn-primary btn-sm" data-action="print-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">打印标签</button>'
+                + '<button type="button" class="btn btn-danger btn-sm" data-action="delete-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">删除</button>'
+                + '</td></tr>';
+        }).join('');
+        itemsHtml = '<div class="batch-actions">'
+            + '<button type="button" class="btn btn-secondary btn-sm" data-action="batch-print" data-parent="' + esc(code) + '">批量打印</button>'
+            + '<button type="button" class="btn btn-secondary btn-sm" data-action="batch-status" data-parent="' + esc(code) + '">批量修改状态</button>'
+            + '</div>'
+            + '<table class="items-table"><thead><tr>'
+            + '<th><input type="checkbox" class="select-all" data-parent="' + esc(code) + '"></th>'
+            + '<th>库存编码</th><th>名称</th><th>成本</th><th>快递单号</th><th>订单号</th><th>状态</th><th>操作</th>'
+            + '</tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    var html = '<div class="tree-node' + (expanded ? ' expanded' : '') + '" data-code="' + esc(code) + '" data-depth="' + depth + '">'
+        + '<div class="node-content">'
+        + toggleIcon
+        + '<span class="name" data-action="toggle" data-code="' + esc(code) + '">' + esc(node.name || code) + '</span>'
+        + '<span class="code">' + esc(code) + '</span>'
+        + '<span class="badge" style="background:' + (unified ? '#dbeafe' : '#fef3c7') + ';">' + (unified ? '统一' : '不统一') + '</span>'
+        + '<span class="status-badge ' + Z.statusClass(nodeStatus) + '">' + esc(nodeStatus) + '</span>'
+        + (node.orderNumber ? '<span class="badge" style="background:#e0e7ff;">📋' + esc(node.orderNumber) + '</span>' : '')
+        + '<span class="actions">' + actions + '</span>'
+        + '</div>'
+        + (childParts.length ? '<div class="children">' + childParts.join('') + '</div>' : '')
+        + (itemsHtml ? '<div class="children">' + itemsHtml + '</div>' : '')
+        + '</div>';
+
+    return { html: html, visible: true };
+}
+
+function renderTree() {
+    var products = gistData.products || {};
+    var term = Z.normalizeQuery(searchInput.value);
+    var filter = filterSelect.value || 'all';
+    var codes = Object.keys(products).sort();
+    if (filter !== 'all') codes = codes.filter(function (code) { return code === filter; });
+    var parts = [];
+    codes.forEach(function (code) {
+        var node = products[code];
+        if (!node || typeof node !== 'object') return;
+        var result = buildNodeHtml(code, node, 0, term, !term, false);
+        if (result.visible) parts.push(result.html);
+    });
+    if (!parts.length) {
+        treeContainer.innerHTML = '<p style="color:var(--color-gray-400);">' +
+            (term ? '没有匹配的商品或库存' : '暂无商品，请添加大类') + '</p>';
+        return;
+    }
+    treeContainer.innerHTML = parts.join('');
+}
+
+function findTreeEl(code) {
+    var nodes = treeContainer.querySelectorAll('.tree-node');
+    for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].dataset.code === code) return nodes[i];
+    }
+    return null;
+}
+
+function toggleNode(code) {
+    var el = findTreeEl(code);
+    if (el) el.classList.toggle('expanded');
+}
+
+function populateFilter() {
+    var products = gistData.products || {};
+    var current = filterSelect.value || 'all';
+    var codes = Object.keys(products).sort();
+    filterSelect.innerHTML = '';
+    var allOpt = document.createElement('option');
+    allOpt.value = 'all';
+    allOpt.textContent = '全部展开';
+    filterSelect.appendChild(allOpt);
+    codes.forEach(function (code) {
+        var opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = (products[code] && products[code].name ? products[code].name : code) + ' (' + code + ')';
+        filterSelect.appendChild(opt);
+    });
+    filterSelect.value = codes.indexOf(current) !== -1 ? current : 'all';
+}
+
+// 事件委托：树 / 表格 / 批量 / 打印按钮
+function onTreeClick(event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+    var el = target.closest('[data-action]');
+    if (!el || !treeContainer.contains(el)) return;
+    var action = el.getAttribute('data-action');
+    var code = el.getAttribute('data-code');
+    var parent = el.getAttribute('data-parent');
+    var itemCode = el.getAttribute('data-item');
+    if (isSaving && action !== 'toggle') { toast('正在保存，请稍候…', 'warn'); return; }
+    switch (action) {
+        case 'toggle': toggleNode(code); break;
+        case 'edit-node': openNodeModal('edit', code); break;
+        case 'add-node': openNodeModal('add', '', code); break;
+        case 'add-item': openItemModal('add', code); break;
+        case 'print-node': window.printNodeLabel(code); break;
+        case 'delete-node': deleteNode(code); break;
+        case 'edit-item': openItemModal('edit', parent, itemCode); break;
+        case 'print-item': window.printItemLabel(parent, itemCode); break;
+        case 'delete-item': deleteItem(parent, itemCode); break;
+        case 'batch-print': window.batchPrintItems(parent); break;
+        case 'batch-status': openBatchStatus(parent); break;
+    }
+}
+
+function onTreeChange(event) {
+    var target = event.target;
+    if (target && target.classList && target.classList.contains('select-all')) {
+        toggleSelectAll(target, target.getAttribute('data-parent') || '');
+    }
+}
+
+// ============================================================
+// 保存引擎封装（ops + 三方合并 + 串行锁 + 冲突 UI）
+// ============================================================
+function setGlobalBusy(busy) {
+    [addRootBtn, refreshBtn, logoutBtn, modalNodeSave, modalItemSave, batchStatusSave, deleteConfirmOk].forEach(function (btn) {
+        if (!btn) return;
+        if (busy) btn.disabled = true;
+        else btn.disabled = false;
+    });
+    if (!busy) updateDeleteConfirmState();
+}
+
+function fieldDiff(values, base) {
+    var fields = {};
+    ['name', 'unified', 'cost', 'trackingNumber', 'orderNumber', 'remark', 'qrLinks', 'status'].forEach(function (field) {
+        if (!Z.valuesEqual(values[field], base ? base[field] : undefined)) fields[field] = values[field];
+    });
+    return fields;
+}
+
+function saveWithOps(ops, options) {
+    options = options || {};
+    if (readOnly) {
+        toast('当前处于只读保护状态，无法写入数据。请先重试加载成功。', { type: 'error', duration: 7000 });
+        return Promise.resolve(null);
+    }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return Promise.resolve(null); }
+    if (isLoading) { toast('正在加载最新数据，请稍候…', 'warn'); return Promise.resolve(null); }
+    if (!ops || !ops.length) { toast('没有需要保存的修改', 'info'); return Promise.resolve(null); }
+    isSaving = true;
+    setGlobalBusy(true);
+    return Z.save({
+        token: currentToken,
+        gistId: currentGistId,
+        filename: currentFilename,
+        baseDoc: baseDoc,
+        ops: ops,
+        onConflict: options.onConflict || showConflictDialog,
+        onRetry: function (err, attempt) {
+            if (options.onRetry) options.onRetry(err, attempt);
+            else toast('网络异常，正在自动重试（第 ' + (attempt + 1) + ' 次）…', 'warn');
+        }
+    }).then(function (result) {
+        // 与加载时一致：baseDoc 保留远端原始值（含历史别名），展示态数据做归一
+        var rawDoc = Z.clone(result.data);
+        normalizeDoc(result.data);
+        gistData = result.data;
+        baseDoc = rawDoc;
+        syncMeta = {
+            updatedAt: result.updatedAt || syncMeta.updatedAt,
+            revision: result.revision || syncMeta.revision,
+            size: result.size || syncMeta.size,
+            lastSyncAt: Date.now()
+        };
+        updateSyncMeta();
+        populateFilter();
+        renderTree();
+        if (result.unchanged) {
+            if (result.conflicts && result.conflicts.length) toast('未写入改动：冲突已按你的选择保留远端版本', { type: 'warn', duration: 5000 });
+            else toast('数据没有变化', 'info');
         } else {
-            alert('节点不存在');
+            toast(options.successMessage || '保存成功', 'success');
+        }
+        if (result.conflicts && result.conflicts.length) {
+            toast('已按你的选择解决 ' + result.conflicts.length + ' 处冲突', { type: 'warn', duration: 5000 });
+        }
+        return result;
+    }).catch(function (err) {
+        var tip = Z.friendlyError(err);
+        toast('保存失败：' + tip, { type: 'error', duration: 7000 });
+        if (options.onError) options.onError(err, tip);
+        return null;
+    }).finally(function () {
+        isSaving = false;
+        setGlobalBusy(false);
+    });
+}
+
+// ---------- 冲突处理弹窗 ----------
+function conflictFieldLabel(conflict) {
+    if (conflict.kind === 'remote-deleted' || conflict.field === '__deleted__') return '已被其它设备删除';
+    if (conflict.kind === 'remote-modified' || conflict.field === '__modified__') return '已被其它设备修改';
+    return conflict.label || conflict.field || '字段';
+}
+
+function conflictValueText(conflict, side) {
+    var isRemote = (side === 'remote' || side === 'theirs');
+    if (conflict.kind === 'remote-deleted') return isRemote ? '接受远端删除' : '保留我的版本（重建）';
+    if (conflict.kind === 'remote-modified') return isRemote ? '放弃删除，保留远端修改' : '仍然删除';
+    var value = isRemote ? conflict.remote : conflict.mine;
+    if (value === undefined || value === null) return '（空）';
+    if (typeof value === 'boolean') return value ? '是' : '否';
+    if (typeof value === 'object') {
+        try { return JSON.stringify(value); } catch (e) { return String(value); }
+    }
+    return String(value);
+}
+
+function showConflictDialog(conflicts) {
+    return new Promise(function (resolve) {
+        conflictState = {
+            conflicts: conflicts,
+            choices: conflicts.map(function () { return 'mine'; }),
+            resolve: resolve
+        };
+        conflictList.innerHTML = '';
+        conflicts.forEach(function (conflict, index) {
+            var item = document.createElement('div');
+            item.className = 'conflict-item';
+            var scopeName = conflict.scope === 'item' ? '库存' : '节点';
+            var target = conflict.target === undefined || conflict.target === null ? '' : String(conflict.target);
+            item.innerHTML = '<div class="conflict-head">'
+                + '<span class="badge">' + esc(scopeName) + '</span>'
+                + '<span class="conflict-target">' + esc(target) + '</span>'
+                + '<span class="badge">' + esc(conflictFieldLabel(conflict)) + '</span>'
+                + '</div>'
+                + '<div class="conflict-values">'
+                + '<label class="conflict-choice"><span><input type="radio" name="conflict-' + index + '" value="mine" checked> 用我的</span>'
+                + '<span class="value">' + esc(conflictValueText(conflict, 'mine')) + '</span></label>'
+                + '<label class="conflict-choice"><span><input type="radio" name="conflict-' + index + '" value="theirs"> 用远端</span>'
+                + '<span class="value">' + esc(conflictValueText(conflict, 'theirs')) + '</span></label>'
+                + '</div>';
+            item.querySelectorAll('input[type="radio"]').forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    if (!conflictState) return;
+                    conflictState.choices[index] = radio.value;
+                });
+            });
+            conflictList.appendChild(item);
+        });
+        setText(conflictSummary, '检测到 ' + conflicts.length + ' 处与其它设备/扫码端的修改冲突，请逐项选择保留哪一边（默认“用我的”）。');
+        conflictOverlay.classList.add('active');
+        conflictConfirm.focus();
+    });
+}
+
+function finishConflict(mode) {
+    if (!conflictState) return;
+    var state = conflictState;
+    conflictState = null;
+    conflictOverlay.classList.remove('active');
+    if (mode === 'cancel') { state.resolve(null); return; }
+    state.resolve(state.choices.slice());
+}
+
+function selectAllConflictChoices(side) {
+    if (!conflictState) return;
+    conflictState.choices = conflictState.conflicts.map(function () { return side; });
+    conflictList.querySelectorAll('input[type="radio"]').forEach(function (radio) {
+        radio.checked = radio.value === side;
+    });
+}
+
+// ============================================================
+// 节点弹窗
+// ============================================================
+function resetSaveButton(btn, statusDiv) {
+    if (btn) { btn.disabled = false; btn.textContent = '保存'; }
+    if (statusDiv) { statusDiv.textContent = ''; }
+}
+
+function collectNodeFormValues() {
+    return {
+        name: modalNodeName.value.trim(),
+        unified: modalNodeUnified.value === 'true',
+        cost: parseCost(modalNodeCost.value),
+        trackingNumber: trimOrUndefined(modalNodeTracking.value),
+        orderNumber: trimOrUndefined(modalNodeOrder.value),
+        qrLinks: parseLinks(modalNodeQrlinks.value),
+        remark: trimOrUndefined(modalNodeRemark.value),
+        status: Z.normalizeStatus(modalNodeStatus.value)
+    };
+}
+
+function openNodeModal(mode, code, parentCode) {
+    if (readOnly) { toast('当前为只读保护状态，无法编辑。请先重试加载。', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    if (mode === 'add') {
+        // 新增节点：只有新增时才创建空 children（编辑绝不携带 children/items）
+        var defaultCode = parentCode ? generateChildCode(parentCode) : generateRootCode();
+        if (!defaultCode) return;
+        editContext = { nodeMode: 'add', originalCode: null, parentCode: parentCode || '', baseNode: null };
+        modalNodeMode.value = 'add';
+        modalNodeParent.value = parentCode || '';
+        modalNodeTitle.textContent = parentCode ? '添加子类' : '添加大类';
+        modalNodeCode.value = defaultCode;
+        modalNodeName.value = '';
+        modalNodeUnified.value = 'true';
+        modalNodeCost.value = '';
+        modalNodeTracking.value = '';
+        modalNodeOrder.value = '';
+        modalNodeQrlinks.value = '';
+        modalNodeRemark.value = '';
+        modalNodeOriginalCode.value = '';
+        fillStatusSelect(modalNodeStatus, STATUS.ON_SALE);
+    } else {
+        var node = findNodeByCode(code);
+        if (!node) { toast('节点不存在或已被删除', 'error'); return; }
+        editContext = {
+            nodeMode: 'edit',
+            originalCode: code,
+            parentCode: '',
+            baseNode: Z.clone(baseNodeOf(code) || node)
+        };
+        modalNodeMode.value = 'edit';
+        modalNodeOriginalCode.value = code;
+        modalNodeParent.value = '';
+        modalNodeTitle.textContent = '编辑节点';
+        modalNodeCode.value = code;
+        modalNodeName.value = node.name || '';
+        modalNodeUnified.value = node.unified !== false ? 'true' : 'false';
+        modalNodeCost.value = node.cost === undefined || node.cost === null ? '' : node.cost;
+        modalNodeTracking.value = node.trackingNumber || '';
+        modalNodeOrder.value = node.orderNumber || '';
+        modalNodeQrlinks.value = (Array.isArray(node.qrLinks) && node.qrLinks.length) ? node.qrLinks.join(', ') : '';
+        modalNodeRemark.value = node.remark || '';
+        fillStatusSelect(modalNodeStatus, node.status);
+    }
+    modalNodeOverlay.classList.add('active');
+    resetSaveButton(modalNodeSave, nodeSaveStatus);
+    setTimeout(function () { modalNodeName.focus(); }, 30);
+}
+
+function closeNodeModal() {
+    modalNodeOverlay.classList.remove('active');
+    resetSaveButton(modalNodeSave, nodeSaveStatus);
+    editContext = null;
+}
+
+function saveNode() {
+    if (readOnly) { toast('当前为只读保护状态，无法保存。请先重试加载。', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    if (!editContext) return;
+    var mode = editContext.nodeMode;
+    var code = Z.normalizeCode(modalNodeCode.value);
+    var values = collectNodeFormValues();
+    if (!values.name) {
+        toast('名称不能为空', 'error');
+        modalNodeName.focus();
+        return;
+    }
+    if (!code) {
+        if (mode === 'add') {
+            code = editContext.parentCode ? generateChildCode(editContext.parentCode) : generateRootCode();
+            if (!code) return;
+            modalNodeCode.value = code;
+        } else {
+            toast('编码不能为空', 'error');
             return;
         }
-        // 删除时直接覆盖（不检测冲突，因为删除是管理操作）
-        try {
-            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-            renderTree();
-            populateFilter();
-        } catch (e) {
-            alert('删除失败: ' + e.message);
-            await loadData();
-        }
     }
-
-    window.openNodeModal = openNodeModal;
-    window.deleteNode = deleteNode;
-    modalNodeSave.addEventListener('click', saveNode);
-
-    // ---------- 库存操作 ----------
-    function openItemModal(mode, parentCode, itemCode) {
-        modalItemParentCode.value = parentCode;
-        if (mode === 'add') {
-            modalItemTitle.textContent = '添加库存';
-            let defaultCode = generateItemCode(parentCode);
-            modalItemCode.value = defaultCode || '';
-            modalItemName.value = '';
-            modalItemCost.value = '';
-            modalItemTracking.value = '';
-            modalItemOrder.value = '';
-            modalItemStatus.value = '在售';
-            modalItemQrlinks.value = '';
-            modalItemRemark.value = '';
-            modalItemOriginalCode.value = '';
-            _originalItemData = null;
+    var originalCode = editContext.originalCode;
+    var existing = findNodeEntry(code);
+    if (existing && (!originalCode || !Z.sameCode(code, originalCode))) {
+        toast('编码已存在：' + code, 'error');
+        return;
+    }
+    var op;
+    if (mode === 'add') {
+        op = {
+            type: 'node.upsert',
+            code: code,
+            originalCode: null,
+            parentCode: editContext.parentCode || null,
+            baseNode: null,
+            fields: fieldDiff(values, null)
+        };
+    } else {
+        var baseNode = editContext.baseNode;
+        var fields = fieldDiff(values, baseNode);
+        // 历史数据节点可能没有 status 字段：默认“在售”不主动写入，避免制造无意义改动
+        if (fields.status !== undefined && baseNode.status === undefined && fields.status === STATUS.ON_SALE) {
+            delete fields.status;
+        }
+        if (!Object.keys(fields).length && Z.sameCode(code, originalCode)) {
+            toast('没有需要保存的修改', 'info');
+            closeNodeModal();
+            return;
+        }
+        op = {
+            type: 'node.upsert',
+            code: code,
+            originalCode: originalCode,
+            parentCode: null,
+            baseNode: Z.clone(baseNode),
+            fields: fields
+        };
+    }
+    modalNodeSave.disabled = true;
+    modalNodeSave.textContent = '保存中…';
+    nodeSaveStatus.innerHTML = '<span class="spinner"></span> 保存中…';
+    var successMessage = (mode === 'add' ? '已添加节点 ' : '已保存节点 ') + code;
+    saveWithOps([op], {
+        successMessage: successMessage,
+        onError: function (err, tip) {
+            nodeSaveStatus.textContent = '保存失败：' + tip;
+        }
+    }).then(function (result) {
+        if (result) {
+            closeNodeModal();
         } else {
-            const parent = findNodeByCode(parentCode);
-            if (!parent || !parent.items) { alert('库存不存在'); return; }
-            const item = parent.items.find(it => it.code === itemCode);
-            if (!item) { alert('库存项不存在'); return; }
-            modalItemTitle.textContent = '编辑库存';
-            modalItemCode.value = item.code;
-            modalItemName.value = item.name || '';
-            modalItemCost.value = item.cost !== undefined ? item.cost : '';
-            modalItemTracking.value = item.trackingNumber || '';
-            modalItemOrder.value = item.orderNumber || '';
-            modalItemStatus.value = item.status || '在售';
-            modalItemQrlinks.value = (item.qrLinks && item.qrLinks.length) ? item.qrLinks.join(', ') : '';
-            modalItemRemark.value = item.remark || '';
-            modalItemOriginalCode.value = itemCode;
-            _originalItemData = JSON.parse(JSON.stringify(item));
+            modalNodeSave.disabled = false;
+            modalNodeSave.textContent = '重试保存';
+            if (!nodeSaveStatus.textContent) nodeSaveStatus.textContent = '保存失败，请重试';
         }
-        modalItemOverlay.classList.add('active');
-        resetSaveButton(modalItemSave, itemSaveStatus);
+    });
+}
+
+// ============================================================
+// 库存弹窗
+// ============================================================
+function collectItemFormValues() {
+    return {
+        name: trimOrUndefined(modalItemName.value),
+        cost: parseCost(modalItemCost.value),
+        trackingNumber: trimOrUndefined(modalItemTracking.value),
+        orderNumber: trimOrUndefined(modalItemOrder.value),
+        status: Z.normalizeStatus(modalItemStatus.value),
+        qrLinks: parseLinks(modalItemQrlinks.value),
+        remark: trimOrUndefined(modalItemRemark.value)
+    };
+}
+
+function openItemModal(mode, parentCode, itemCode) {
+    if (readOnly) { toast('当前为只读保护状态，无法编辑。请先重试加载。', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var parent = findNodeByCode(parentCode);
+    if (!parent) { toast('父节点不存在或已被删除', 'error'); return; }
+    modalItemParentCode.value = parentCode;
+    if (mode === 'add') {
+        var defaultCode = generateItemCode(parentCode);
+        if (!defaultCode) return;
+        itemContext = { itemMode: 'add', parentCode: parentCode, originalCode: null, baseItem: null };
+        modalItemTitle.textContent = '添加库存';
+        modalItemCode.value = defaultCode;
+        modalItemName.value = '';
+        modalItemCost.value = '';
+        modalItemTracking.value = '';
+        modalItemOrder.value = '';
+        modalItemQrlinks.value = '';
+        modalItemRemark.value = '';
+        modalItemOriginalCode.value = '';
+        fillStatusSelect(modalItemStatus, STATUS.ON_SALE);
+    } else {
+        var item = Z.findItem(parent, itemCode);
+        if (!item) { toast('库存项不存在或已被删除', 'error'); return; }
+        itemContext = {
+            itemMode: 'edit',
+            parentCode: parentCode,
+            originalCode: itemCode,
+            baseItem: Z.clone(baseItemOf(parentCode, itemCode) || item)
+        };
+        modalItemTitle.textContent = '编辑库存';
+        modalItemCode.value = item.code || '';
+        modalItemName.value = item.name || '';
+        modalItemCost.value = item.cost === undefined || item.cost === null ? '' : item.cost;
+        modalItemTracking.value = item.trackingNumber || '';
+        modalItemOrder.value = item.orderNumber || '';
+        modalItemQrlinks.value = (Array.isArray(item.qrLinks) && item.qrLinks.length) ? item.qrLinks.join(', ') : '';
+        modalItemRemark.value = item.remark || '';
+        modalItemOriginalCode.value = itemCode;
+        fillStatusSelect(modalItemStatus, item.status);
     }
+    modalItemOverlay.classList.add('active');
+    resetSaveButton(modalItemSave, itemSaveStatus);
+    setTimeout(function () { modalItemName.focus(); }, 30);
+}
 
-    async function saveItem() {
-        const parentCode = modalItemParentCode.value;
-        const parent = findNodeByCode(parentCode);
-        if (!parent) { alert('父节点不存在'); return; }
-        if (!parent.items) parent.items = [];
+function closeItemModal() {
+    modalItemOverlay.classList.remove('active');
+    resetSaveButton(modalItemSave, itemSaveStatus);
+    itemContext = null;
+}
 
-        let code = modalItemCode.value.trim();
-        if (!code) {
+function saveItem() {
+    if (readOnly) { toast('当前为只读保护状态，无法保存。请先重试加载。', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    if (!itemContext) return;
+    var parentCode = itemContext.parentCode;
+    var parent = findNodeByCode(parentCode);
+    if (!parent) { toast('父节点不存在或已被删除', 'error'); return; }
+    var items = Array.isArray(parent.items) ? parent.items : [];
+    var code = Z.normalizeCode(modalItemCode.value);
+    if (!code) {
+        if (itemContext.itemMode === 'add') {
             code = generateItemCode(parentCode);
-            if (!code) { alert('编码生成失败'); return; }
-        }
-        const name = modalItemName.value.trim();
-        const cost = parseFloat(modalItemCost.value);
-        const tracking = modalItemTracking.value.trim();
-        const order = modalItemOrder.value.trim();
-        const status = modalItemStatus.value;
-        const qrLinks = modalItemQrlinks.value.split(/[,，\n]+/).map(s => s.trim()).filter(s => s);
-        const remark = modalItemRemark.value.trim();
-
-        const originalCode = modalItemOriginalCode.value;
-        const exists = parent.items.some(it => it.code === code && it.code !== originalCode);
-        if (exists) { alert('编码已存在'); return; }
-
-        modalItemSave.disabled = true;
-        modalItemSave.textContent = '保存中…';
-        itemSaveStatus.innerHTML = '<div class="spinner"></div>';
-
-        try {
-            const itemData = {
-                code: code,
-                name: name || undefined,
-                cost: isNaN(cost) ? undefined : cost,
-                trackingNumber: tracking || undefined,
-                orderNumber: order || undefined,
-                status: status,
-                qrLinks: qrLinks.length ? qrLinks : undefined,
-                remark: remark || undefined
-            };
-
-            if (originalCode) {
-                const idx = parent.items.findIndex(it => it.code === originalCode);
-                if (idx === -1) { alert('库存项不存在'); resetSaveButton(modalItemSave, itemSaveStatus); return; }
-                parent.items[idx] = itemData;
-            } else {
-                parent.items.push(itemData);
-            }
-
-            // 调用合并保存
-            const success = await mergeAndSave(
-                code,
-                itemData,
-                _originalItemData,
-                true,
-                parentCode
-            );
-
-            if (success) {
-                itemSaveStatus.innerHTML = '✓ 已保存';
-                modalItemSave.textContent = '已保存';
-                renderTree();
-                setTimeout(() => {
-                    modalItemOverlay.classList.remove('active');
-                    resetSaveButton(modalItemSave, itemSaveStatus);
-                }, 3000);
-            } else {
-                itemSaveStatus.innerHTML = '⚠️ 已取消，数据已恢复最新';
-                modalItemSave.textContent = '取消';
-                await loadData();
-                renderTree();
-                setTimeout(() => {
-                    modalItemOverlay.classList.remove('active');
-                    resetSaveButton(modalItemSave, itemSaveStatus);
-                }, 3000);
-            }
-        } catch (e) {
-            alert('保存出错: ' + e.message);
-            resetSaveButton(modalItemSave, itemSaveStatus);
+            if (!code) return;
+            modalItemCode.value = code;
+        } else {
+            toast('编码不能为空', 'error');
+            return;
         }
     }
-
-    modalItemCancel.addEventListener('click', () => {
-        modalItemOverlay.classList.remove('active');
-        resetSaveButton(modalItemSave, itemSaveStatus);
+    var originalCode = itemContext.originalCode;
+    var duplicated = items.some(function (item) {
+        return item && item.code === code && (!originalCode || item.code !== originalCode);
     });
-
-    async function deleteItem(parentCode, itemCode) {
-        if (!confirm(`确定删除库存 "${itemCode}" 吗？`)) return;
-        const parent = findNodeByCode(parentCode);
-        if (!parent || !parent.items) { alert('库存不存在'); return; }
-        const idx = parent.items.findIndex(it => it.code === itemCode);
-        if (idx === -1) { alert('库存项不存在'); return; }
-        parent.items.splice(idx, 1);
-        try {
-            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-            renderTree();
-        } catch (e) {
-            alert('删除失败: ' + e.message);
-            await loadData();
+    if (duplicated) { toast('编码已存在：' + code, 'error'); return; }
+    var values = collectItemFormValues();
+    var op;
+    if (itemContext.itemMode === 'add') {
+        op = {
+            type: 'item.upsert',
+            parentCode: parentCode,
+            code: code,
+            originalCode: null,
+            baseItem: null,
+            fields: fieldDiff(values, null)
+        };
+    } else {
+        var baseItem = itemContext.baseItem;
+        var fields = fieldDiff(values, baseItem);
+        if (!Object.keys(fields).length && Z.sameCode(code, originalCode)) {
+            toast('没有需要保存的修改', 'info');
+            closeItemModal();
+            return;
         }
+        op = {
+            type: 'item.upsert',
+            parentCode: parentCode,
+            code: code,
+            originalCode: originalCode,
+            baseItem: Z.clone(baseItem),
+            fields: fields
+        };
     }
+    modalItemSave.disabled = true;
+    modalItemSave.textContent = '保存中…';
+    itemSaveStatus.innerHTML = '<span class="spinner"></span> 保存中…';
+    var successMessage = (itemContext.itemMode === 'add' ? '已添加库存 ' : '已保存库存 ') + code;
+    saveWithOps([op], {
+        successMessage: successMessage,
+        onError: function (err, tip) {
+            itemSaveStatus.textContent = '保存失败：' + tip;
+        }
+    }).then(function (result) {
+        if (result) {
+            closeItemModal();
+        } else {
+            modalItemSave.disabled = false;
+            modalItemSave.textContent = '重试保存';
+            if (!itemSaveStatus.textContent) itemSaveStatus.textContent = '保存失败，请重试';
+        }
+    });
+}
 
-    window.openItemModal = openItemModal;
-    window.editItem = function(parentCode, itemCode) { openItemModal('edit', parentCode, itemCode); };
-    window.deleteItem = deleteItem;
-    modalItemSave.addEventListener('click', saveItem);
+// ============================================================
+// 删除（二次确认 + 输入编码 + 数量统计）
+// ============================================================
+function updateDeleteConfirmState() {
+    if (!deleteState) return;
+    var typed = deleteConfirmInput.value;
+    var ok = Z.sameCode(typed, deleteState.code);
+    deleteConfirmOk.disabled = !ok || isSaving;
+}
 
-    // ---------- 批量操作 ----------
-    function getSelectedItems(parentCode) {
-        const checkboxes = document.querySelectorAll(`.item-checkbox[data-parent="${parentCode}"]:checked`);
-        return Array.from(checkboxes).map(cb => cb.dataset.itemCode);
-    }
+function showDeleteConfirm(opts) {
+    deleteState = { code: opts.code, onConfirm: opts.onConfirm };
+    setText(deleteConfirmTitle, opts.title || '确认删除');
+    deleteConfirmMessage.textContent = opts.message || '';
+    setText(deleteConfirmCode, opts.code);
+    deleteConfirmInput.value = '';
+    setText(deleteConfirmStatus, '');
+    deleteConfirmOk.disabled = true;
+    deleteConfirmCancel.disabled = false;
+    deleteConfirmOk.textContent = '确认删除';
+    deleteConfirmOverlay.classList.add('active');
+    setTimeout(function () { deleteConfirmInput.focus(); }, 40);
+}
 
-    window.toggleSelectAll = function(checkbox, parentCode) {
-        const items = document.querySelectorAll(`.item-checkbox[data-parent="${parentCode}"]`);
-        items.forEach(cb => cb.checked = checkbox.checked);
-    };
+function cancelDelete() {
+    deleteConfirmOverlay.classList.remove('active');
+    deleteState = null;
+}
 
-    window.batchPrintItems = function(parentCode) {
-        const selected = getSelectedItems(parentCode);
-        if (selected.length === 0) { alert('请先选择要打印的库存项'); return; }
-        const parent = findNodeByCode(parentCode);
-        if (!parent) return;
-        const dataList = selected.map(itemCode => {
-            const item = parent.items.find(it => it.code === itemCode);
-            return {
+function confirmDelete() {
+    if (!deleteState || isSaving) return;
+    if (!Z.sameCode(deleteConfirmInput.value, deleteState.code)) return;
+    var state = deleteState;
+    deleteConfirmOk.disabled = true;
+    deleteConfirmCancel.disabled = true;
+    deleteConfirmOk.textContent = '删除中…';
+    Promise.resolve(state.onConfirm()).then(function (ok) {
+        deleteConfirmOk.textContent = '确认删除';
+        deleteConfirmCancel.disabled = false;
+        if (ok) {
+            deleteConfirmOverlay.classList.remove('active');
+            deleteState = null;
+        } else {
+            updateDeleteConfirmState();
+        }
+    });
+}
+
+function deleteNode(code) {
+    if (readOnly) { toast('当前为只读保护状态，无法删除。请先重试加载。', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var entry = findNodeEntry(code);
+    if (!entry) { toast('节点不存在或已被删除', 'error'); return; }
+    var counts = Z.countDescendants(entry.node);
+    var baseNode = baseNodeOf(code);
+    var parts = ['将删除节点「' + code + '」'];
+    if (counts.children > 0) parts.push('其下 ' + counts.children + ' 个子类');
+    if (counts.items > 0) parts.push('其下 ' + counts.items + ' 个库存');
+    var message = parts.join('，') + '。此操作不可撤销。';
+    showDeleteConfirm({
+        title: '删除节点',
+        code: code,
+        message: message,
+        onConfirm: function () {
+            deleteConfirmStatus.textContent = '删除中…';
+            return saveWithOps([{ type: 'node.delete', code: code, baseNode: baseNode ? Z.clone(baseNode) : null }], {
+                successMessage: '已删除节点 ' + code,
+                onError: function (err, tip) { deleteConfirmStatus.textContent = '删除失败：' + tip; }
+            }).then(function (result) {
+                if (result) {
+                    if (result.unchanged && result.conflicts && result.conflicts.length) {
+                        toast('检测到远端修改，已按你的选择取消删除节点 ' + code, { type: 'warn', duration: 5000 });
+                    } else {
+                        toast('已删除节点 ' + code + '（' + counts.children + ' 个子类 / ' + counts.items + ' 个库存）', 'success');
+                    }
+                }
+                return !!result;
+            });
+        }
+    });
+}
+
+function deleteItem(parentCode, itemCode) {
+    if (readOnly) { toast('当前为只读保护状态，无法删除。请先重试加载。', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var parent = findNodeByCode(parentCode);
+    if (!parent) { toast('父节点不存在或已被删除', 'error'); return; }
+    var item = Z.findItem(parent, itemCode);
+    if (!item) { toast('库存项不存在或已被删除', 'error'); return; }
+    var baseItem = baseItemOf(parentCode, itemCode);
+    showDeleteConfirm({
+        title: '删除库存',
+        code: itemCode,
+        message: '将删除库存「' + itemCode + '」（影响库存：1 项）。此操作不可撤销。',
+        onConfirm: function () {
+            deleteConfirmStatus.textContent = '删除中…';
+            return saveWithOps([{
+                type: 'item.delete',
+                parentCode: parentCode,
                 code: itemCode,
-                name: item ? item.name || parent.name || '' : parent.name || '',
-                cost: item ? item.cost : undefined,
-                orderNumber: item ? item.orderNumber : undefined,
-                trackingNumber: item ? item.trackingNumber : undefined,
-                qrLinks: item ? item.qrLinks : undefined
-            };
-        });
-        openPrintPreview(dataList);
-    };
-
-    window.openBatchStatus = function(parentCode) {
-        const selected = getSelectedItems(parentCode);
-        if (selected.length === 0) { alert('请先选择要修改的库存项'); return; }
-        window.batchParentCode = parentCode;
-        window.batchSelectedItems = selected;
-        batchStatusOverlay.classList.add('active');
-    };
-
-    batchStatusCancel.addEventListener('click', () => batchStatusOverlay.classList.remove('active'));
-    batchStatusSave.addEventListener('click', async () => {
-        const newStatus = batchStatusSelect.value;
-        const parentCode = window.batchParentCode;
-        const items = window.batchSelectedItems;
-        const parent = findNodeByCode(parentCode);
-        if (!parent || !parent.items) return;
-        items.forEach(code => {
-            const item = parent.items.find(it => it.code === code);
-            if (item) item.status = newStatus;
-        });
-        try {
-            await updateGistContent(currentToken, currentGistId, currentFilename, gistData);
-            batchStatusOverlay.classList.remove('active');
-            renderTree();
-        } catch (e) {
-            alert('批量修改失败: ' + e.message);
-            await loadData();
+                baseItem: baseItem ? Z.clone(baseItem) : null
+            }], {
+                successMessage: '已删除库存 ' + itemCode,
+                onError: function (err, tip) { deleteConfirmStatus.textContent = '删除失败：' + tip; }
+            }).then(function (result) {
+                if (result) {
+                    if (result.unchanged && result.conflicts && result.conflicts.length) {
+                        toast('检测到远端修改，已按你的选择取消删除库存 ' + itemCode, { type: 'warn', duration: 5000 });
+                    } else {
+                        toast('已删除库存 ' + itemCode, 'success');
+                    }
+                }
+                return !!result;
+            });
         }
     });
+}
 
-    // ---------- 搜索和过滤 ----------
-    searchBtn.addEventListener('click', renderTree);
-    clearSearchBtn.addEventListener('click', function() {
-        searchInput.value = '';
-        renderTree();
+// ============================================================
+// 批量操作
+// ============================================================
+function getSelectedItems(parentCode) {
+    var checkboxes = treeContainer.querySelectorAll('.item-checkbox');
+    var result = [];
+    Array.prototype.forEach.call(checkboxes, function (checkbox) {
+        if (checkbox.checked && checkbox.dataset.parent === parentCode) result.push(checkbox.dataset.itemCode);
     });
-    searchInput.addEventListener('keyup', e => { if (e.key === 'Enter') renderTree(); });
-    filterSelect.addEventListener('change', renderTree);
+    return result;
+}
 
-    refreshBtn.addEventListener('click', async function() {
-        refreshBtn.classList.add('loading');
-        await loadData();
-        setTimeout(() => refreshBtn.classList.remove('loading'), 500);
+function toggleSelectAll(checkbox, parentCode) {
+    var checkboxes = treeContainer.querySelectorAll('.item-checkbox');
+    Array.prototype.forEach.call(checkboxes, function (item) {
+        if (item.dataset.parent === parentCode) item.checked = checkbox.checked;
     });
-    addRootBtn.addEventListener('click', () => openNodeModal('add', '', ''));
+}
+
+function batchPrintItems(parentCode) {
+    var selected = getSelectedItems(parentCode);
+    if (!selected.length) { toast('请先选择要打印的库存项', 'warn'); return; }
+    var parent = findNodeByCode(parentCode);
+    if (!parent) return;
+    var dataList = selected.map(function (itemCode) {
+        var item = Z.findItem(parent, itemCode);
+        return {
+            code: itemCode,
+            name: item ? (item.name || parent.name || '') : (parent.name || ''),
+            cost: item ? item.cost : undefined,
+            orderNumber: item ? item.orderNumber : undefined,
+            trackingNumber: item ? item.trackingNumber : undefined,
+            qrLinks: item ? item.qrLinks : undefined
+        };
+    });
+    openPrintPreview(dataList);
+}
+
+function openBatchStatus(parentCode) {
+    if (readOnly) { toast('当前为只读保护状态，无法修改。请先重试加载。', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var selected = getSelectedItems(parentCode);
+    if (!selected.length) { toast('请先选择要修改的库存项', 'warn'); return; }
+    batchContext = { parentCode: parentCode, itemCodes: selected };
+    fillStatusSelect(batchStatusSelect, STATUS.ON_SALE);
+    setText(batchStatusNote, '已选择 ' + selected.length + ' 项库存，将统一修改为下方状态。');
+    batchStatusOverlay.classList.add('active');
+}
+
+function applyBatchStatus() {
+    if (!batchContext) return;
+    if (readOnly) { toast('当前为只读保护状态，无法保存。请先重试加载。', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var parent = findNodeByCode(batchContext.parentCode);
+    if (!parent) { toast('父节点不存在或已被删除', 'error'); batchStatusOverlay.classList.remove('active'); return; }
+    var target = Z.normalizeStatus(batchStatusSelect.value);
+    var baseParent = Z.findNodeByCode(baseDoc.products, batchContext.parentCode);
+    var ops = [];
+    batchContext.itemCodes.forEach(function (itemCode) {
+        var item = Z.findItem(parent, itemCode);
+        if (!item) return;
+        if (Z.normalizeStatus(item.status) === target) return;
+        var baseItem = baseParent ? Z.findItem(baseParent, itemCode) : null;
+        ops.push({
+            type: 'item.upsert',
+            parentCode: batchContext.parentCode,
+            code: itemCode,
+            originalCode: itemCode,
+            baseItem: baseItem ? Z.clone(baseItem) : null,
+            fields: { status: target }
+        });
+    });
+    if (!ops.length) { toast('所选库存状态未变化', 'info'); batchStatusOverlay.classList.remove('active'); return; }
+    batchStatusSave.disabled = true;
+    batchStatusSave.textContent = '保存中…';
+    saveWithOps(ops, { successMessage: '已修改 ' + ops.length + ' 项库存状态为「' + target + '」' }).then(function (result) {
+        batchStatusSave.disabled = false;
+        batchStatusSave.textContent = '确定修改';
+        if (result) batchStatusOverlay.classList.remove('active');
+    });
+}
+
+// ============================================================
+// 事件绑定
+// ============================================================
+loginBtn.addEventListener('click', function () { performLogin(); });
+document.querySelectorAll('#login-token, #login-gistid, #login-filename').forEach(function (el) {
+    el.addEventListener('keydown', function (event) { if (event.key === 'Enter') performLogin(); });
+});
+logoutBtn.addEventListener('click', logout);
+refreshBtn.addEventListener('click', function () { refreshFromRemote(); });
+addRootBtn.addEventListener('click', function () { openNodeModal('add', '', ''); });
+searchBtn.addEventListener('click', renderTree);
+clearSearchBtn.addEventListener('click', function () { searchInput.value = ''; renderTree(); });
+searchInput.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); renderTree(); } });
+filterSelect.addEventListener('change', renderTree);
+modalNodeSave.addEventListener('click', saveNode);
+modalNodeCancel.addEventListener('click', closeNodeModal);
+modalItemSave.addEventListener('click', saveItem);
+modalItemCancel.addEventListener('click', closeItemModal);
+batchStatusSave.addEventListener('click', applyBatchStatus);
+batchStatusCancel.addEventListener('click', function () { batchStatusOverlay.classList.remove('active'); });
+deleteConfirmCancel.addEventListener('click', cancelDelete);
+deleteConfirmOk.addEventListener('click', confirmDelete);
+deleteConfirmInput.addEventListener('input', updateDeleteConfirmState);
+deleteConfirmInput.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter' && !deleteConfirmOk.disabled) { event.preventDefault(); confirmDelete(); }
+});
+conflictAllMine.addEventListener('click', function () { selectAllConflictChoices('mine'); });
+conflictAllTheirs.addEventListener('click', function () { selectAllConflictChoices('theirs'); });
+conflictCancel.addEventListener('click', function () { finishConflict('cancel'); });
+conflictConfirm.addEventListener('click', function () { finishConflict('confirm'); });
+loadErrorRetry.addEventListener('click', retryLoad);
+loadErrorLogin.addEventListener('click', showLoginForm);
+treeContainer.addEventListener('click', onTreeClick);
+treeContainer.addEventListener('change', onTreeChange);
+
+// Esc 关闭 / Enter 保存
+document.addEventListener('keydown', function (event) {
+    var key = event.key;
+    if (key === 'Escape') {
+        if (conflictOverlay.classList.contains('active')) { finishConflict('cancel'); return; }
+        if (deleteConfirmOverlay.classList.contains('active')) { cancelDelete(); return; }
+        if (modalNodeOverlay.classList.contains('active')) { closeNodeModal(); return; }
+        if (modalItemOverlay.classList.contains('active')) { closeItemModal(); return; }
+        if (batchStatusOverlay.classList.contains('active')) { batchStatusOverlay.classList.remove('active'); return; }
+        if (printPreviewOverlay.classList.contains('active')) { printPreviewOverlay.classList.remove('active'); return; }
+        return;
+    }
+    if (key === 'Enter' && !event.isComposing) {
+        var target = event.target;
+        if (!target || !target.tagName) return;
+        if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
+        if (modalNodeOverlay.classList.contains('active') && modalNodeOverlay.contains(target)) {
+            event.preventDefault();
+            saveNode();
+        } else if (modalItemOverlay.classList.contains('active') && modalItemOverlay.contains(target)) {
+            event.preventDefault();
+            saveItem();
+        }
+    }
+});
+
+// 兼容旧入口（打印/批量打印按钮通过事件委托调用）
+window.toggleNode = toggleNode;
+window.toggleSelectAll = toggleSelectAll;
+window.batchPrintItems = batchPrintItems;
+window.openNodeModal = openNodeModal;
+window.openItemModal = openItemModal;
+window.deleteNode = deleteNode;
+window.deleteItem = deleteItem;
+window.openBatchStatus = openBatchStatus;
 
     // ---------- 打印相关（完全保留） ----------
     const printTemplates = [
@@ -2150,7 +2819,7 @@
 
         if (dataList.length === 1) {
             const d = dataList[0];
-            printInfoDiv.innerHTML = `<p><strong>编码：</strong>${d.code || ''}</p><p><strong>名称：</strong>${d.name || ''}</p>`;
+            printInfoDiv.innerHTML = `<p><strong>编码：</strong>${escapeHtml(String(d.code || ''))}</p><p><strong>名称：</strong>${escapeHtml(String(d.name || ''))}</p>`;
         } else {
             printInfoDiv.innerHTML = `<p><strong>批量打印：</strong>已选 ${dataList.length} 个标签</p>`;
         }
@@ -2330,23 +2999,27 @@
     printPreviewBtn.addEventListener('click', showLodopPreview);
     printExecute.addEventListener('click', executePrint);
 
-    // ---------- 自动登录 ----------
-    (function autoLogin() {
-        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
-        const gistId = localStorage.getItem(STORAGE_KEYS.GIST_ID);
-        const filename = localStorage.getItem(STORAGE_KEYS.FILENAME) || 'data.json';
-        if (token && gistId) {
-            loginToken.value = token;
-            loginGistId.value = gistId;
-            loginFilename.value = filename;
-            performLogin();
+    // ---------- 初始化与自动登录 ----------
+    (function initAdmin() {
+        fillStatusSelect(modalItemStatus, STATUS.ON_SALE);
+        fillStatusSelect(batchStatusSelect, STATUS.ON_SALE);
+        fillStatusSelect(modalNodeStatus, STATUS.ON_SALE);
+        updateSyncMeta();
+
+        var savedToken = Z.storage.get(STORAGE_KEYS.TOKEN, '');
+        var savedGistId = Z.storage.get(STORAGE_KEYS.GIST_ID, '');
+        var savedFilename = Z.storage.get(STORAGE_KEYS.FILENAME, 'data.json');
+        loginToken.value = savedToken;
+        loginGistId.value = savedGistId || DEFAULT_GIST_ID;
+        loginFilename.value = savedFilename;
+        if (savedToken && savedGistId) {
+            performLogin({ silent: true });
         } else {
-            loginOverlay.classList.add('active');
-            appContainer.style.display = 'none';
+            showLoginForm();
         }
     })();
 
-    console.log('管理后台已加载（智能冲突检测版）');
+    console.log('管理后台已加载（ZCFI 核心版：ops 保存 / 三方合并 / 严格加载）');
 </script>
 </body>
 </html>
