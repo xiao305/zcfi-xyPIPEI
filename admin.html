@@ -312,19 +312,16 @@
             color: var(--color-primary);
         }
         .tree-node .children {
-            overflow: hidden;
-            max-height: 0;
-            opacity: 0;
-            transition: max-height 0.35s ease, opacity 0.3s ease, margin 0.3s ease;
+            display: none;
             margin-left: 24px;
             padding-left: 16px;
             border-left: 2px dashed var(--color-gray-200);
         }
         .tree-node.expanded > .children {
-            max-height: 5000px;
-            opacity: 1;
+            display: block;
             margin-top: 6px;
         }
+        .tree-node.tree-node-hidden { display: none; }
 
         /* ===== 表格 ===== */
         .items-table {
@@ -1119,6 +1116,150 @@
         }
         .confirm-require { margin-top: 12px; }
 
+        /* ===== 搜索高亮 ===== */
+        #tree-container mark {
+            background: #fef08a;
+            color: #713f12;
+            padding: 0 1px;
+            border-radius: 3px;
+        }
+
+        /* ===== 汇总条 / 节点行汇总 ===== */
+        .summary-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .summary-chip {
+            font-size: 12px;
+            color: var(--color-gray-600);
+            background: var(--color-gray-100);
+            border-radius: 20px;
+            padding: 3px 12px;
+            white-space: nowrap;
+        }
+        .summary-chip b {
+            color: var(--color-gray-900);
+            font-size: 13px;
+            margin-left: 2px;
+        }
+        .summary-chip.sold { background: #e2e8f0; color: #475569; }
+        .summary-chip.onsale { background: #d1fae5; color: #065f46; }
+        .summary-chip.pending { background: #fef3c7; color: #92400e; }
+        .node-summary {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--color-gray-500);
+        }
+        .node-summary span {
+            background: #f1f5f9;
+            border-radius: 14px;
+            padding: 1px 9px;
+            white-space: nowrap;
+        }
+        .node-summary span.onsale { background: #ecfdf5; color: #047857; }
+        .node-summary span.sold { background: #f1f5f9; color: #475569; }
+        .node-summary span.pending { background: #fffbeb; color: #b45309; }
+
+        /* ===== 批量选择条 ===== */
+        .batch-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 0 0 12px 0;
+            padding: 8px 12px;
+            background: var(--color-gray-50);
+            border-radius: 10px;
+            font-size: 13px;
+            color: var(--color-gray-600);
+        }
+        .global-select {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .global-select input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--color-primary);
+            margin: 0;
+        }
+        #global-selected-count { color: var(--color-gray-500); }
+
+        /* ===== 表格横向滚动容器 ===== */
+        .table-scroll {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 12px;
+            border-radius: 12px;
+        }
+        .table-scroll .items-table { margin-top: 0; }
+
+        /* ===== 可排序表头 ===== */
+        .items-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+        }
+        .items-table th.sortable:hover { color: var(--color-primary-dark); }
+        .items-table th.sort-asc,
+        .items-table th.sort-desc { color: var(--color-primary-dark); background: #eef2ff; }
+
+        /* ===== 备注 / 链接 / 复制编码 ===== */
+        .item-remark { font-size: 12px; color: var(--color-gray-500); max-width: 140px; }
+        .item-remark .remark-text { display: inline-block; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+        .qr-count {
+            font-size: 11px;
+            background: #e0e7ff;
+            color: var(--color-primary-dark);
+            border-radius: 12px;
+            padding: 1px 7px;
+            white-space: nowrap;
+        }
+
+        /* ===== 树级保存遮罩 ===== */
+        .tree-saving-mask {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 30;
+            background: rgba(248, 250, 252, 0.72);
+            backdrop-filter: blur(1.5px);
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            color: var(--color-gray-600);
+        }
+        .tree-saving-mask.active { display: flex; }
+
+        /* ===== 页脚 ===== */
+        .app-footer {
+            text-align: center;
+            font-size: 12px;
+            color: var(--color-gray-400);
+            padding: 8px 0 24px;
+            line-height: 1.7;
+        }
+
+        /* ===== 空状态 ===== */
+        .empty-state {
+            text-align: center;
+            padding: 48px 16px;
+            color: var(--color-gray-400);
+        }
+        .empty-state .empty-icon { font-size: 40px; margin-bottom: 10px; }
+        .empty-state p { font-size: 14px; line-height: 1.8; }
+
         /* ===== 响应式微调 ===== */
         @media (max-width: 768px) {
             .conflict-values { grid-template-columns: 1fr; }
@@ -1133,6 +1274,57 @@
             .tree-node .node-content .actions { margin-left: 0; width: 100%; }
             .items-table { font-size: 12px; }
             .items-table th, .items-table td { padding: 8px 10px; }
+            .items-table { min-width: 760px; }
+            .table-scroll { margin-left: -4px; margin-right: -4px; }
+            #app-container .btn,
+            #app-container button {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            #app-container .btn-sm {
+                min-height: 44px;
+                min-width: 44px;
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+            #tree-container [data-action] {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 44px;
+                min-width: 44px;
+            }
+            .tree-node .node-content .toggle {
+                width: 44px;
+                height: 44px;
+                line-height: 44px;
+                font-size: 16px;
+            }
+            .tree-node .node-content .name { padding: 8px 2px; word-break: break-word; overflow-wrap: anywhere; }
+            .tree-node .node-content .code { word-break: break-all; }
+            .tree-node .node-content { min-width: 0; }
+            .tree-node .node-content .node-summary { min-width: 0; }
+            .top-bar { min-width: 0; }
+            .top-bar .actions { min-width: 0; }
+            .filter-bar > * { max-width: 100%; }
+            .modal-overlay { padding: 0; }
+            .modal {
+                width: 100%;
+                max-width: 100%;
+                max-height: 100vh;
+                min-height: 100vh;
+                border-radius: 0;
+                padding: 20px;
+            }
+            .data-menu { max-width: calc(100vw - 32px); }
+            .filter-bar select,
+            .filter-bar input { max-width: 100%; }
+            .summary-bar { gap: 6px; }
+            .summary-chip { font-size: 11px; padding: 2px 9px; }
+            .node-summary { width: 100%; }
+            .node-summary span { padding: 2px 10px; font-size: 12px; }
+            .batch-bar { font-size: 12px; }
+            .app-footer { padding-bottom: 32px; }
         }
 
         /* ===== 通用工具 ===== */
@@ -1193,6 +1385,13 @@
                     <span id="data-revision" class="sync-meta">版本：未知</span>
                     <span id="lodop-status">⏳ 检测打印服务…</span>
                 </div>
+                <div class="summary-bar" id="summary-bar" aria-label="数据汇总">
+                    <span class="summary-chip">节点 <b id="sum-nodes">0</b></span>
+                    <span class="summary-chip">库存 <b id="sum-items">0</b></span>
+                    <span class="summary-chip onsale">在售 <b id="sum-onsale">0</b></span>
+                    <span class="summary-chip sold">售出 <b id="sum-sold">0</b></span>
+                    <span class="summary-chip pending">待售 <b id="sum-pending">0</b></span>
+                </div>
             </div>
             <div class="actions">
                 <button class="btn btn-success" id="add-root-btn">＋ 添加大类</button>
@@ -1224,15 +1423,35 @@
 
         <div class="card">
             <div class="filter-bar">
-                <select id="filter-select"><option value="all">全部展开</option></select>
-                <input type="text" id="search-input" placeholder="搜索编码或名称…" />
+                <select id="filter-select" aria-label="筛选大类"><option value="all">全部大类</option></select>
+                <select id="node-sort-select" aria-label="节点排序">
+                    <option value="code-asc">编码 ↑</option>
+                    <option value="code-desc">编码 ↓</option>
+                    <option value="name-asc">名称 A→Z</option>
+                    <option value="name-desc">名称 Z→A</option>
+                    <option value="updated-desc">更新时间 ↓</option>
+                </select>
+                <input type="text" id="search-input" placeholder="搜索编码/名称/单号/备注…" aria-label="搜索商品或库存" />
                 <button class="btn btn-secondary" id="search-btn">搜索</button>
                 <button class="btn btn-secondary" id="clear-search-btn">清除</button>
+                <button class="btn btn-secondary" id="expand-all-btn" type="button">全部展开</button>
+                <button class="btn btn-secondary" id="collapse-all-btn" type="button">全部折叠</button>
             </div>
-            <div class="tree-container" id="tree-container">
-                <p style="color:var(--color-gray-400);">加载中…</p>
+            <div class="batch-bar">
+                <label class="global-select"><input type="checkbox" id="global-select-all" /> 全选当前筛选结果</label>
+                <span id="global-selected-count">已选 0 项</span>
+                <button type="button" class="btn btn-secondary btn-sm" id="global-batch-status-btn">跨节点批量改状态</button>
+            </div>
+            <div class="card-body-wrap" style="position:relative;">
+                <div id="tree-saving-mask" class="tree-saving-mask"><span class="spinner"></span> 保存中…</div>
+                <div class="tree-container" id="tree-container">
+                    <p style="color:var(--color-gray-400);">加载中…</p>
+                </div>
             </div>
         </div>
+        <footer class="app-footer">
+            <span id="app-version">管理后台</span>
+        </footer>
     </div>
 </div>
 
@@ -1280,6 +1499,10 @@
 <div class="modal-overlay" id="modal-item-overlay">
     <div class="modal">
         <h3 id="modal-item-title">添加库存</h3>
+        <div id="item-qty-row">
+            <label>数量（件）</label>
+            <input type="number" id="modal-item-qty" value="1" min="1" max="100" step="1" placeholder="批量添加数量 1-100" />
+        </div>
         <label>库存编码</label>
         <input type="text" id="modal-item-code" placeholder="自定义编码（留空自动生成）" />
         <label class="code-toggle"><input type="checkbox" id="modal-item-code-custom" /> 自定义编码（高级）</label>
@@ -1498,10 +1721,15 @@ var STATUS = Z.STATUS;
 var STATUS_LIST = Z.STATUS_LIST;
 /** 统一转义别名（打印片段内另有同名 function escapeHtml，注意不要重复声明） */
 var esc = Z.escapeHtml;
-/** Toast 包装：兼容 toast(msg, 'error') 与 toast(msg, { type, duration }) 两种写法 */
+/** Toast 包装：兼容 toast(msg, 'error') 与 toast(msg, { type, duration }) 两种写法；最多同时显示 3 条 */
 function toast(message, options) {
     if (typeof options === 'string') options = { type: options };
-    return Z.toast(message, options || {});
+    var el = Z.toast(message, options || {});
+    var host = document.getElementById('zcfi-toast-host');
+    if (host) {
+        while (host.children.length > 3) host.removeChild(host.firstChild);
+    }
+    return el;
 }
 
 // ---------- 全局状态 ----------
@@ -1533,6 +1761,15 @@ var SNAPSHOT_KEY = 'zcfi_admin_snapshots_v1';
 var SNAPSHOT_MAX = 3;
 var SNAPSHOT_MAX_BYTES = 1.5 * 1024 * 1024;
 var snapshotOversizeWarned = false;
+
+// R2b：视图状态（搜索/筛选/排序/展开）持久化
+var VIEW_KEY = 'zcfi_admin_view_v1';
+var BUILD_DATE = '2026-10-21';
+var DEFAULT_SEARCH_DEBOUNCE = 200;
+var viewState = { search: '', filter: 'all', nodeSort: 'code-asc', sortKey: 'code', sortDir: 'asc', expanded: null };
+var searchDebounceTimer = null;
+var expandedSet = null;                 // null = 按默认策略（数据量大时只展开第一层）
+var globalSelectAll = false;
 
 // 编码规范
 var CODE_RE = {
@@ -1584,6 +1821,19 @@ var dataMenuBtn = $('data-menu-btn');
 var dataMenu = $('data-menu');
 var importFile = $('import-file');
 var recycleCount = $('recycle-count');
+var summaryNodesEl = $('sum-nodes');
+var summaryItemsEl = $('sum-items');
+var summaryOnSaleEl = $('sum-onsale');
+var summarySoldEl = $('sum-sold');
+var summaryPendingEl = $('sum-pending');
+var nodeSortSelect = $('node-sort-select');
+var expandAllBtn = $('expand-all-btn');
+var collapseAllBtn = $('collapse-all-btn');
+var globalSelectAllEl = $('global-select-all');
+var globalSelectedCount = $('global-selected-count');
+var globalBatchStatusBtn = $('global-batch-status-btn');
+var treeSavingMask = $('tree-saving-mask');
+var appVersionEl = $('app-version');
 
 var modalNodeOverlay = $('modal-node-overlay');
 var modalNodeTitle = $('modal-node-title');
@@ -1619,6 +1869,8 @@ var modalItemParentCode = $('modal-item-parent-code');
 var modalItemOriginalCode = $('modal-item-original-code');
 var modalItemCodeCustom = $('modal-item-code-custom');
 var modalItemCodeHint = $('modal-item-code-hint');
+var itemQtyRow = $('item-qty-row');
+var modalItemQty = $('modal-item-qty');
 var modalItemSave = $('modal-item-save');
 var modalItemCancel = $('modal-item-cancel');
 var itemSaveStatus = $('item-save-status');
@@ -1712,6 +1964,448 @@ function normalizeDoc(doc) {
             });
         }
     });
+}
+
+// ============================================================
+// R2b：视图持久化 / 汇总 / 排序 / 高亮 / 复制 / 键盘与焦点
+// ============================================================
+var defaultExpandedCache = null;
+function invalidateViewCaches() { defaultExpandedCache = null; }
+
+function countActiveNodes() {
+    var n = 0;
+    Z.walk(gistData.products, function (node) { if (node && !Z.isDeleted(node)) n += 1; });
+    return n;
+}
+function statusBucket(status) {
+    var s = Z.normalizeStatus(status);
+    if (s === STATUS.ON_SALE) return 'onSale';
+    if (s === STATUS.SOLD) return 'sold';
+    if (s === STATUS.PENDING) return 'pending';
+    return 'other';
+}
+/** 节点行汇总：直属子类数 + 递归库存/状态/成本（默认排除已删除项） */
+function nodeSubtreeStats(node, includeDeleted) {
+    var stats = { directChildren: 0, items: 0, onSale: 0, sold: 0, pending: 0, other: 0, costTotal: 0 };
+    if (!node || typeof node !== 'object') return stats;
+    if (node.children && typeof node.children === 'object') {
+        Object.keys(node.children).forEach(function (key) {
+            var child = node.children[key];
+            if (!child || typeof child !== 'object') return;
+            if (!includeDeleted && Z.isDeleted(child)) return;
+            stats.directChildren += 1;
+        });
+    }
+    function visit(current) {
+        if (!current || typeof current !== 'object') return;
+        if (Array.isArray(current.items)) {
+            current.items.forEach(function (item) {
+                if (!item) return;
+                if (!includeDeleted && Z.isDeleted(item)) return;
+                stats.items += 1;
+                var bucket = statusBucket(item.status);
+                stats[bucket] += 1;
+                if (typeof item.cost === 'number' && isFinite(item.cost)) stats.costTotal += item.cost;
+            });
+        }
+        if (current.children && typeof current.children === 'object') {
+            Object.keys(current.children).forEach(function (key) {
+                var child = current.children[key];
+                if (!child || typeof child !== 'object') return;
+                if (!includeDeleted && Z.isDeleted(child)) return;
+                visit(child);
+            });
+        }
+    }
+    visit(node);
+    return stats;
+}
+function docSummary() {
+    var summary = { nodes: 0, items: 0, onSale: 0, sold: 0, pending: 0, other: 0 };
+    Z.walk(gistData.products, function (node) {
+        if (!node || Z.isDeleted(node)) return;
+        summary.nodes += 1;
+        if (Array.isArray(node.items)) {
+            node.items.forEach(function (item) {
+                if (!item || Z.isDeleted(item)) return;
+                summary.items += 1;
+                summary[statusBucket(item.status)] += 1;
+            });
+        }
+    });
+    return summary;
+}
+function updateSummaryBar() {
+    var s = docSummary();
+    setText(summaryNodesEl, s.nodes);
+    setText(summaryItemsEl, s.items);
+    setText(summaryOnSaleEl, s.onSale);
+    setText(summarySoldEl, s.sold);
+    setText(summaryPendingEl, s.pending);
+}
+
+// ---------- 排序 ----------
+function compareNodeCode(a, b) {
+    var mode = viewState.nodeSort || 'code-asc';
+    var result;
+    if (mode.indexOf('name') === 0) {
+        var an = (gistData.products[a] && gistData.products[a].name) || '';
+        var bn = (gistData.products[b] && gistData.products[b].name) || '';
+        result = String(an).localeCompare(String(bn), 'zh-CN');
+    } else if (mode.indexOf('updated') === 0) {
+        var at = (gistData.products[a] && gistData.products[a].updatedAt) || '';
+        var bt = (gistData.products[b] && gistData.products[b].updatedAt) || '';
+        result = String(bt).localeCompare(String(at));
+    } else {
+        result = String(a).localeCompare(String(b), 'en');
+    }
+    return mode.indexOf('-desc') !== -1 ? -result : result;
+}
+function sortNodeKeys(container) {
+    return Object.keys(container || {}).filter(function (key) {
+        var node = container[key];
+        return node && typeof node === 'object' && !Z.isDeleted(node);
+    }).sort(function (a, b) {
+        var mode = viewState.nodeSort || 'code-asc';
+        var result;
+        if (mode.indexOf('name') === 0) {
+            result = String(container[a].name || a).localeCompare(String(container[b].name || b), 'zh-CN');
+        } else if (mode.indexOf('updated') === 0) {
+            result = String(container[b].updatedAt || '').localeCompare(String(container[a].updatedAt || ''));
+        } else {
+            result = String(a).localeCompare(String(b), 'en');
+        }
+        return mode.indexOf('-desc') !== -1 ? -result : result;
+    });
+}
+function compareItems(a, b) {
+    var key = viewState.sortKey || 'code';
+    var dir = viewState.sortDir === 'desc' ? -1 : 1;
+    var av = a[key];
+    var bv = b[key];
+    var result;
+    if (key === 'cost') {
+        var an = typeof av === 'number' ? av : parseFloat(av);
+        var bn = typeof bv === 'number' ? bv : parseFloat(bv);
+        if (isNaN(an)) an = -Infinity;
+        if (isNaN(bn)) bn = -Infinity;
+        result = an === bn ? 0 : (an < bn ? -1 : 1);
+    } else if (key === 'status') {
+        var order = {};
+        order[STATUS.PENDING] = 0; order[STATUS.ON_SALE] = 1; order[STATUS.SOLD] = 2;
+        var ax = order[Z.normalizeStatus(av)];
+        var bx = order[Z.normalizeStatus(bv)];
+        if (ax === undefined) ax = 9;
+        if (bx === undefined) bx = 9;
+        result = ax === bx ? 0 : (ax < bx ? -1 : 1);
+    } else {
+        result = String(av === undefined || av === null ? '' : av).localeCompare(String(bv === undefined || bv === null ? '' : bv), 'zh-CN');
+    }
+    if (result === 0) result = String(a.code || '').localeCompare(String(b.code || ''), 'en');
+    return result * dir;
+}
+function sortItems(items) {
+    return (items || []).slice().sort(compareItems);
+}
+
+// ---------- 视图状态持久化 ----------
+function loadViewState() {
+    var raw = Z.storage.getJson(VIEW_KEY, null);
+    if (!raw || typeof raw !== 'object') return;
+    viewState.search = typeof raw.search === 'string' ? raw.search : '';
+    viewState.filter = typeof raw.filter === 'string' ? raw.filter : 'all';
+    viewState.nodeSort = typeof raw.nodeSort === 'string' ? raw.nodeSort : 'code-asc';
+    viewState.sortKey = typeof raw.sortKey === 'string' ? raw.sortKey : 'code';
+    viewState.sortDir = raw.sortDir === 'desc' ? 'desc' : 'asc';
+    if (Array.isArray(raw.expanded)) {
+        expandedSet = Object.create(null);
+        raw.expanded.forEach(function (code) { if (code) expandedSet[code] = true; });
+    } else {
+        expandedSet = null;
+    }
+}
+function saveViewState() {
+    viewState.search = searchInput ? searchInput.value : '';
+    viewState.filter = filterSelect ? (filterSelect.value || 'all') : 'all';
+    viewState.nodeSort = nodeSortSelect ? (nodeSortSelect.value || 'code-asc') : 'code-asc';
+    viewState.expanded = expandedSet ? Object.keys(expandedSet).filter(function (code) { return expandedSet[code]; }) : null;
+    Z.storage.setJson(VIEW_KEY, viewState);
+}
+function getDefaultExpandedSet() {
+    if (defaultExpandedCache) return defaultExpandedCache;
+    var set = Object.create(null);
+    var total = countActiveNodes();
+    var firstLevelOnly = total > 50;
+    Z.walk(gistData.products, function (node, code, depth) {
+        if (!node || Z.isDeleted(node)) return;
+        if (!firstLevelOnly || depth === 0) set[code] = true;
+    });
+    defaultExpandedCache = set;
+    return set;
+}
+function ensureExpandedExplicit() {
+    if (!expandedSet) expandedSet = Object.assign(Object.create(null), getDefaultExpandedSet());
+    return expandedSet;
+}
+function isCodeExpanded(code, term, forceExpand) {
+    if (term) return !!forceExpand;
+    if (expandedSet) return !!expandedSet[code];
+    return !!getDefaultExpandedSet()[code];
+}
+function setExpandedAll(expand) {
+    expandedSet = Object.create(null);
+    if (expand) {
+        Z.walk(gistData.products, function (node, code) {
+            if (node && !Z.isDeleted(node)) expandedSet[code] = true;
+        });
+    }
+    saveViewState();
+    renderTree();
+    updateGlobalSelection();
+}
+
+// ---------- 搜索高亮 / 剪贴板 ----------
+function highlightText(value, term) {
+    var raw = value === undefined || value === null ? '' : String(value);
+    if (!term) return esc(raw);
+    var lower = raw.toLowerCase();
+    var idx = lower.indexOf(term);
+    if (idx === -1) return esc(raw);
+    var out = '';
+    var pos = 0;
+    while (idx !== -1) {
+        out += esc(raw.slice(pos, idx)) + '<mark>' + esc(raw.slice(idx, idx + term.length)) + '</mark>';
+        pos = idx + term.length;
+        idx = lower.indexOf(term, pos);
+    }
+    out += esc(raw.slice(pos));
+    return out;
+}
+function copyTextToClipboard(text) {
+    return new Promise(function (resolve) {
+        try { window.__clipboard = window.__clipboard || []; window.__clipboard.push(text); } catch (e) { /* ignore */ }
+        function fallback() {
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                var ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                resolve(!!ok);
+            } catch (e) { resolve(false); }
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () { resolve(true); }).catch(fallback);
+        } else fallback();
+    });
+}
+function copyCodeToClipboard(code) {
+    copyTextToClipboard(code).then(function (ok) {
+        toast(ok ? '已复制编码：' + code : '复制失败，请手动选择编码', ok ? 'success' : 'warn');
+    });
+}
+
+// ---------- 复制节点 / 复制库存 ----------
+function cloneNodeFields(node, isCopyRoot) {
+    var fields = {
+        name: (node.name || '') + (isCopyRoot ? '（副本）' : ''),
+        unified: node.unified !== false,
+        cost: node.cost,
+        trackingNumber: node.trackingNumber,
+        orderNumber: node.orderNumber,
+        remark: node.remark,
+        qrLinks: node.qrLinks ? Z.clone(node.qrLinks) : undefined,
+        status: node.status !== undefined ? Z.normalizeStatus(node.status) : undefined
+    };
+    Object.keys(fields).forEach(function (key) { if (fields[key] === undefined) delete fields[key]; });
+    return fields;
+}
+function cloneItemFields(item) {
+    var fields = {
+        name: item.name,
+        cost: item.cost,
+        trackingNumber: item.trackingNumber,
+        orderNumber: item.orderNumber,
+        remark: item.remark,
+        qrLinks: item.qrLinks ? Z.clone(item.qrLinks) : undefined,
+        status: Z.normalizeStatus(item.status)
+    };
+    Object.keys(fields).forEach(function (key) { if (fields[key] === undefined) delete fields[key]; });
+    return fields;
+}
+function requestCopyNode(code) {
+    if (readOnly) { toast('当前为只读保护状态，无法复制', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var entry = findNodeEntry(code);
+    if (!entry || Z.isDeleted(entry.node)) { toast('节点不存在或已在回收站', 'error'); return; }
+    var hasChildren = entry.node.children && Object.keys(entry.node.children).length > 0;
+    var hasItems = Array.isArray(entry.node.items) && entry.node.items.length > 0;
+    showConfirm({
+        title: '复制节点',
+        message: '将复制节点「' + code + '」' + (hasChildren ? '（含子类）' : '') + (hasItems ? '（含库存）' : '') +
+            '，新编码自动生成，放在' + (entry.parentCode ? '同级（父节点 ' + entry.parentCode + '）' : '根级') + '。',
+        confirmText: '确认复制',
+        danger: false,
+        onConfirm: function () { return performCopyNode(code, entry.parentCode, entry.node); }
+    });
+}
+function performCopyNode(code, parentCode, node) {
+    var newCode = parentCode ? generateChildCode(parentCode) : generateRootCode();
+    if (!newCode) return Promise.resolve(false);
+    var ops = [];
+    var allocated = Object.create(null);
+    function visit(oldNode, oldCode, currentNodeCode, parentNewCode, isRoot) {
+        ops.push({
+            type: 'node.upsert',
+            code: currentNodeCode,
+            originalCode: null,
+            parentCode: parentNewCode || null,
+            baseNode: null,
+            fields: cloneNodeFields(oldNode, isRoot)
+        });
+        Object.keys(oldNode.children || {}).forEach(function (childCode) {
+            var child = oldNode.children[childCode];
+            if (!child || Z.isDeleted(child)) return;
+            visit(child, childCode, currentNodeCode + childCode.slice(oldCode.length), currentNodeCode, false);
+        });
+        var seq = 0;
+        (Array.isArray(oldNode.items) ? oldNode.items : []).forEach(function (item) {
+            if (!item || Z.isDeleted(item)) return;
+            var candidate;
+            do {
+                seq += 1;
+                candidate = currentNodeCode + '/' + String(seq).padStart(3, '0');
+            } while (findCodeCollision(candidate, null) || allocated[candidate]);
+            allocated[candidate] = true;
+            ops.push({
+                type: 'item.upsert',
+                parentCode: currentNodeCode,
+                code: candidate,
+                originalCode: null,
+                baseItem: null,
+                fields: cloneItemFields(item)
+            });
+        });
+    }
+    visit(node, code, newCode, parentCode || null, true);
+    return saveWithOps(ops, { successMessage: '已复制节点 ' + code + ' → ' + newCode }).then(function (result) {
+        if (result) toast('已复制节点：' + code + ' → ' + newCode, 'success');
+        return !!result;
+    });
+}
+function requestCopyItem(parentCode, itemCode) {
+    if (readOnly) { toast('当前为只读保护状态，无法复制', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var parent = findNodeByCode(parentCode);
+    if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); return; }
+    var item = Z.findItem(parent, itemCode);
+    if (!item || Z.isDeleted(item)) { toast('库存项不存在或已在回收站', 'error'); return; }
+    showConfirm({
+        title: '复制库存',
+        message: '将在节点「' + parentCode + '」下复制库存「' + itemCode + '」，自动生成新编码并复制名称/成本/单号/状态等字段。',
+        confirmText: '确认复制',
+        danger: false,
+        onConfirm: function () {
+            var newCode = generateItemCode(parentCode);
+            if (!newCode) return Promise.resolve(false);
+            return saveWithOps([{
+                type: 'item.upsert',
+                parentCode: parentCode,
+                code: newCode,
+                originalCode: null,
+                baseItem: null,
+                fields: cloneItemFields(item)
+            }], { successMessage: '已复制库存 ' + itemCode + ' → ' + newCode }).then(function (result) {
+                if (result) toast('已复制库存：' + itemCode + ' → ' + newCode, 'success');
+                return !!result;
+            });
+        }
+    });
+}
+function generateItemCodes(parentCode, count) {
+    var parent = findNodeByCode(parentCode);
+    if (!parent) return [];
+    var maxNum = 0;
+    (Array.isArray(parent.items) ? parent.items : []).forEach(function (item) {
+        if (!item || !item.code) return;
+        var last = String(item.code).split('/').pop();
+        if (/^\d+$/.test(last)) maxNum = Math.max(maxNum, parseInt(last, 10));
+    });
+    var allCodes = collectAllCodes();
+    var codes = [];
+    var num = maxNum;
+    while (codes.length < count) {
+        num += 1;
+        if (num > 999) break;
+        var candidate = parentCode + '/' + String(num).padStart(3, '0');
+        if (allCodes[candidate]) continue;
+        allCodes[candidate] = true;
+        codes.push(candidate);
+    }
+    return codes;
+}
+
+// ---------- 跨节点多选 ----------
+function updateGlobalSelection() {
+    var visibleBoxes = Array.prototype.filter.call(treeContainer.querySelectorAll('.item-checkbox'), function (box) {
+        return box.offsetParent !== null;
+    });
+    var checked = visibleBoxes.filter(function (box) { return box.checked; });
+    if (globalSelectedCount) setText(globalSelectedCount, '已选 ' + checked.length + ' 项');
+    if (globalSelectAllEl) {
+        globalSelectAllEl.checked = visibleBoxes.length > 0 && checked.length === visibleBoxes.length;
+        globalSelectAllEl.indeterminate = checked.length > 0 && checked.length < visibleBoxes.length;
+    }
+}
+function collectCheckedItemEntries() {
+    var entries = Object.create(null);
+    Array.prototype.forEach.call(treeContainer.querySelectorAll('.item-checkbox'), function (box) {
+        if (!box.checked) return;
+        var parent = box.getAttribute('data-parent') || '';
+        if (!entries[parent]) entries[parent] = [];
+        entries[parent].push(box.getAttribute('data-item-code') || '');
+    });
+    return Object.keys(entries).map(function (parentCode) {
+        return { parentCode: parentCode, itemCodes: entries[parentCode] };
+    });
+}
+
+// ---------- 模态焦点陷阱 / 键盘 ----------
+function topMostModalOverlay() {
+    var ids = ['confirm-overlay', 'delete-confirm-overlay', 'conflict-overlay', 'modal-node-overlay',
+        'modal-item-overlay', 'batch-status-overlay', 'data-modal-overlay', 'print-preview-overlay'];
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (el && el.classList.contains('active')) return el;
+    }
+    return null;
+}
+function handleFocusTrap(event) {
+    if (event.key !== 'Tab') return false;
+    var overlay = topMostModalOverlay();
+    if (!overlay) return false;
+    var modal = overlay.querySelector('.modal, .print-preview-box');
+    if (!modal) return false;
+    var focusables = Array.prototype.filter.call(
+        modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'),
+        function (el) { return el.offsetParent !== null; }
+    );
+    if (!focusables.length) return false;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (event.shiftKey) {
+        if (document.activeElement === first || !modal.contains(document.activeElement)) {
+            last.focus();
+            event.preventDefault();
+        }
+    } else if (document.activeElement === last || !modal.contains(document.activeElement)) {
+        first.focus();
+        event.preventDefault();
+    }
+    return true;
 }
 
 // ============================================================
@@ -2617,8 +3311,13 @@ function applyLoaded(result) {
     readOnly = false;
     hideLoadError();
     updateSyncMeta();
+    invalidateViewCaches();
+    // 恢复上次的搜索词 / 节点排序 / 筛选 / 展开状态
+    if (searchInput) searchInput.value = viewState.search || '';
+    if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
     populateFilter();
     renderTree();
+    updateSummaryBar();
     updateRecycleCount();
     setText(userStatus, '已连接 (' + currentGistId + ')');
     setRefreshing(false);
@@ -2847,42 +3546,93 @@ function itemMatchesTerm(item, term) {
     return false;
 }
 
-function buildNodeHtml(code, node, depth, term, expandAll, forceShow) {
+function buildItemRowHtml(code, item, term) {
+    var itemCode = item.code === undefined || item.code === null ? '' : String(item.code);
+    var itemStatus = Z.normalizeStatus(item.status);
+    var costText = (item.cost === undefined || item.cost === null || item.cost === '') ? '' : esc(item.cost);
+    var parentAttr = esc(code);
+    var itemAttr = esc(itemCode);
+    var remarkHtml = '';
+    if (item.remark) {
+        var remarkFull = String(item.remark);
+        var remarkShort = remarkFull.length > 10 ? remarkFull.slice(0, 10) + '…' : remarkFull;
+        remarkHtml = '<span class="remark-text" title="' + esc(remarkFull) + '">' + highlightText(remarkShort, term) + '</span>';
+    }
+    var linksHtml = '';
+    if (Array.isArray(item.qrLinks) && item.qrLinks.length) {
+        linksHtml = '<span class="qr-count" title="' + esc(item.qrLinks.join('\n')) + '">🔗' + item.qrLinks.length + '</span>';
+    }
+    return '<tr data-item-code="' + itemAttr + '">'
+        + '<td><input type="checkbox" class="item-checkbox" data-parent="' + parentAttr + '" data-item-code="' + itemAttr + '" aria-label="选择库存 ' + itemAttr + '"></td>'
+        + '<td>' + highlightText(itemCode, term) + '</td>'
+        + '<td>' + highlightText(item.name || '', term) + '</td>'
+        + '<td>' + costText + '</td>'
+        + '<td>' + highlightText(item.trackingNumber || '', term) + '</td>'
+        + '<td>' + highlightText(item.orderNumber || '', term) + '</td>'
+        + '<td><span class="status-badge ' + Z.statusClass(itemStatus) + '">' + esc(itemStatus) + '</span></td>'
+        + '<td class="item-remark">' + (remarkHtml ? '📝 ' + remarkHtml : '') + '</td>'
+        + '<td>' + linksHtml + '</td>'
+        + '<td class="actions">'
+        + '<button type="button" class="btn btn-primary btn-sm" data-action="edit-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">编辑</button>'
+        + '<button type="button" class="btn btn-primary btn-sm" data-action="print-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">打印标签</button>'
+        + '<button type="button" class="btn btn-secondary btn-sm" data-action="copy-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">复制</button>'
+        + '<button type="button" class="btn btn-secondary btn-sm" data-action="copy-code" data-code="' + itemAttr + '">复制编码</button>'
+        + '<button type="button" class="btn btn-danger btn-sm" data-action="delete-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">删除</button>'
+        + '</td></tr>';
+}
+
+function itemTableHeaderHtml(code) {
+    var defs = [['code', '库存编码'], ['name', '名称'], ['cost', '成本'], ['trackingNumber', '快递单号'], ['orderNumber', '订单号'], ['status', '状态']];
+    var html = '<th><input type="checkbox" class="select-all" data-parent="' + esc(code) + '" aria-label="全选本节点库存"></th>';
+    defs.forEach(function (pair) {
+        var key = pair[0];
+        var label = pair[1];
+        var active = (viewState.sortKey || 'code') === key;
+        var arrow = active ? (viewState.sortDir === 'desc' ? '↓' : '↑') : '↕';
+        var cls = 'sortable' + (active ? ' sort-' + (viewState.sortDir === 'desc' ? 'desc' : 'asc') : '');
+        html += '<th class="' + cls + '" data-sort="' + key + '" aria-label="按' + label + '排序">' + label + ' ' + arrow + '</th>';
+    });
+    html += '<th>备注</th><th>链接</th><th>操作</th>';
+    return html;
+}
+
+function buildNodeHtml(code, node, depth, term, ctx) {
     // 软删除：已删除节点（含其整个子树）不参与渲染/搜索/打印
     if (Z.isDeleted(node)) return { html: '', visible: false };
+    ctx = ctx || {};
     var children = (node.children && typeof node.children === 'object' && !Array.isArray(node.children)) ? node.children : {};
-    var items = Array.isArray(node.items) ? node.items : [];
+    var allItems = (Array.isArray(node.items) ? node.items : []).filter(function (item) { return item && !Z.isDeleted(item); });
     var selfMatch = term ? nodeMatchesTerm(node, code, term) : false;
-    var showAll = !!forceShow || !term || selfMatch;
+    var showAllItems = !term || selfMatch;
 
-    var childParts = [];
-    Object.keys(children).sort().forEach(function (childCode) {
+    var childResults = [];
+    sortNodeKeys(children).forEach(function (childCode) {
         var child = children[childCode];
         if (!child || typeof child !== 'object' || Z.isDeleted(child)) return;
-        var result = buildNodeHtml(childCode, child, depth + 1, term, expandAll, showAll);
-        if (result.visible) childParts.push(result.html);
+        childResults.push(buildNodeHtml(childCode, child, depth + 1, term, ctx));
     });
+    var childMatch = childResults.some(function (r) { return r.visible; });
 
-    var visibleItems = [];
-    items.forEach(function (item) {
-        if (!item || Z.isDeleted(item)) return;
-        if (showAll || itemMatchesTerm(item, term)) visibleItems.push(item);
-    });
+    var matchedItems = allItems.filter(function (item) { return showAllItems || itemMatchesTerm(item, term); });
+    var visibleBySearch = !term || selfMatch || childMatch || matchedItems.length > 0;
+    var hiddenByFilter = !!(ctx.filterRoot && code !== ctx.filterRoot);
+    var visible = visibleBySearch && !hiddenByFilter;
+    var forceExpand = term ? (selfMatch || childMatch || matchedItems.length > 0) : false;
+    var expanded = isCodeExpanded(code, term, forceExpand);
 
-    var visible = !term || selfMatch || childParts.length > 0 || visibleItems.length > 0;
-    if (!visible) return { html: '', visible: false };
-
-    var expanded = expandAll || (term && (selfMatch || childParts.length > 0 || visibleItems.length > 0));
+    var displayItems = sortItems(showAllItems ? allItems : matchedItems);
+    var stats = nodeSubtreeStats(node, false);
     var unified = node.unified !== false;
     var nodeStatus = Z.normalizeStatus(node.status);
-    var hasToggle = childParts.length > 0 || visibleItems.length > 0;
+    var hasToggle = childResults.length > 0 || allItems.length > 0;
 
     var toggleIcon = hasToggle
-        ? '<span class="toggle" data-action="toggle" data-code="' + esc(code) + '" title="展开/收起">▼</span>'
+        ? '<span class="toggle" data-action="toggle" data-code="' + esc(code) + '" title="展开/收起" aria-label="展开或收起 ' + esc(code) + '">▼</span>'
         : '';
 
     var actions = [
         '<button type="button" class="btn btn-secondary btn-sm" data-action="edit-node" data-code="' + esc(code) + '">编辑</button>',
+        '<button type="button" class="btn btn-secondary btn-sm" data-action="copy-node" data-code="' + esc(code) + '">复制</button>',
         unified
             ? '<button type="button" class="btn btn-secondary btn-sm" data-action="add-node" data-parent="' + esc(code) + '">添加子类</button>'
             : '<button type="button" class="btn btn-success btn-sm" data-action="add-item" data-parent="' + esc(code) + '">添加库存</button>',
@@ -2890,74 +3640,74 @@ function buildNodeHtml(code, node, depth, term, expandAll, forceShow) {
         '<button type="button" class="btn btn-danger btn-sm" data-action="delete-node" data-code="' + esc(code) + '">删除</button>'
     ].join('');
 
+    var nodeSummaryHtml = '<span class="node-summary" title="当前节点汇总">'
+        + '<span>子类 ' + stats.directChildren + '</span>'
+        + '<span>库存 ' + stats.items + '</span>'
+        + '<span class="onsale">在售 ' + stats.onSale + '</span>'
+        + '<span class="sold">售出 ' + stats.sold + '</span>'
+        + '<span class="pending">待售 ' + stats.pending + '</span>'
+        + '</span>';
+
     var itemsHtml = '';
-    if (visibleItems.length) {
-        var rows = visibleItems.map(function (item) {
-            var itemCode = item.code === undefined || item.code === null ? '' : String(item.code);
-            var itemStatus = Z.normalizeStatus(item.status);
-            var costText = (item.cost === undefined || item.cost === null || item.cost === '') ? '' : esc(item.cost);
-            var parentAttr = esc(code);
-            var itemAttr = esc(itemCode);
-            return '<tr>'
-                + '<td><input type="checkbox" class="item-checkbox" data-parent="' + parentAttr + '" data-item-code="' + itemAttr + '"></td>'
-                + '<td>' + esc(itemCode) + '</td>'
-                + '<td>' + esc(item.name || '') + '</td>'
-                + '<td>' + costText + '</td>'
-                + '<td>' + esc(item.trackingNumber || '') + '</td>'
-                + '<td>' + esc(item.orderNumber || '') + '</td>'
-                + '<td><span class="status-badge ' + Z.statusClass(itemStatus) + '">' + esc(itemStatus) + '</span></td>'
-                + '<td class="actions">'
-                + '<button type="button" class="btn btn-primary btn-sm" data-action="edit-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">编辑</button>'
-                + '<button type="button" class="btn btn-primary btn-sm" data-action="print-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">打印标签</button>'
-                + '<button type="button" class="btn btn-danger btn-sm" data-action="delete-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">删除</button>'
-                + '</td></tr>';
-        }).join('');
+    if (displayItems.length) {
+        var rows = displayItems.map(function (item) { return buildItemRowHtml(code, item, term); }).join('');
         itemsHtml = '<div class="batch-actions">'
             + '<button type="button" class="btn btn-secondary btn-sm" data-action="batch-print" data-parent="' + esc(code) + '">批量打印</button>'
             + '<button type="button" class="btn btn-secondary btn-sm" data-action="batch-status" data-parent="' + esc(code) + '">批量修改状态</button>'
             + '</div>'
-            + '<table class="items-table"><thead><tr>'
-            + '<th><input type="checkbox" class="select-all" data-parent="' + esc(code) + '"></th>'
-            + '<th>库存编码</th><th>名称</th><th>成本</th><th>快递单号</th><th>订单号</th><th>状态</th><th>操作</th>'
-            + '</tr></thead><tbody>' + rows + '</tbody></table>';
+            + '<div class="table-scroll"><table class="items-table"><thead><tr>'
+            + itemTableHeaderHtml(code)
+            + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    var html = '<div class="tree-node' + (expanded ? ' expanded' : '') + '" data-code="' + esc(code) + '" data-depth="' + depth + '">'
+    var hiddenClass = visible ? '' : ' tree-node-hidden';
+    var html = '<div class="tree-node' + (expanded ? ' expanded' : '') + hiddenClass + '" data-code="' + esc(code) + '" data-depth="' + depth + '">'
         + '<div class="node-content">'
         + toggleIcon
-        + '<span class="name" data-action="toggle" data-code="' + esc(code) + '">' + esc(node.name || code) + '</span>'
-        + '<span class="code">' + esc(code) + '</span>'
+        + '<span class="name" data-action="toggle" data-code="' + esc(code) + '">' + highlightText(node.name || code, term) + '</span>'
+        + '<span class="code">' + highlightText(code, term) + '</span>'
         + '<span class="badge" style="background:' + (unified ? '#dbeafe' : '#fef3c7') + ';">' + (unified ? '统一' : '不统一') + '</span>'
         + '<span class="status-badge ' + Z.statusClass(nodeStatus) + '">' + esc(nodeStatus) + '</span>'
-        + (node.orderNumber ? '<span class="badge" style="background:#e0e7ff;">📋' + esc(node.orderNumber) + '</span>' : '')
+        + (node.orderNumber ? '<span class="badge" style="background:#e0e7ff;">📋' + highlightText(node.orderNumber, term) + '</span>' : '')
+        + nodeSummaryHtml
         + '<span class="actions">' + actions + '</span>'
         + '</div>'
-        + (childParts.length ? '<div class="children">' + childParts.join('') + '</div>' : '')
+        + (childResults.length ? '<div class="children">' + childResults.map(function (r) { return r.html; }).join('') + '</div>' : '')
         + (itemsHtml ? '<div class="children">' + itemsHtml + '</div>' : '')
         + '</div>';
 
-    return { html: html, visible: true };
+    return { html: html, visible: visible };
 }
 
 function renderTree() {
     var products = gistData.products || {};
     var term = Z.normalizeQuery(searchInput.value);
     var filter = filterSelect.value || 'all';
-    var codes = Object.keys(products).sort();
-    if (filter !== 'all') codes = codes.filter(function (code) { return code === filter; });
+    var roots = sortNodeKeys(products);
     var parts = [];
-    codes.forEach(function (code) {
+    var visibleCount = 0;
+    roots.forEach(function (code) {
         var node = products[code];
         if (!node || typeof node !== 'object') return;
-        var result = buildNodeHtml(code, node, 0, term, !term, false);
-        if (result.visible) parts.push(result.html);
+        var result = buildNodeHtml(code, node, 0, term, { filterRoot: filter !== 'all' ? filter : null });
+        if (result.html) {
+            parts.push(result.html);
+            if (result.visible) visibleCount += 1;
+        }
     });
+    var scrollY = window.scrollY;
     if (!parts.length) {
-        treeContainer.innerHTML = '<p style="color:var(--color-gray-400);">' +
-            (term ? '没有匹配的商品或库存' : '暂无商品，请添加大类') + '</p>';
-        return;
+        treeContainer.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div>' +
+            '<p>暂无商品数据<br />可以点击“＋ 添加大类”开始录入，或从“数据 → 导入”恢复备份</p></div>';
+    } else {
+        var emptyHint = (visibleCount === 0)
+            ? '<div class="empty-state"><div class="empty-icon">🔍</div><p>没有匹配的商品或库存<br />试试清空搜索词或切换筛选</p></div>'
+            : '';
+        treeContainer.innerHTML = emptyHint + parts.join('');
     }
-    treeContainer.innerHTML = parts.join('');
+    if (scrollY) window.scrollTo(0, scrollY);
+    updateSummaryBar();
+    updateGlobalSelection();
 }
 
 function findTreeEl(code) {
@@ -2970,19 +3720,27 @@ function findTreeEl(code) {
 
 function toggleNode(code) {
     var el = findTreeEl(code);
-    if (el) el.classList.toggle('expanded');
+    if (!el) return;
+    ensureExpandedExplicit();
+    if (el.classList.contains('expanded')) {
+        el.classList.remove('expanded');
+        delete expandedSet[code];
+    } else {
+        el.classList.add('expanded');
+        expandedSet[code] = true;
+    }
+    saveViewState();
+    updateGlobalSelection();
 }
 
 function populateFilter() {
     var products = gistData.products || {};
-    var current = filterSelect.value || 'all';
-    var codes = Object.keys(products).sort().filter(function (code) {
-        return products[code] && !Z.isDeleted(products[code]);
-    });
+    var current = (filterSelect.value && filterSelect.value !== 'all') ? filterSelect.value : (viewState.filter || 'all');
+    var codes = sortNodeKeys(products);
     filterSelect.innerHTML = '';
     var allOpt = document.createElement('option');
     allOpt.value = 'all';
-    allOpt.textContent = '全部展开';
+    allOpt.textContent = '全部大类';
     filterSelect.appendChild(allOpt);
     codes.forEach(function (code) {
         var opt = document.createElement('option');
@@ -2991,12 +3749,29 @@ function populateFilter() {
         filterSelect.appendChild(opt);
     });
     filterSelect.value = codes.indexOf(current) !== -1 ? current : 'all';
+    viewState.filter = filterSelect.value;
 }
 
-// 事件委托：树 / 表格 / 批量 / 打印按钮
+// 事件委托：树 / 表格 / 批量 / 打印 / 排序 / 复制
+function toggleTableSort(key) {
+    if (viewState.sortKey === key) {
+        viewState.sortDir = viewState.sortDir === 'desc' ? 'asc' : 'desc';
+    } else {
+        viewState.sortKey = key;
+        viewState.sortDir = 'asc';
+    }
+    saveViewState();
+    renderTree();
+}
+
 function onTreeClick(event) {
     var target = event.target;
     if (!target || !target.closest) return;
+    var th = target.closest('th[data-sort]');
+    if (th && treeContainer.contains(th)) {
+        toggleTableSort(th.getAttribute('data-sort'));
+        return;
+    }
     var el = target.closest('[data-action]');
     if (!el || !treeContainer.contains(el)) return;
     var action = el.getAttribute('data-action');
@@ -3009,6 +3784,7 @@ function onTreeClick(event) {
         case 'edit-node': openNodeModal('edit', code); break;
         case 'add-node': openNodeModal('add', '', parent); break;
         case 'add-item': openItemModal('add', parent); break;
+        case 'copy-node': requestCopyNode(code); break;
         case 'print-node': {
             var printNode = findNodeByCode(code);
             if (!printNode || Z.isDeleted(printNode)) { toast('该节点已在回收站，无法打印', 'warn'); break; }
@@ -3017,6 +3793,8 @@ function onTreeClick(event) {
         }
         case 'delete-node': deleteNode(code); break;
         case 'edit-item': openItemModal('edit', parent, itemCode); break;
+        case 'copy-item': requestCopyItem(parent, itemCode); break;
+        case 'copy-code': copyCodeToClipboard(code); break;
         case 'print-item': {
             var printParent = findNodeByCode(parent);
             var printItem = printParent ? Z.findItem(printParent, itemCode) : null;
@@ -3032,9 +3810,27 @@ function onTreeClick(event) {
 
 function onTreeChange(event) {
     var target = event.target;
-    if (target && target.classList && target.classList.contains('select-all')) {
+    if (!target) return;
+    if (target.classList && target.classList.contains('select-all')) {
         toggleSelectAll(target, target.getAttribute('data-parent') || '');
+        updateGlobalSelection();
     }
+    if (target.classList && target.classList.contains('item-checkbox')) {
+        updateGlobalSelection();
+    }
+}
+
+function onTreeDblClick(event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+    if (target.closest('button, input, select, textarea, a, label')) return;
+    var tr = target.closest('tr[data-item-code]');
+    if (!tr || !treeContainer.contains(tr)) return;
+    var nodeEl = tr.closest('.tree-node');
+    if (!nodeEl) return;
+    var parentCode = nodeEl.getAttribute('data-code');
+    var itemCode = tr.getAttribute('data-item-code');
+    if (parentCode && itemCode) openItemModal('edit', parentCode, itemCode);
 }
 
 // ============================================================
@@ -3068,6 +3864,7 @@ function saveWithOps(ops, options) {
     if (!ops || !ops.length) { toast('没有需要保存的修改', 'info'); return Promise.resolve(null); }
     isSaving = true;
     setGlobalBusy(true);
+    if (treeSavingMask) treeSavingMask.classList.add('active');
     // 保存前自动做本地快照（失败不影响远端保存）
     takeSnapshotBeforeSave();
     return Z.save({
@@ -3094,8 +3891,10 @@ function saveWithOps(ops, options) {
             lastSyncAt: Date.now()
         };
         updateSyncMeta();
+        invalidateViewCaches();
         populateFilter();
         renderTree();
+        updateSummaryBar();
         updateRecycleCount();
         if (result.unchanged) {
             if (result.conflicts && result.conflicts.length) toast('未写入改动：冲突已按你的选择保留远端版本', { type: 'warn', duration: 5000 });
@@ -3114,6 +3913,7 @@ function saveWithOps(ops, options) {
         return null;
     }).finally(function () {
         isSaving = false;
+        if (treeSavingMask) treeSavingMask.classList.remove('active');
         setGlobalBusy(false);
     });
 }
@@ -3402,6 +4202,8 @@ function openItemModal(mode, parentCode, itemCode) {
         if (!defaultCode) return;
         itemContext = { itemMode: 'add', parentCode: parentCode, originalCode: null, baseItem: null, autoCode: defaultCode };
         modalItemTitle.textContent = '添加库存';
+        if (itemQtyRow) itemQtyRow.style.display = 'block';
+        if (modalItemQty) modalItemQty.value = '1';
         modalItemCode.value = defaultCode;
         modalItemName.value = '';
         modalItemCost.value = '';
@@ -3422,6 +4224,7 @@ function openItemModal(mode, parentCode, itemCode) {
             autoCode: itemCode
         };
         modalItemTitle.textContent = '编辑库存';
+        if (itemQtyRow) itemQtyRow.style.display = 'none';
         modalItemCode.value = item.code || '';
         modalItemName.value = item.name || '';
         modalItemCost.value = item.cost === undefined || item.cost === null ? '' : item.cost;
@@ -3474,6 +4277,47 @@ function saveItem() {
     }
     modalItemCode.value = code;
     var values = collectItemFormValues();
+    // 添加 N 件：一次保存写入 N 个 item.upsert（自动连续编码）
+    if (itemContext.itemMode === 'add') {
+        var qty = parseInt(modalItemQty ? modalItemQty.value : '1', 10);
+        if (!isFinite(qty) || qty < 1) qty = 1;
+        qty = Math.min(100, Math.floor(qty));
+        if (qty > 1) {
+            if (custom) toast('批量添加将使用自动连续编码（忽略自定义编码）', 'warn');
+            var batchFields = fieldDiff(values, null);
+            var codes = generateItemCodes(parentCode, qty);
+            if (codes.length !== qty) {
+                toast('可用库存编码不足（最多到 999），请减少数量或先整理编码', { type: 'error', duration: 7000 });
+                return;
+            }
+            var batchOps = codes.map(function (newCode) {
+                return {
+                    type: 'item.upsert',
+                    parentCode: parentCode,
+                    code: newCode,
+                    originalCode: null,
+                    baseItem: null,
+                    fields: Z.clone(batchFields)
+                };
+            });
+            modalItemSave.disabled = true;
+            modalItemSave.textContent = '保存中…';
+            itemSaveStatus.innerHTML = '<span class="spinner"></span> 批量保存 ' + qty + ' 件…';
+            saveWithOps(batchOps, {
+                successMessage: '已批量添加 ' + qty + ' 件库存（' + codes[0] + ' ~ ' + codes[codes.length - 1] + '）',
+                onError: function (err, tip) { itemSaveStatus.textContent = '保存失败：' + tip; }
+            }).then(function (result) {
+                if (result) {
+                    closeItemModal();
+                } else {
+                    modalItemSave.disabled = false;
+                    modalItemSave.textContent = '重试保存';
+                    if (!itemSaveStatus.textContent) itemSaveStatus.textContent = '保存失败，请重试';
+                }
+            });
+            return;
+        }
+    }
     var op;
     if (itemContext.itemMode === 'add') {
         op = {
@@ -3682,9 +4526,21 @@ function openBatchStatus(parentCode) {
     if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
     var selected = getSelectedItems(parentCode);
     if (!selected.length) { toast('请先选择要修改的库存项', 'warn'); return; }
-    batchContext = { parentCode: parentCode, itemCodes: selected };
+    batchContext = { entries: [{ parentCode: parentCode, itemCodes: selected }] };
     fillStatusSelect(batchStatusSelect, STATUS.ON_SALE);
     setText(batchStatusNote, '已选择 ' + selected.length + ' 项库存，将统一修改为下方状态。');
+    batchStatusOverlay.classList.add('active');
+}
+
+function openGlobalBatchStatus() {
+    if (readOnly) { toast('当前为只读保护状态，无法修改。请先重试加载。', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var entries = collectCheckedItemEntries();
+    var total = entries.reduce(function (sum, entry) { return sum + entry.itemCodes.length; }, 0);
+    if (!total) { toast('请先勾选要修改状态的库存项（可用“全选当前筛选结果”）', 'warn'); return; }
+    batchContext = { entries: entries };
+    fillStatusSelect(batchStatusSelect, STATUS.ON_SALE);
+    setText(batchStatusNote, '已跨 ' + entries.length + ' 个节点选择 ' + total + ' 项库存，将统一修改为下方状态。');
     batchStatusOverlay.classList.add('active');
 }
 
@@ -3692,23 +4548,25 @@ function applyBatchStatus() {
     if (!batchContext) return;
     if (readOnly) { toast('当前为只读保护状态，无法保存。请先重试加载。', 'error'); return; }
     if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
-    var parent = findNodeByCode(batchContext.parentCode);
-    if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); batchStatusOverlay.classList.remove('active'); return; }
     var target = Z.normalizeStatus(batchStatusSelect.value);
-    var baseParent = Z.findNodeByCode(baseDoc.products, batchContext.parentCode);
     var ops = [];
-    batchContext.itemCodes.forEach(function (itemCode) {
-        var item = Z.findItem(parent, itemCode);
-        if (!item || Z.isDeleted(item)) return;
-        if (Z.normalizeStatus(item.status) === target) return;
-        var baseItem = baseParent ? Z.findItem(baseParent, itemCode) : null;
-        ops.push({
-            type: 'item.upsert',
-            parentCode: batchContext.parentCode,
-            code: itemCode,
-            originalCode: itemCode,
-            baseItem: baseItem ? Z.clone(baseItem) : null,
-            fields: { status: target }
+    (batchContext.entries || []).forEach(function (entry) {
+        var parent = findNodeByCode(entry.parentCode);
+        if (!parent || Z.isDeleted(parent)) return;
+        var baseParent = Z.findNodeByCode(baseDoc.products, entry.parentCode);
+        entry.itemCodes.forEach(function (itemCode) {
+            var item = Z.findItem(parent, itemCode);
+            if (!item || Z.isDeleted(item)) return;
+            if (Z.normalizeStatus(item.status) === target) return;
+            var baseItem = baseParent ? Z.findItem(baseParent, itemCode) : null;
+            ops.push({
+                type: 'item.upsert',
+                parentCode: entry.parentCode,
+                code: itemCode,
+                originalCode: itemCode,
+                baseItem: baseItem ? Z.clone(baseItem) : null,
+                fields: { status: target }
+            });
         });
     });
     if (!ops.length) { toast('所选库存状态未变化', 'info'); batchStatusOverlay.classList.remove('active'); return; }
@@ -3717,7 +4575,10 @@ function applyBatchStatus() {
     saveWithOps(ops, { successMessage: '已修改 ' + ops.length + ' 项库存状态为「' + target + '」' }).then(function (result) {
         batchStatusSave.disabled = false;
         batchStatusSave.textContent = '确定修改';
-        if (result) batchStatusOverlay.classList.remove('active');
+        if (result) {
+            batchStatusOverlay.classList.remove('active');
+            updateGlobalSelection();
+        }
     });
 }
 
@@ -3750,10 +4611,46 @@ document.querySelectorAll('#login-token, #login-gistid, #login-filename').forEac
 logoutBtn.addEventListener('click', logout);
 refreshBtn.addEventListener('click', function () { refreshFromRemote(); });
 addRootBtn.addEventListener('click', function () { openNodeModal('add', '', ''); });
-searchBtn.addEventListener('click', renderTree);
-clearSearchBtn.addEventListener('click', function () { searchInput.value = ''; renderTree(); });
-searchInput.addEventListener('keydown', function (event) { if (event.key === 'Enter') { event.preventDefault(); renderTree(); } });
-filterSelect.addEventListener('change', renderTree);
+searchBtn.addEventListener('click', function () { renderTree(); saveViewState(); });
+clearSearchBtn.addEventListener('click', function () {
+    searchInput.value = '';
+    renderTree();
+    saveViewState();
+});
+// 200ms 防抖实时搜索（输入期间不重渲染，避免大列表每次按键卡顿）
+searchInput.addEventListener('input', function () {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(function () {
+        searchDebounceTimer = null;
+        renderTree();
+        saveViewState();
+    }, DEFAULT_SEARCH_DEBOUNCE);
+});
+searchInput.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        if (searchDebounceTimer) { clearTimeout(searchDebounceTimer); searchDebounceTimer = null; }
+        renderTree();
+        saveViewState();
+    }
+});
+filterSelect.addEventListener('change', function () { renderTree(); saveViewState(); });
+if (nodeSortSelect) nodeSortSelect.addEventListener('change', function () {
+    viewState.nodeSort = nodeSortSelect.value || 'code-asc';
+    renderTree();
+    saveViewState();
+});
+if (expandAllBtn) expandAllBtn.addEventListener('click', function () { setExpandedAll(true); });
+if (collapseAllBtn) collapseAllBtn.addEventListener('click', function () { setExpandedAll(false); });
+if (globalSelectAllEl) globalSelectAllEl.addEventListener('change', function () {
+    var checked = !!globalSelectAllEl.checked;
+    Array.prototype.forEach.call(treeContainer.querySelectorAll('.item-checkbox'), function (box) {
+        if (box.offsetParent !== null) box.checked = checked;
+    });
+    updateGlobalSelection();
+});
+if (globalBatchStatusBtn) globalBatchStatusBtn.addEventListener('click', openGlobalBatchStatus);
+treeContainer.addEventListener('dblclick', onTreeDblClick);
 modalNodeSave.addEventListener('click', saveNode);
 modalNodeCancel.addEventListener('click', closeNodeModal);
 modalItemSave.addEventListener('click', saveItem);
@@ -3827,9 +4724,24 @@ confirmRequireInput.addEventListener('keydown', function (event) {
     }
 });
 
-// Esc 关闭 / Enter 保存
+// 快捷键 / Esc 关闭 / Enter 保存 / 焦点陷阱
 document.addEventListener('keydown', function (event) {
     var key = event.key;
+    var mod = event.ctrlKey || event.metaKey;
+    if (mod && !event.shiftKey && (key === 's' || key === 'S')) {
+        event.preventDefault();
+        if (modalNodeOverlay.classList.contains('active')) saveNode();
+        else if (modalItemOverlay.classList.contains('active')) saveItem();
+        else toast('当前没有打开的编辑弹窗', 'info');
+        return;
+    }
+    if (mod && !event.shiftKey && (key === 'f' || key === 'F')) {
+        event.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+        return;
+    }
+    if (handleFocusTrap(event)) return;
     if (key === 'Escape') {
         if (dataMenu.classList.contains('open')) { closeDataMenu(); return; }
         if (confirmOverlay.classList.contains('active')) { cancelConfirm(); return; }
@@ -4313,11 +5225,23 @@ window.openBatchStatus = openBatchStatus;
 
     // ---------- 初始化与自动登录 ----------
     (function initAdmin() {
+        // 恢复上次视图状态（搜索词/筛选/排序/展开）
+        loadViewState();
+        if (searchInput) searchInput.value = viewState.search || '';
+        if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
+        setText(appVersionEl, '管理后台 v' + (Z.VERSION || '') + ' · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        document.querySelectorAll('.modal-overlay .modal, #print-preview-overlay .print-preview-box').forEach(function (el) {
+            el.setAttribute('role', 'dialog');
+            el.setAttribute('aria-modal', 'true');
+        });
+
         fillStatusSelect(modalItemStatus, STATUS.ON_SALE);
         fillStatusSelect(batchStatusSelect, STATUS.ON_SALE);
         fillStatusSelect(modalNodeStatus, STATUS.ON_SALE);
+        if (itemQtyRow) itemQtyRow.style.display = 'none';
         updateSyncMeta();
         updateRecycleCount();
+        updateGlobalSelection();
 
         var savedToken = readCred(STORAGE_KEYS.TOKEN);
         var savedGistId = readCred(STORAGE_KEYS.GIST_ID);
@@ -4335,7 +5259,7 @@ window.openBatchStatus = openBatchStatus;
         }
     })();
 
-    console.log('管理后台已加载（ZCFI R2a：软删除/回收站/导入导出/历史恢复/本地快照/编码规范）');
+    console.log('管理后台已加载（ZCFI R2b：搜索防抖/高亮、排序、汇总、复制、批量新增、视图持久化、响应式）');
 </script>
 </body>
 </html>
