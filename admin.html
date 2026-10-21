@@ -70,6 +70,8 @@
 
         /* ===== 顶部栏 ===== */
         .top-bar {
+            position: relative;
+            z-index: 900;
             display: flex;
             flex-wrap: wrap;
             gap: 16px;
@@ -876,6 +878,7 @@
             font-size: 13px;
             line-height: 1.7;
             margin: 12px 0;
+            white-space: pre-line;
             word-break: break-word;
         }
         .delete-code {
@@ -898,6 +901,223 @@
             color: var(--color-gray-600);
             margin-top: 10px;
         }
+
+        /* ===== 数据菜单（右侧下拉） ===== */
+        .data-menu-wrap {
+            position: relative;
+        }
+        .data-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: calc(100% + 6px);
+            min-width: 210px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+            border: 1px solid var(--color-gray-200);
+            padding: 6px;
+            z-index: 1200;
+        }
+        .data-menu.open { display: block; }
+        .data-menu button {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--color-gray-700);
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+        }
+        .data-menu button:hover { background: var(--color-gray-100); }
+        .data-menu button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .data-menu .menu-sep { height: 1px; margin: 4px 8px; background: var(--color-gray-200); }
+        .data-menu .recycle-badge {
+            margin-left: auto;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            border-radius: 9px;
+            background: var(--color-danger);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 18px;
+            text-align: center;
+        }
+
+        /* ===== 记住登录 ===== */
+        .login-remember {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-gray-700);
+            cursor: pointer;
+        }
+        .login-remember input {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            accent-color: var(--color-primary);
+        }
+        .login-note {
+            margin-top: 10px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--color-gray-500);
+        }
+
+        /* ===== 数据工具弹窗（导入/体检/历史/快照/回收站共用） ===== */
+        .modal.modal-wide { max-width: 880px; }
+        .data-note {
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--color-gray-600);
+            background: var(--color-gray-50);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin: 10px 0;
+            white-space: pre-line;
+            word-break: break-word;
+        }
+        .data-stat {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 12px 0;
+        }
+        .data-stat .item {
+            flex: 1;
+            min-width: 110px;
+            background: var(--color-gray-50);
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-size: 12px;
+            color: var(--color-gray-500);
+        }
+        .data-stat .item strong {
+            display: block;
+            font-size: 18px;
+            color: var(--color-gray-900);
+            margin-bottom: 2px;
+        }
+        .data-list {
+            max-height: 46vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 10px 0;
+            padding-right: 4px;
+        }
+        .data-row {
+            border: 1px solid var(--color-gray-200);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fff;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+        .data-row .row-main { flex: 1; min-width: 220px; }
+        .data-row .row-title {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--color-gray-800);
+            word-break: break-all;
+        }
+        .data-row .row-sub {
+            font-size: 12px;
+            color: var(--color-gray-500);
+            margin-top: 3px;
+            word-break: break-all;
+        }
+        .data-row .row-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .data-list .issue {
+            font-size: 12px;
+            line-height: 1.7;
+            padding: 6px 10px;
+            border-radius: 8px;
+            word-break: break-word;
+        }
+        .data-list .issue.error { background: #fef2f2; color: #991b1b; }
+        .data-list .issue.warning { background: #fffbeb; color: #92400e; }
+        .data-empty {
+            padding: 24px;
+            text-align: center;
+            color: var(--color-gray-400);
+            font-size: 13px;
+        }
+        .data-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        /* ===== 编码自定义开关 ===== */
+        .code-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--color-gray-600);
+            cursor: pointer;
+        }
+        .code-toggle input {
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            accent-color: var(--color-primary);
+        }
+        .code-hint {
+            margin-top: 4px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--color-gray-500);
+            word-break: break-word;
+        }
+        .modal input[readonly] {
+            background: var(--color-gray-50);
+            color: var(--color-gray-500);
+            cursor: not-allowed;
+        }
+
+        /* ===== 通用二次确认弹窗 ===== */
+        #confirm-overlay { z-index: 1350; }
+        #confirm-overlay .modal { max-width: 580px; }
+        #confirm-message {
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--color-gray-700);
+            white-space: pre-line;
+            word-break: break-word;
+        }
+        #confirm-status {
+            min-height: 18px;
+            font-size: 13px;
+            color: var(--color-danger);
+            margin-top: 8px;
+        }
+        .confirm-require { margin-top: 12px; }
 
         /* ===== 响应式微调 ===== */
         @media (max-width: 768px) {
@@ -935,6 +1155,11 @@
         <input type="text" id="login-gistid" value="f13d97c430522e4851afbf3cd2331e14" />
         <label>文件名</label>
         <input type="text" id="login-filename" value="data.json" />
+        <label class="login-remember">
+            <input type="checkbox" id="login-remember" checked />
+            记住登录（本机）
+        </label>
+        <p class="login-note">Token 仅保存在本机浏览器（localStorage/sessionStorage），不会上传到任何服务器。</p>
         <div class="btn-group" style="display:flex; gap:12px; margin-top:24px; justify-content:flex-end;">
             <button class="btn btn-primary" id="login-btn">登录</button>
         </div>
@@ -980,6 +1205,19 @@
                     </span>
                     刷新
                 </button>
+                <div class="data-menu-wrap">
+                    <button class="btn btn-secondary" id="data-menu-btn" type="button">🗄 数据 ▾</button>
+                    <div class="data-menu" id="data-menu">
+                        <button type="button" data-menu-action="export">⬇️ 导出备份 JSON</button>
+                        <button type="button" data-menu-action="import">⬆️ 导入 JSON…</button>
+                        <button type="button" data-menu-action="inspect">🩺 数据体检</button>
+                        <div class="menu-sep"></div>
+                        <button type="button" data-menu-action="history">🕘 历史版本…</button>
+                        <button type="button" data-menu-action="snapshots">🧷 恢复本地快照…</button>
+                        <button type="button" data-menu-action="recycle">🗑️ 回收站 <span class="recycle-badge" id="recycle-count" style="display:none;"></span></button>
+                    </div>
+                </div>
+                <input type="file" id="import-file" accept=".json,application/json" style="display:none;" />
                 <button class="btn btn-danger" id="logout-btn">退出</button>
             </div>
         </div>
@@ -1004,6 +1242,8 @@
         <h3 id="modal-node-title">编辑节点</h3>
         <label>编码</label>
         <input type="text" id="modal-node-code" placeholder="自定义编码（留空自动生成）" />
+        <label class="code-toggle"><input type="checkbox" id="modal-node-code-custom" /> 自定义编码（高级）</label>
+        <p class="code-hint" id="modal-node-code-hint"></p>
         <label>名称 *</label>
         <input type="text" id="modal-node-name" />
         <label>统一条码</label>
@@ -1042,6 +1282,8 @@
         <h3 id="modal-item-title">添加库存</h3>
         <label>库存编码</label>
         <input type="text" id="modal-item-code" placeholder="自定义编码（留空自动生成）" />
+        <label class="code-toggle"><input type="checkbox" id="modal-item-code-custom" /> 自定义编码（高级）</label>
+        <p class="code-hint" id="modal-item-code-hint"></p>
         <label>名称（可选）</label>
         <input type="text" id="modal-item-name" placeholder="可留空，默认使用节点名称" />
         <label>成本</label>
@@ -1109,6 +1351,32 @@
             <div style="flex:1"></div>
             <button type="button" class="btn btn-secondary" id="conflict-cancel">取消保存</button>
             <button type="button" class="btn btn-primary" id="conflict-confirm">确认保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 数据工具弹窗（导入 / 体检 / 历史版本 / 本地快照 / 回收站共用） -->
+<div class="modal-overlay" id="data-modal-overlay">
+    <div class="modal modal-wide">
+        <h3 id="data-modal-title">数据</h3>
+        <div id="data-modal-body"></div>
+        <div class="data-footer" id="data-modal-footer"></div>
+    </div>
+</div>
+
+<!-- 通用二次确认弹窗（恢复历史/快照、改名级联等） -->
+<div class="modal-overlay" id="confirm-overlay">
+    <div class="modal">
+        <h3 id="confirm-title">确认操作</h3>
+        <p id="confirm-message"></p>
+        <div class="confirm-require" id="confirm-require-wrap" style="display:none;">
+            <label id="confirm-require-label">请输入 RESTORE 以确认：</label>
+            <input type="text" id="confirm-require-input" autocomplete="off" spellcheck="false" />
+        </div>
+        <div id="confirm-status"></div>
+        <div class="btn-group">
+            <button type="button" class="btn btn-secondary" id="confirm-cancel">取消</button>
+            <button type="button" class="btn btn-danger" id="confirm-ok">确认</button>
         </div>
     </div>
 </div>
@@ -1255,6 +1523,26 @@ var itemContext = null;                 // 库存编辑上下文 { itemMode, par
 var batchContext = null;                // 批量状态上下文 { parentCode, itemCodes }
 var deleteState = null;                 // 删除确认上下文
 var conflictState = null;               // 冲突处理上下文
+var confirmState = null;                // 通用二次确认上下文
+var dataModalState = null;              // 数据工具弹窗上下文
+var pendingImport = null;               // 待导入的数据 { doc, report, fileName, confirmed }
+var revisionState = null;               // 历史版本查看上下文 { item, result, stats, report, diff }
+
+// 本地自动快照（环形 3 份，localStorage）
+var SNAPSHOT_KEY = 'zcfi_admin_snapshots_v1';
+var SNAPSHOT_MAX = 3;
+var SNAPSHOT_MAX_BYTES = 1.5 * 1024 * 1024;
+var snapshotOversizeWarned = false;
+
+// 编码规范
+var CODE_RE = {
+    root: /^A\d{3}$/,
+    node: /^A\d{3}(\/B\d{3})+$/,
+    itemSuffix: /\/\d{3}$/
+};
+var AUTO_CODE_HINT = '编码由系统自动生成（推荐）。如需手动指定/改名，请勾选“自定义编码”。';
+var CUSTOM_NODE_HINT = '自定义编码规则：大类 ^A\\d{3}$；子类 ^A\\d{3}(/B\\d{3})+$；必须与父编码前缀一致；节点与库存编码全局唯一。';
+var CUSTOM_ITEM_HINT = '自定义编码规则：库存编码必须为 父编码/三位数字（如 A001/B001/001），且与节点、库存编码全局唯一。';
 
 function $(id) { return document.getElementById(id); }
 function setText(el, text) { if (el) el.textContent = text === null || text === undefined ? '' : String(text); }
@@ -1291,6 +1579,11 @@ var clearSearchBtn = $('clear-search-btn');
 var addRootBtn = $('add-root-btn');
 var refreshBtn = $('refresh-btn');
 var logoutBtn = $('logout-btn');
+var loginRemember = $('login-remember');
+var dataMenuBtn = $('data-menu-btn');
+var dataMenu = $('data-menu');
+var importFile = $('import-file');
+var recycleCount = $('recycle-count');
 
 var modalNodeOverlay = $('modal-node-overlay');
 var modalNodeTitle = $('modal-node-title');
@@ -1306,6 +1599,8 @@ var modalNodeRemark = $('modal-node-remark');
 var modalNodeOriginalCode = $('modal-node-original-code');
 var modalNodeParent = $('modal-node-parent');
 var modalNodeMode = $('modal-node-mode');
+var modalNodeCodeCustom = $('modal-node-code-custom');
+var modalNodeCodeHint = $('modal-node-code-hint');
 var modalNodeSave = $('modal-node-save');
 var modalNodeCancel = $('modal-node-cancel');
 var nodeSaveStatus = $('node-save-status');
@@ -1322,6 +1617,8 @@ var modalItemQrlinks = $('modal-item-qrlinks');
 var modalItemRemark = $('modal-item-remark');
 var modalItemParentCode = $('modal-item-parent-code');
 var modalItemOriginalCode = $('modal-item-original-code');
+var modalItemCodeCustom = $('modal-item-code-custom');
+var modalItemCodeHint = $('modal-item-code-hint');
 var modalItemSave = $('modal-item-save');
 var modalItemCancel = $('modal-item-cancel');
 var itemSaveStatus = $('item-save-status');
@@ -1355,6 +1652,21 @@ var loadErrorMessage = $('load-error-message');
 var loadErrorHint = $('load-error-hint');
 var loadErrorRetry = $('load-error-retry');
 var loadErrorLogin = $('load-error-login');
+
+var dataModalOverlay = $('data-modal-overlay');
+var dataModalTitle = $('data-modal-title');
+var dataModalBody = $('data-modal-body');
+var dataModalFooter = $('data-modal-footer');
+
+var confirmOverlay = $('confirm-overlay');
+var confirmTitle = $('confirm-title');
+var confirmMessage = $('confirm-message');
+var confirmRequireWrap = $('confirm-require-wrap');
+var confirmRequireLabel = $('confirm-require-label');
+var confirmRequireInput = $('confirm-require-input');
+var confirmStatus = $('confirm-status');
+var confirmCancel = $('confirm-cancel');
+var confirmOk = $('confirm-ok');
 
 // 打印模块使用的 DOM 引用（打印函数本轮不改，变量名保持原样）
 var printPreviewOverlay = $('print-preview-overlay');
@@ -1403,6 +1715,875 @@ function normalizeDoc(doc) {
 }
 
 // ============================================================
+// 数据安全网：凭据存储 / 本地快照 / 数据统计与差异 / 确认弹窗 / 数据工具
+// ============================================================
+function timestampSlug(date) {
+    var d = date || new Date();
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return String(d.getFullYear()) + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+}
+
+// ---------- 凭据：记住登录（localStorage）/ 仅本次会话（sessionStorage） ----------
+function readCred(key) {
+    try {
+        var sessionValue = window.sessionStorage.getItem(key);
+        if (sessionValue !== null && sessionValue !== '') return sessionValue;
+    } catch (e) { /* ignore */ }
+    return Z.storage.get(key, '');
+}
+function writeCred(key, value, remember) {
+    try {
+        if (remember) {
+            window.localStorage.setItem(key, value);
+            window.sessionStorage.removeItem(key);
+        } else {
+            window.sessionStorage.setItem(key, value);
+            window.localStorage.removeItem(key);
+        }
+    } catch (e) {
+        try { Z.storage.set(key, value); } catch (ignore) { /* ignore */ }
+    }
+}
+function saveCredentials(token, gistId, filename, remember) {
+    writeCred(STORAGE_KEYS.TOKEN, token, remember);
+    writeCred(STORAGE_KEYS.GIST_ID, gistId, remember);
+    writeCred(STORAGE_KEYS.FILENAME, filename, remember);
+}
+function clearCredentials() {
+    [STORAGE_KEYS.TOKEN, STORAGE_KEYS.GIST_ID, STORAGE_KEYS.FILENAME].forEach(function (key) {
+        try { window.localStorage.removeItem(key); } catch (e) { /* ignore */ }
+        try { window.sessionStorage.removeItem(key); } catch (e) { /* ignore */ }
+        Z.storage.remove(key);
+    });
+}
+
+// ---------- 本地自动快照（环形 3 份，保存前取 baseDoc） ----------
+function readSnapshots() {
+    var list = Z.storage.getJson(SNAPSHOT_KEY, []);
+    if (!Array.isArray(list)) return [];
+    return list.filter(function (item) { return item && item.data && Z.isPlainObject(item.data.products); });
+}
+function writeSnapshots(list) { return Z.storage.setJson(SNAPSHOT_KEY, list); }
+function countActiveStats(doc) {
+    var stats = { nodes: 0, items: 0 };
+    var products = doc && doc.products ? doc.products : {};
+    function visit(container) {
+        Object.keys(container).forEach(function (code) {
+            var node = container[code];
+            if (!node || typeof node !== 'object' || Z.isDeleted(node)) return;
+            stats.nodes += 1;
+            if (Array.isArray(node.items)) {
+                node.items.forEach(function (item) { if (item && !Z.isDeleted(item)) stats.items += 1; });
+            }
+            if (node.children && typeof node.children === 'object') visit(node.children);
+        });
+    }
+    visit(products);
+    return stats;
+}
+/** 统计节点内容（默认排除已删除子项，供回收站/删除提示使用） */
+function countNodeContents(node, includeDeleted) {
+    var result = { children: 0, items: 0 };
+    function visit(current) {
+        if (!current || typeof current !== 'object') return;
+        if (Array.isArray(current.items)) {
+            current.items.forEach(function (item) {
+                if (!item) return;
+                if (!includeDeleted && Z.isDeleted(item)) return;
+                result.items += 1;
+            });
+        }
+        if (current.children && typeof current.children === 'object') {
+            Object.keys(current.children).forEach(function (key) {
+                var child = current.children[key];
+                if (!child || typeof child !== 'object') return;
+                if (!includeDeleted && Z.isDeleted(child)) return;
+                result.children += 1;
+                visit(child);
+            });
+        }
+    }
+    visit(node);
+    return result;
+}
+function takeSnapshotBeforeSave() {
+    try {
+        if (!baseDoc || !Z.isPlainObject(baseDoc.products)) return;
+        var json = JSON.stringify(baseDoc);
+        var byteSize = json.length;
+        try { byteSize = new TextEncoder().encode(json).length; } catch (e) { /* 回退到字符数 */ }
+        if (byteSize > SNAPSHOT_MAX_BYTES) {
+            if (!snapshotOversizeWarned) {
+                snapshotOversizeWarned = true;
+                toast('当前数据超过 1.5MB，已跳过自动本地快照（不影响远端保存）', { type: 'warn', duration: 6000 });
+            }
+            return;
+        }
+        var list = readSnapshots();
+        if (list.length && JSON.stringify(list[0].data) === json) return; // 内容相同不重复记录
+        var stats = countActiveStats(baseDoc);
+        list.unshift({
+            id: 'snap-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+            time: new Date().toISOString(),
+            nodes: stats.nodes,
+            items: stats.items,
+            size: byteSize,
+            data: JSON.parse(json)
+        });
+        while (list.length > SNAPSHOT_MAX) list.pop();
+        var saved = writeSnapshots(list);
+        while (!saved && list.length > 1) {
+            list.pop();
+            saved = writeSnapshots(list);
+        }
+        if (!saved) toast('浏览器本地存储空间不足：自动快照写入失败（不影响远端保存）', { type: 'warn', duration: 6000 });
+    } catch (e) {
+        console.warn('自动快照失败', e);
+    }
+}
+
+// ---------- 编码规范与全局唯一校验 ----------
+function collectAllCodes() {
+    var set = Object.create(null);
+    Z.walk(gistData.products, function (node, key) {
+        set[key] = true;
+        if (Array.isArray(node.items)) {
+            node.items.forEach(function (item) { if (item && item.code) set[item.code] = true; });
+        }
+    });
+    return set;
+}
+function collectSubtreeCodes(node, code) {
+    var codes = [code];
+    if (node && node.children && typeof node.children === 'object') {
+        Object.keys(node.children).forEach(function (childCode) {
+            codes = codes.concat(collectSubtreeCodes(node.children[childCode], childCode));
+        });
+    }
+    return codes;
+}
+function escapeRegExp(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function validateNodeCodeFormat(code, mode) {
+    var parentCode = null;
+    if (mode === 'add') {
+        parentCode = editContext && editContext.parentCode ? editContext.parentCode : null;
+    } else if (editContext && editContext.originalCode) {
+        var entry = findNodeEntry(editContext.originalCode);
+        parentCode = entry ? entry.parentCode : null;
+    }
+    if (parentCode) {
+        if (!CODE_RE.node.test(code)) return '子节点编码格式应为 A001/B001（可更深层级），当前为“' + code + '”';
+        if (code.indexOf(parentCode + '/') !== 0) return '子节点编码必须以父编码「' + parentCode + '/」开头，当前为“' + code + '”';
+    } else if (!CODE_RE.root.test(code)) {
+        return '大类编码格式应为 A001（A + 三位数字），当前为“' + code + '”';
+    }
+    return '';
+}
+function validateItemCodeFormat(code, parentCode) {
+    var re = new RegExp('^' + escapeRegExp(parentCode) + '\\/\\d{3}$');
+    if (!re.test(code)) return '库存编码必须为「' + parentCode + '/三位数字」（如 ' + parentCode + '/001），当前为“' + code + '”';
+    return '';
+}
+function findCodeCollision(code, ignoreCode) {
+    var set = collectAllCodes();
+    if (ignoreCode) delete set[ignoreCode];
+    return !!set[code];
+}
+/** 节点改名：检查新节点码与级联后的所有子/库存码是否与其它记录冲突 */
+function findNodeRenameCollision(newCode, oldCode, node) {
+    var oldCodes = collectSubtreeCodes(node, oldCode);
+    var newCodes = oldCodes.map(function (code) {
+        return code === oldCode ? newCode : newCode + code.slice(oldCode.length);
+    });
+    var set = collectAllCodes();
+    oldCodes.forEach(function (code) { delete set[code]; });
+    for (var i = 0; i < newCodes.length; i++) {
+        if (set[newCodes[i]]) return newCodes[i];
+    }
+    return '';
+}
+function updateNodeCodeUI() {
+    var custom = !!(modalNodeCodeCustom && modalNodeCodeCustom.checked);
+    modalNodeCode.readOnly = !custom;
+    setText(modalNodeCodeHint, custom ? CUSTOM_NODE_HINT : AUTO_CODE_HINT);
+}
+function updateItemCodeUI() {
+    var custom = !!(modalItemCodeCustom && modalItemCodeCustom.checked);
+    modalItemCode.readOnly = !custom;
+    setText(modalItemCodeHint, custom ? CUSTOM_ITEM_HINT : AUTO_CODE_HINT);
+}
+
+// ---------- 文档差异（历史版本对比用） ----------
+var NODE_DIFF_FIELDS = ['name', 'unified', 'cost', 'trackingNumber', 'orderNumber', 'remark', 'qrLinks', 'status', 'deletedAt'];
+var ITEM_DIFF_FIELDS = ['name', 'cost', 'trackingNumber', 'orderNumber', 'remark', 'qrLinks', 'status', 'deletedAt'];
+function flattenDoc(doc) {
+    var nodes = Object.create(null);
+    var items = Object.create(null);
+    var products = doc && doc.products ? doc.products : {};
+    function visit(container, parentCode) {
+        Object.keys(container).forEach(function (code) {
+            var node = container[code];
+            if (!node || typeof node !== 'object') return;
+            nodes[code] = { node: node, parentCode: parentCode || null };
+            if (Array.isArray(node.items)) {
+                node.items.forEach(function (item) {
+                    if (!item || !item.code) return;
+                    items[code + '|' + item.code] = { item: item, parentCode: code };
+                });
+            }
+            if (node.children && typeof node.children === 'object') visit(node.children, code);
+        });
+    }
+    visit(products, null);
+    return { nodes: nodes, items: items };
+}
+function diffDocs(currentDoc, targetDoc) {
+    var current = flattenDoc(currentDoc);
+    var target = flattenDoc(targetDoc);
+    var result = {
+        addedNodes: [], removedNodes: [], addedItems: [], removedItems: [],
+        changedNodes: [], changedItems: [], changedNodeFields: 0, changedItemFields: 0
+    };
+    Object.keys(target.nodes).forEach(function (code) { if (!current.nodes[code]) result.addedNodes.push(code); });
+    Object.keys(current.nodes).forEach(function (code) { if (!target.nodes[code]) result.removedNodes.push(code); });
+    Object.keys(target.items).forEach(function (key) { if (!current.items[key]) result.addedItems.push(key); });
+    Object.keys(current.items).forEach(function (key) { if (!target.items[key]) result.removedItems.push(key); });
+    Object.keys(target.nodes).forEach(function (code) {
+        if (!current.nodes[code]) return;
+        var changed = false;
+        NODE_DIFF_FIELDS.forEach(function (field) {
+            if (!Z.valuesEqual(current.nodes[code].node[field], target.nodes[code].node[field])) {
+                result.changedNodeFields += 1;
+                changed = true;
+            }
+        });
+        if (changed) result.changedNodes.push(code);
+    });
+    Object.keys(target.items).forEach(function (key) {
+        if (!current.items[key]) return;
+        var changed = false;
+        ITEM_DIFF_FIELDS.forEach(function (field) {
+            if (!Z.valuesEqual(current.items[key].item[field], target.items[key].item[field])) {
+                result.changedItemFields += 1;
+                changed = true;
+            }
+        });
+        if (changed) result.changedItems.push(key);
+    });
+    return result;
+}
+function shortList(list, max) {
+    max = max || 8;
+    if (!list || !list.length) return '';
+    var shown = list.slice(0, max).join('、');
+    return list.length > max ? shown + ' 等 ' + list.length + ' 项' : shown;
+}
+
+// ---------- 小型 DOM 辅助 ----------
+function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+}
+function createStatRow(container, items) {
+    var wrap = el('div', 'data-stat');
+    items.forEach(function (item) {
+        var box = el('div', 'item');
+        box.appendChild(el('strong', null, item.value));
+        box.appendChild(document.createTextNode(item.label));
+        wrap.appendChild(box);
+    });
+    container.appendChild(wrap);
+    return wrap;
+}
+function createDataList(container) {
+    var list = el('div', 'data-list');
+    container.appendChild(list);
+    return list;
+}
+function buildIssueList(container, errors, warnings) {
+    errors = errors || [];
+    warnings = warnings || [];
+    if (!errors.length && !warnings.length) return;
+    var list = createDataList(container);
+    errors.forEach(function (msg) { list.appendChild(el('div', 'issue error', '❌ ' + msg)); });
+    warnings.forEach(function (msg) { list.appendChild(el('div', 'issue warning', '⚠️ ' + msg)); });
+}
+
+// ---------- 通用二次确认弹窗 ----------
+function showConfirm(options) {
+    return new Promise(function (resolve) {
+        options = options || {};
+        confirmState = { resolve: resolve, options: options };
+        setText(confirmTitle, options.title || '确认操作');
+        confirmMessage.textContent = options.message || '';
+        var requireText = options.requireText || '';
+        if (requireText) {
+            confirmRequireWrap.style.display = 'block';
+            setText(confirmRequireLabel, '请输入 ' + requireText + ' 以确认：');
+            confirmRequireInput.value = '';
+            confirmOk.disabled = true;
+        } else {
+            confirmRequireWrap.style.display = 'none';
+            confirmOk.disabled = false;
+        }
+        confirmOk.textContent = options.confirmText || '确认';
+        confirmOk.className = 'btn ' + (options.danger === false ? 'btn-primary' : 'btn-danger');
+        setText(confirmStatus, '');
+        confirmOverlay.classList.add('active');
+        setTimeout(function () {
+            if (requireText) confirmRequireInput.focus();
+            else confirmOk.focus();
+        }, 40);
+    });
+}
+function updateConfirmState() {
+    if (!confirmState) return;
+    var options = confirmState.options || {};
+    if (options.requireText) confirmOk.disabled = confirmRequireInput.value.trim() !== options.requireText || isSaving;
+    else confirmOk.disabled = !!isSaving;
+}
+function finishConfirm(ok) {
+    if (!confirmState) return;
+    var state = confirmState;
+    confirmState = null;
+    confirmOverlay.classList.remove('active');
+    state.resolve(!!ok);
+}
+function cancelConfirm() {
+    if (!confirmState) return;
+    finishConfirm(false);
+}
+function handleConfirmOk() {
+    if (!confirmState || isSaving) return;
+    var options = confirmState.options || {};
+    if (options.requireText && confirmRequireInput.value.trim() !== options.requireText) return;
+    if (typeof options.onConfirm !== 'function') { finishConfirm(true); return; }
+    confirmOk.disabled = true;
+    setText(confirmStatus, '处理中…');
+    Promise.resolve(options.onConfirm()).then(function (ok) {
+        if (ok) { finishConfirm(true); return; }
+        setText(confirmStatus, '操作未完成');
+        updateConfirmState();
+    }).catch(function (err) {
+        setText(confirmStatus, '操作失败：' + Z.friendlyError(err));
+        updateConfirmState();
+    });
+}
+
+// ---------- 数据工具弹窗 ----------
+function renderDataFooter(actions) {
+    dataModalFooter.innerHTML = '';
+    (actions || []).forEach(function (action) {
+        var btn = el('button', 'btn ' + (action.className || 'btn-secondary'), action.label);
+        btn.type = 'button';
+        if (action.disabled) btn.disabled = true;
+        btn.addEventListener('click', function () {
+            if (typeof action.onClick === 'function') action.onClick(btn);
+            else closeDataModal();
+        });
+        dataModalFooter.appendChild(btn);
+    });
+}
+function openDataModal(options) {
+    options = options || {};
+    dataModalState = options;
+    setText(dataModalTitle, options.title || '数据');
+    dataModalBody.innerHTML = '';
+    if (typeof options.build === 'function') options.build(dataModalBody);
+    renderDataFooter(options.actions);
+    dataModalOverlay.classList.add('active');
+}
+function closeDataModal() {
+    dataModalOverlay.classList.remove('active');
+    dataModalState = null;
+}
+function setDataModalBody(builder) {
+    dataModalBody.innerHTML = '';
+    if (typeof builder === 'function') builder(dataModalBody);
+}
+
+// ---------- 导出 / 体检 / 导入 ----------
+function exportBackupFile(reason) {
+    var name = 'zcfi-backup-' + timestampSlug() + (reason ? '-' + reason : '') + '.json';
+    Z.downloadJson(name, gistData);
+    toast('已导出当前数据备份：' + name, 'success');
+    return name;
+}
+function runInspect() {
+    var report = Z.validateDocDeep(gistData);
+    var activeStats = countActiveStats(gistData);
+    var recycle = collectRecycleEntries();
+    openDataModal({
+        title: '数据体检',
+        build: function (body) {
+            body.appendChild(el('p', 'data-note', '体检范围：当前 Gist 数据（含回收站条目）。errors 为结构性错误，warnings 为可修复的提示。'));
+            createStatRow(body, [
+                { label: '节点（含回收站）', value: report.stats.nodes },
+                { label: '库存（含回收站）', value: report.stats.items },
+                { label: '有效节点', value: activeStats.nodes },
+                { label: '有效库存', value: activeStats.items },
+                { label: '回收站条目', value: recycle.nodes.length + recycle.items.length }
+            ]);
+            buildIssueList(body, report.errors, report.warnings);
+            if (!report.errors.length && !report.warnings.length) body.appendChild(el('p', 'data-empty', '未发现结构错误或警告 ✅'));
+        },
+        actions: [
+            {
+                label: '导出体检报告 JSON',
+                onClick: function () {
+                    Z.downloadJson('zcfi-inspect-' + timestampSlug() + '.json', {
+                        generatedAt: new Date().toISOString(),
+                        gistId: currentGistId,
+                        filename: currentFilename,
+                        sync: syncMeta,
+                        activeStats: activeStats,
+                        report: report
+                    });
+                    toast('已导出体检报告', 'success');
+                }
+            },
+            { label: '关闭', className: 'btn-primary', onClick: closeDataModal }
+        ]
+    });
+}
+function handleImportFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+        var text = String(reader.result || '');
+        var doc;
+        try {
+            doc = JSON.parse(text);
+        } catch (e) {
+            toast('导入失败：JSON 解析错误（' + e.message + '）', { type: 'error', duration: 7000 });
+            return;
+        }
+        pendingImport = {
+            doc: doc,
+            report: Z.validateDocDeep(doc),
+            fileName: file.name || 'import.json',
+            confirmed: false
+        };
+        openImportModal();
+    };
+    reader.onerror = function () { toast('读取文件失败', 'error'); };
+    reader.readAsText(file, 'utf-8');
+}
+function openImportModal() {
+    if (!pendingImport) return;
+    openDataModal({
+        title: '导入 JSON 备份',
+        build: function (body) {
+            body.appendChild(el('p', 'data-note',
+                '文件：' + pendingImport.fileName + '\n导入会用该文件的 products 替换当前全部商品数据（根级其它字段保留）。\n导入前会自动下载当前数据备份。'));
+            createStatRow(body, [
+                { label: '文件中节点数', value: pendingImport.report.stats.nodes },
+                { label: '文件中库存数', value: pendingImport.report.stats.items },
+                { label: '当前有效节点数', value: countActiveStats(gistData).nodes }
+            ]);
+            buildIssueList(body, pendingImport.report.errors, pendingImport.report.warnings);
+            if (pendingImport.report.ok) {
+                var label = el('label', 'code-toggle');
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.addEventListener('change', function () {
+                    if (pendingImport) pendingImport.confirmed = checkbox.checked;
+                });
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(' 我已确认：导入将替换当前全部数据（当前数据会先自动下载备份）'));
+                body.appendChild(label);
+            } else {
+                body.appendChild(el('p', 'data-note', '存在结构性错误（errors），已禁止导入。请修复 JSON 后重试。'));
+            }
+        },
+        actions: [
+            { label: '取消', onClick: function () { pendingImport = null; closeDataModal(); } },
+            { label: '下载当前备份并导入', className: 'btn-danger', disabled: !pendingImport.report.ok, onClick: runImport }
+        ]
+    });
+}
+function runImport(button) {
+    if (!pendingImport || !pendingImport.report.ok) return;
+    if (!pendingImport.confirmed) { toast('请先勾选确认项', 'warn'); return; }
+    button.disabled = true;
+    button.textContent = '备份并导入中…';
+    exportBackupFile('before-import');
+    var doc = Z.clone(pendingImport.doc);
+    var fileName = pendingImport.fileName;
+    saveWithOps([{ type: 'doc.replace', doc: doc }], { successMessage: '已导入 ' + fileName }).then(function (result) {
+        if (result) {
+            pendingImport = null;
+            button.textContent = '完成';
+            updateRecycleCount();
+            closeDataModal();
+            toast('导入完成：已用备份数据替换当前全部商品数据', 'success');
+        } else {
+            button.disabled = false;
+            button.textContent = '下载当前备份并导入';
+        }
+    });
+}
+
+// ---------- 历史版本 ----------
+function openHistoryModal() {
+    if (readOnly) { toast('当前为只读保护状态，无法读取历史版本', 'error'); return; }
+    revisionState = null;
+    openDataModal({
+        title: '历史版本（最近 10 个）',
+        build: function (body) { body.appendChild(el('p', 'data-empty', '正在读取历史版本…')); },
+        actions: [{ label: '关闭', onClick: closeDataModal }]
+    });
+    Z.history(currentToken, currentGistId).then(function (list) {
+        if (!dataModalState) return;
+        renderHistoryList(list.slice(0, 10));
+    }).catch(function (err) {
+        if (!dataModalState) return;
+        setDataModalBody(function (body) { body.appendChild(el('p', 'data-empty', '读取历史失败：' + Z.friendlyError(err))); });
+    });
+}
+function renderHistoryList(list) {
+    setDataModalBody(function (body) {
+        if (!list || !list.length) {
+            body.appendChild(el('p', 'data-empty', '该 Gist 暂无历史版本'));
+            return;
+        }
+        body.appendChild(el('p', 'data-note', '选择版本后可先查看节点/库存统计与差异概览，确认后再恢复。恢复前会自动下载当前数据备份。'));
+        var dataList = createDataList(body);
+        list.forEach(function (item) {
+            var row = el('div', 'data-row');
+            var main = el('div', 'row-main');
+            main.appendChild(el('div', 'row-title', (item.committedAt ? Z.formatDateTime(item.committedAt) : '时间未知') + ' · ' + String(item.version || '').slice(0, 7)));
+            main.appendChild(el('div', 'row-sub', 'change_status：' + (item.changeStatus || '—')));
+            row.appendChild(main);
+            var actions = el('div', 'row-actions');
+            var viewBtn = el('button', 'btn btn-primary btn-sm', '查看差异');
+            viewBtn.type = 'button';
+            viewBtn.addEventListener('click', function () { loadRevision(item); });
+            actions.appendChild(viewBtn);
+            row.appendChild(actions);
+            dataList.appendChild(row);
+        });
+    });
+}
+function loadRevision(item) {
+    setDataModalBody(function (body) { body.appendChild(el('p', 'data-empty', '正在读取版本 ' + String(item.version || '').slice(0, 7) + '…')); });
+    renderDataFooter([{ label: '关闭', onClick: closeDataModal }]);
+    Z.getAtRevision(currentToken, currentGistId, item.version, currentFilename).then(function (result) {
+        if (!dataModalState) return;
+        var report = Z.validateDocDeep(result.data);
+        var stats = countActiveStats(result.data);
+        var diff = diffDocs(gistData, result.data);
+        revisionState = { item: item, result: result, stats: stats, report: report, diff: diff };
+        setDataModalBody(function (body) {
+            body.appendChild(el('p', 'data-note',
+                '版本 ' + String(item.version || '').slice(0, 7) + ' · ' + (result.updatedAt ? Z.formatDateTime(result.updatedAt) : '时间未知') +
+                '\n恢复会替换当前全部商品数据；恢复前将自动下载当前数据备份。'));
+            createStatRow(body, [
+                { label: '该版本节点数', value: stats.nodes },
+                { label: '该版本库存数', value: stats.items },
+                { label: '新增节点', value: diff.addedNodes.length },
+                { label: '删除节点', value: diff.removedNodes.length },
+                { label: '字段变化条数', value: diff.changedNodeFields + diff.changedItemFields }
+            ]);
+            var summary = [];
+            if (diff.addedNodes.length) summary.push('较当前新增节点：' + shortList(diff.addedNodes));
+            if (diff.removedNodes.length) summary.push('较当前删除节点：' + shortList(diff.removedNodes));
+            if (diff.addedItems.length) summary.push('较当前新增库存：' + shortList(diff.addedItems));
+            if (diff.removedItems.length) summary.push('较当前删除库存：' + shortList(diff.removedItems));
+            if (diff.changedNodes.length) summary.push('字段有变化的节点：' + shortList(diff.changedNodes));
+            if (diff.changedItems.length) summary.push('字段有变化的库存：' + shortList(diff.changedItems));
+            body.appendChild(el('p', 'data-note', summary.length ? summary.join('\n') : '该版本与当前数据一致'));
+            if (report.errors.length) buildIssueList(body, report.errors, []);
+            var backBtn = el('button', 'btn btn-secondary', '← 返回版本列表');
+            backBtn.type = 'button';
+            backBtn.addEventListener('click', openHistoryModal);
+            body.appendChild(backBtn);
+        });
+        renderDataFooter([
+            { label: '取消', onClick: closeDataModal },
+            { label: '恢复此版本…', className: 'btn-danger', onClick: confirmRestoreRevision }
+        ]);
+    }).catch(function (err) {
+        if (!dataModalState) return;
+        setDataModalBody(function (body) { body.appendChild(el('p', 'data-empty', '读取版本失败：' + Z.friendlyError(err))); });
+    });
+}
+function confirmRestoreRevision() {
+    if (!revisionState) return;
+    var item = revisionState.item;
+    var targetDoc = Z.clone(revisionState.result.data);
+    var shortVersion = String(item.version || '').slice(0, 7);
+    showConfirm({
+        title: '恢复历史版本',
+        message: '将把全部商品数据恢复为版本 ' + shortVersion + '（' + (item.committedAt ? Z.formatDateTime(item.committedAt) : '时间未知') + '）。\n\n恢复会替换当前全部数据，恢复前将自动下载当前数据备份。',
+        requireText: 'RESTORE',
+        confirmText: '恢复此版本',
+        onConfirm: function () {
+            exportBackupFile('before-restore-' + shortVersion);
+            return saveWithOps([{ type: 'doc.replace', doc: targetDoc }], { successMessage: '已恢复历史版本 ' + shortVersion }).then(function (result) {
+                if (result) {
+                    revisionState = null;
+                    closeDataModal();
+                }
+                return !!result;
+            });
+        }
+    });
+}
+
+// ---------- 本地快照列表 / 恢复 ----------
+function openSnapshotsModal() {
+    var list = readSnapshots();
+    openDataModal({
+        title: '恢复本地快照（最多保留 3 份）',
+        build: function (body) {
+            body.appendChild(el('p', 'data-note', '每次保存前会自动把当时的数据记入本机快照（localStorage），不占用 Gist。恢复前会先自动下载当前数据备份。'));
+            if (!list.length) {
+                body.appendChild(el('p', 'data-empty', '暂无本地快照（完成一次保存后会自动生成）'));
+                return;
+            }
+            var dataList = createDataList(body);
+            list.forEach(function (snap) {
+                var row = el('div', 'data-row');
+                var main = el('div', 'row-main');
+                main.appendChild(el('div', 'row-title', (snap.time ? Z.formatDateTime(snap.time) : '时间未知') + ' · 节点 ' + (snap.nodes || 0) + ' / 库存 ' + (snap.items || 0)));
+                main.appendChild(el('div', 'row-sub', '大小 ' + Math.round((snap.size || 0) / 1024) + ' KB'));
+                row.appendChild(main);
+                var actions = el('div', 'row-actions');
+                var btn = el('button', 'btn btn-primary btn-sm', '恢复此快照');
+                btn.type = 'button';
+                btn.addEventListener('click', function () { restoreSnapshot(snap); });
+                actions.appendChild(btn);
+                row.appendChild(actions);
+                dataList.appendChild(row);
+            });
+        },
+        actions: [{ label: '关闭', onClick: closeDataModal }]
+    });
+}
+function restoreSnapshot(snap) {
+    if (!snap || !snap.data) return;
+    showConfirm({
+        title: '恢复本地快照',
+        message: '快照时间：' + (snap.time ? Z.formatDateTime(snap.time) : '未知') + '\n节点 ' + (snap.nodes || 0) + ' / 库存 ' + (snap.items || 0) + '\n\n恢复会替换当前全部商品数据，恢复前将自动下载当前数据备份。',
+        confirmText: '恢复快照',
+        onConfirm: function () {
+            exportBackupFile('before-snapshot-restore');
+            return saveWithOps([{ type: 'doc.replace', doc: Z.clone(snap.data) }], { successMessage: '已恢复本地快照' }).then(function (result) {
+                if (result) closeDataModal();
+                return !!result;
+            });
+        }
+    });
+}
+
+// ---------- 回收站（软删除） ----------
+function collectRecycleEntries() {
+    var nodes = [];
+    var items = [];
+    var products = gistData.products || {};
+    function visit(container, parentCode) {
+        Object.keys(container).sort().forEach(function (code) {
+            var node = container[code];
+            if (!node || typeof node !== 'object') return;
+            if (Z.isDeleted(node)) {
+                nodes.push({
+                    type: 'node',
+                    code: code,
+                    parentCode: parentCode || null,
+                    name: node.name || '',
+                    deletedAt: node.deletedAt,
+                    active: countNodeContents(node, false),
+                    all: countNodeContents(node, true)
+                });
+                return; // 已删除节点整体在回收站，不再单独展开其内部条目
+            }
+            if (Array.isArray(node.items)) {
+                node.items.forEach(function (item) {
+                    if (item && Z.isDeleted(item)) {
+                        items.push({
+                            type: 'item',
+                            parentCode: code,
+                            code: item.code || '',
+                            name: item.name || node.name || '',
+                            deletedAt: item.deletedAt
+                        });
+                    }
+                });
+            }
+            if (node.children && typeof node.children === 'object') visit(node.children, code);
+        });
+    }
+    visit(products, null);
+    return { nodes: nodes, items: items };
+}
+function updateRecycleCount() {
+    if (!recycleCount) return;
+    var entries = collectRecycleEntries();
+    var total = entries.nodes.length + entries.items.length;
+    if (total > 0) {
+        recycleCount.style.display = 'inline-block';
+        setText(recycleCount, String(total));
+    } else {
+        recycleCount.style.display = 'none';
+        setText(recycleCount, '');
+    }
+}
+function ancestorsDeleted(code) {
+    var entry = findNodeEntry(code);
+    var parentCode = entry ? entry.parentCode : null;
+    var guard = 0;
+    while (parentCode && guard < 100) {
+        guard += 1;
+        var parent = Z.findNodeByCode(gistData.products, parentCode);
+        if (parent && Z.isDeleted(parent)) return parentCode;
+        var parentEntry = findNodeEntry(parentCode);
+        parentCode = parentEntry ? parentEntry.parentCode : null;
+    }
+    return null;
+}
+function openRecycleModal() {
+    var entries = collectRecycleEntries();
+    openDataModal({
+        title: '回收站（' + (entries.nodes.length + entries.items.length) + ' 项）',
+        build: function (body) {
+            body.appendChild(el('p', 'data-note', '删除会先移入回收站（数据仍在 Gist 中，但树、搜索、打印与扫码端都不再显示）。可在此恢复，或彻底删除（永久移除，无法恢复）。'));
+            if (!entries.nodes.length && !entries.items.length) {
+                body.appendChild(el('p', 'data-empty', '回收站为空'));
+                return;
+            }
+            var dataList = createDataList(body);
+            entries.nodes.forEach(function (entry) {
+                var row = el('div', 'data-row');
+                var main = el('div', 'row-main');
+                main.appendChild(el('div', 'row-title', '节点 · ' + entry.code + (entry.name ? ' · ' + entry.name : '')));
+                main.appendChild(el('div', 'row-sub', '删除时间：' + (entry.deletedAt ? Z.formatDateTime(entry.deletedAt) : '未知') +
+                    ' · 恢复后可见：' + entry.active.children + ' 个子类 / ' + entry.active.items + ' 个库存'));
+                row.appendChild(main);
+                var actions = el('div', 'row-actions');
+                var restoreBtn = el('button', 'btn btn-primary btn-sm', '恢复');
+                restoreBtn.type = 'button';
+                restoreBtn.addEventListener('click', function () { restoreRecycleNode(entry); });
+                var purgeBtn = el('button', 'btn btn-danger btn-sm', '彻底删除');
+                purgeBtn.type = 'button';
+                purgeBtn.addEventListener('click', function () { purgeRecycleNode(entry); });
+                actions.appendChild(restoreBtn);
+                actions.appendChild(purgeBtn);
+                row.appendChild(actions);
+                dataList.appendChild(row);
+            });
+            entries.items.forEach(function (entry) {
+                var row = el('div', 'data-row');
+                var main = el('div', 'row-main');
+                main.appendChild(el('div', 'row-title', '库存 · ' + entry.code + (entry.name ? ' · ' + entry.name : '')));
+                main.appendChild(el('div', 'row-sub', '父节点：' + entry.parentCode + ' · 删除时间：' + (entry.deletedAt ? Z.formatDateTime(entry.deletedAt) : '未知')));
+                row.appendChild(main);
+                var actions = el('div', 'row-actions');
+                var restoreBtn = el('button', 'btn btn-primary btn-sm', '恢复');
+                restoreBtn.type = 'button';
+                restoreBtn.addEventListener('click', function () { restoreRecycleItem(entry); });
+                var purgeBtn = el('button', 'btn btn-danger btn-sm', '彻底删除');
+                purgeBtn.type = 'button';
+                purgeBtn.addEventListener('click', function () { purgeRecycleItem(entry); });
+                actions.appendChild(restoreBtn);
+                actions.appendChild(purgeBtn);
+                row.appendChild(actions);
+                dataList.appendChild(row);
+            });
+        },
+        actions: [{ label: '关闭', onClick: closeDataModal }]
+    });
+}
+function restoreRecycleNode(entry) {
+    if (readOnly) { toast('当前为只读保护状态，无法恢复', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var ancestor = ancestorsDeleted(entry.code);
+    if (ancestor) { toast('上级节点「' + ancestor + '」仍在回收站，请先恢复上级节点', 'warn'); return; }
+    var baseNode = Z.findNodeByCode(baseDoc.products, entry.code);
+    if (!baseNode) { toast('基准数据中找不到该节点，请刷新后重试', 'error'); return; }
+    saveWithOps([{
+        type: 'node.upsert',
+        code: entry.code,
+        originalCode: entry.code,
+        parentCode: null,
+        baseNode: Z.clone(baseNode),
+        fields: { deletedAt: undefined }
+    }], { successMessage: '已从回收站恢复节点 ' + entry.code }).then(function (result) {
+        if (result) { updateRecycleCount(); openRecycleModal(); }
+    });
+}
+function restoreRecycleItem(entry) {
+    if (readOnly) { toast('当前为只读保护状态，无法恢复', 'error'); return; }
+    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    var parent = Z.findNodeByCode(gistData.products, entry.parentCode);
+    if (!parent || Z.isDeleted(parent)) { toast('父节点仍在回收站，请先恢复父节点', 'warn'); return; }
+    var baseItem = baseItemOf(entry.parentCode, entry.code);
+    if (!baseItem) { toast('基准数据中找不到该库存，请刷新后重试', 'error'); return; }
+    saveWithOps([{
+        type: 'item.upsert',
+        parentCode: entry.parentCode,
+        code: entry.code,
+        originalCode: entry.code,
+        baseItem: Z.clone(baseItem),
+        fields: { deletedAt: undefined }
+    }], { successMessage: '已从回收站恢复库存 ' + entry.code }).then(function (result) {
+        if (result) { updateRecycleCount(); openRecycleModal(); }
+    });
+}
+function purgeRecycleNode(entry) {
+    if (readOnly) { toast('当前为只读保护状态，无法删除', 'error'); return; }
+    var rawNode = Z.findNodeByCode(gistData.products, entry.code);
+    if (!rawNode) { toast('节点不存在或已被删除', 'error'); return; }
+    var baseNode = Z.findNodeByCode(baseDoc.products, entry.code) || rawNode;
+    var counts = countNodeContents(rawNode, true);
+    showDeleteConfirm({
+        title: '彻底删除节点',
+        code: entry.code,
+        message: '将永久删除节点「' + entry.code + '」及其下 ' + counts.children + ' 个子类、' + counts.items + ' 个库存。\n此操作不可恢复，Gist 中将不再保留该数据。',
+        onConfirm: function () {
+            deleteConfirmStatus.textContent = '删除中…';
+            return saveWithOps([{ type: 'node.delete', code: entry.code, baseNode: Z.clone(baseNode) }], {
+                successMessage: '已彻底删除节点 ' + entry.code,
+                onError: function (err, tip) { deleteConfirmStatus.textContent = '删除失败：' + tip; }
+            }).then(function (result) {
+                if (result) { updateRecycleCount(); openRecycleModal(); }
+                return !!result;
+            });
+        }
+    });
+}
+function purgeRecycleItem(entry) {
+    if (readOnly) { toast('当前为只读保护状态，无法删除', 'error'); return; }
+    var parent = Z.findNodeByCode(gistData.products, entry.parentCode);
+    if (!parent) { toast('父节点不存在', 'error'); return; }
+    var rawItem = Z.findItem(parent, entry.code);
+    if (!rawItem) { toast('库存不存在或已被删除', 'error'); return; }
+    var baseItem = baseItemOf(entry.parentCode, entry.code) || rawItem;
+    showDeleteConfirm({
+        title: '彻底删除库存',
+        code: entry.code,
+        message: '将永久删除库存「' + entry.code + '」。\n此操作不可恢复，Gist 中将不再保留该数据。',
+        onConfirm: function () {
+            deleteConfirmStatus.textContent = '删除中…';
+            return saveWithOps([{
+                type: 'item.delete',
+                parentCode: entry.parentCode,
+                code: entry.code,
+                baseItem: Z.clone(baseItem)
+            }], {
+                successMessage: '已彻底删除库存 ' + entry.code,
+                onError: function (err, tip) { deleteConfirmStatus.textContent = '删除失败：' + tip; }
+            }).then(function (result) {
+                if (result) { updateRecycleCount(); openRecycleModal(); }
+                return !!result;
+            });
+        }
+    });
+}
+
+// ============================================================
 // 登录 / 加载 / 同步元信息 / 错误态
 // ============================================================
 function updateSyncMeta() {
@@ -1438,6 +2619,7 @@ function applyLoaded(result) {
     updateSyncMeta();
     populateFilter();
     renderTree();
+    updateRecycleCount();
     setText(userStatus, '已连接 (' + currentGistId + ')');
     setRefreshing(false);
 }
@@ -1508,9 +2690,7 @@ function performLogin(options) {
             currentToken = token;
             currentGistId = gistId;
             currentFilename = filename;
-            Z.storage.set(STORAGE_KEYS.TOKEN, token);
-            Z.storage.set(STORAGE_KEYS.GIST_ID, gistId);
-            Z.storage.set(STORAGE_KEYS.FILENAME, filename);
+            saveCredentials(token, gistId, filename, !!(loginRemember && loginRemember.checked));
             loginOverlay.classList.remove('active');
             appContainer.style.display = 'block';
             applyLoaded(result);
@@ -1548,9 +2728,7 @@ function retryLoad() {
 }
 
 function logout() {
-    Z.storage.remove(STORAGE_KEYS.TOKEN);
-    Z.storage.remove(STORAGE_KEYS.GIST_ID);
-    Z.storage.remove(STORAGE_KEYS.FILENAME);
+    clearCredentials();
     currentToken = '';
     currentGistId = DEFAULT_GIST_ID;
     currentFilename = 'data.json';
@@ -1558,8 +2736,14 @@ function logout() {
     baseDoc = Z.clone(gistData);
     syncMeta = { updatedAt: null, revision: null, size: null, lastSyncAt: null };
     readOnly = true;
+    pendingImport = null;
+    revisionState = null;
     hideLoadError();
+    closeDataModal();
+    if (confirmState) finishConfirm(false);
+    closeDataMenu();
     updateSyncMeta();
+    updateRecycleCount();
     ['modal-node-overlay', 'modal-item-overlay', 'batch-status-overlay', 'delete-confirm-overlay',
         'conflict-overlay', 'print-preview-overlay'].forEach(function (id) {
         var el = $(id);
@@ -1571,6 +2755,7 @@ function logout() {
     loginToken.value = '';
     loginGistId.value = DEFAULT_GIST_ID;
     loginFilename.value = 'data.json';
+    if (loginRemember) loginRemember.checked = true;
     setText(userStatus, '未连接');
     setRefreshing(false);
 }
@@ -1663,6 +2848,8 @@ function itemMatchesTerm(item, term) {
 }
 
 function buildNodeHtml(code, node, depth, term, expandAll, forceShow) {
+    // 软删除：已删除节点（含其整个子树）不参与渲染/搜索/打印
+    if (Z.isDeleted(node)) return { html: '', visible: false };
     var children = (node.children && typeof node.children === 'object' && !Array.isArray(node.children)) ? node.children : {};
     var items = Array.isArray(node.items) ? node.items : [];
     var selfMatch = term ? nodeMatchesTerm(node, code, term) : false;
@@ -1671,14 +2858,14 @@ function buildNodeHtml(code, node, depth, term, expandAll, forceShow) {
     var childParts = [];
     Object.keys(children).sort().forEach(function (childCode) {
         var child = children[childCode];
-        if (!child || typeof child !== 'object') return;
+        if (!child || typeof child !== 'object' || Z.isDeleted(child)) return;
         var result = buildNodeHtml(childCode, child, depth + 1, term, expandAll, showAll);
         if (result.visible) childParts.push(result.html);
     });
 
     var visibleItems = [];
     items.forEach(function (item) {
-        if (!item) return;
+        if (!item || Z.isDeleted(item)) return;
         if (showAll || itemMatchesTerm(item, term)) visibleItems.push(item);
     });
 
@@ -1688,7 +2875,7 @@ function buildNodeHtml(code, node, depth, term, expandAll, forceShow) {
     var expanded = expandAll || (term && (selfMatch || childParts.length > 0 || visibleItems.length > 0));
     var unified = node.unified !== false;
     var nodeStatus = Z.normalizeStatus(node.status);
-    var hasToggle = Object.keys(children).length > 0 || items.length > 0;
+    var hasToggle = childParts.length > 0 || visibleItems.length > 0;
 
     var toggleIcon = hasToggle
         ? '<span class="toggle" data-action="toggle" data-code="' + esc(code) + '" title="展开/收起">▼</span>'
@@ -1789,7 +2976,9 @@ function toggleNode(code) {
 function populateFilter() {
     var products = gistData.products || {};
     var current = filterSelect.value || 'all';
-    var codes = Object.keys(products).sort();
+    var codes = Object.keys(products).sort().filter(function (code) {
+        return products[code] && !Z.isDeleted(products[code]);
+    });
     filterSelect.innerHTML = '';
     var allOpt = document.createElement('option');
     allOpt.value = 'all';
@@ -1818,12 +3007,23 @@ function onTreeClick(event) {
     switch (action) {
         case 'toggle': toggleNode(code); break;
         case 'edit-node': openNodeModal('edit', code); break;
-        case 'add-node': openNodeModal('add', '', code); break;
-        case 'add-item': openItemModal('add', code); break;
-        case 'print-node': window.printNodeLabel(code); break;
+        case 'add-node': openNodeModal('add', '', parent); break;
+        case 'add-item': openItemModal('add', parent); break;
+        case 'print-node': {
+            var printNode = findNodeByCode(code);
+            if (!printNode || Z.isDeleted(printNode)) { toast('该节点已在回收站，无法打印', 'warn'); break; }
+            window.printNodeLabel(code);
+            break;
+        }
         case 'delete-node': deleteNode(code); break;
         case 'edit-item': openItemModal('edit', parent, itemCode); break;
-        case 'print-item': window.printItemLabel(parent, itemCode); break;
+        case 'print-item': {
+            var printParent = findNodeByCode(parent);
+            var printItem = printParent ? Z.findItem(printParent, itemCode) : null;
+            if (!printParent || Z.isDeleted(printParent) || !printItem || Z.isDeleted(printItem)) { toast('该库存已在回收站，无法打印', 'warn'); break; }
+            window.printItemLabel(parent, itemCode);
+            break;
+        }
         case 'delete-item': deleteItem(parent, itemCode); break;
         case 'batch-print': window.batchPrintItems(parent); break;
         case 'batch-status': openBatchStatus(parent); break;
@@ -1841,7 +3041,7 @@ function onTreeChange(event) {
 // 保存引擎封装（ops + 三方合并 + 串行锁 + 冲突 UI）
 // ============================================================
 function setGlobalBusy(busy) {
-    [addRootBtn, refreshBtn, logoutBtn, modalNodeSave, modalItemSave, batchStatusSave, deleteConfirmOk].forEach(function (btn) {
+    [addRootBtn, refreshBtn, logoutBtn, modalNodeSave, modalItemSave, batchStatusSave, deleteConfirmOk, dataMenuBtn].forEach(function (btn) {
         if (!btn) return;
         if (busy) btn.disabled = true;
         else btn.disabled = false;
@@ -1868,6 +3068,8 @@ function saveWithOps(ops, options) {
     if (!ops || !ops.length) { toast('没有需要保存的修改', 'info'); return Promise.resolve(null); }
     isSaving = true;
     setGlobalBusy(true);
+    // 保存前自动做本地快照（失败不影响远端保存）
+    takeSnapshotBeforeSave();
     return Z.save({
         token: currentToken,
         gistId: currentGistId,
@@ -1894,6 +3096,7 @@ function saveWithOps(ops, options) {
         updateSyncMeta();
         populateFilter();
         renderTree();
+        updateRecycleCount();
         if (result.unchanged) {
             if (result.conflicts && result.conflicts.length) toast('未写入改动：冲突已按你的选择保留远端版本', { type: 'warn', duration: 5000 });
             else toast('数据没有变化', 'info');
@@ -2014,11 +3217,12 @@ function collectNodeFormValues() {
 function openNodeModal(mode, code, parentCode) {
     if (readOnly) { toast('当前为只读保护状态，无法编辑。请先重试加载。', 'error'); return; }
     if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+    modalNodeCodeCustom.checked = false;
     if (mode === 'add') {
         // 新增节点：只有新增时才创建空 children（编辑绝不携带 children/items）
         var defaultCode = parentCode ? generateChildCode(parentCode) : generateRootCode();
         if (!defaultCode) return;
-        editContext = { nodeMode: 'add', originalCode: null, parentCode: parentCode || '', baseNode: null };
+        editContext = { nodeMode: 'add', originalCode: null, parentCode: parentCode || '', baseNode: null, autoCode: defaultCode };
         modalNodeMode.value = 'add';
         modalNodeParent.value = parentCode || '';
         modalNodeTitle.textContent = parentCode ? '添加子类' : '添加大类';
@@ -2034,12 +3238,13 @@ function openNodeModal(mode, code, parentCode) {
         fillStatusSelect(modalNodeStatus, STATUS.ON_SALE);
     } else {
         var node = findNodeByCode(code);
-        if (!node) { toast('节点不存在或已被删除', 'error'); return; }
+        if (!node || Z.isDeleted(node)) { toast('节点不存在或已在回收站', 'error'); return; }
         editContext = {
             nodeMode: 'edit',
             originalCode: code,
             parentCode: '',
-            baseNode: Z.clone(baseNodeOf(code) || node)
+            baseNode: Z.clone(baseNodeOf(code) || node),
+            autoCode: code
         };
         modalNodeMode.value = 'edit';
         modalNodeOriginalCode.value = code;
@@ -2055,6 +3260,7 @@ function openNodeModal(mode, code, parentCode) {
         modalNodeRemark.value = node.remark || '';
         fillStatusSelect(modalNodeStatus, node.status);
     }
+    updateNodeCodeUI();
     modalNodeOverlay.classList.add('active');
     resetSaveButton(modalNodeSave, nodeSaveStatus);
     setTimeout(function () { modalNodeName.focus(); }, 30);
@@ -2071,6 +3277,7 @@ function saveNode() {
     if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
     if (!editContext) return;
     var mode = editContext.nodeMode;
+    var custom = !!(modalNodeCodeCustom && modalNodeCodeCustom.checked);
     var code = Z.normalizeCode(modalNodeCode.value);
     var values = collectNodeFormValues();
     if (!values.name) {
@@ -2080,33 +3287,45 @@ function saveNode() {
     }
     if (!code) {
         if (mode === 'add') {
-            code = editContext.parentCode ? generateChildCode(editContext.parentCode) : generateRootCode();
+            code = editContext.autoCode || (editContext.parentCode ? generateChildCode(editContext.parentCode) : generateRootCode());
             if (!code) return;
-            modalNodeCode.value = code;
         } else {
             toast('编码不能为空', 'error');
             return;
         }
     }
-    var originalCode = editContext.originalCode;
-    var existing = findNodeEntry(code);
-    if (existing && (!originalCode || !Z.sameCode(code, originalCode))) {
-        toast('编码已存在：' + code, 'error');
-        return;
+    if (mode === 'add' && !custom) {
+        code = editContext.autoCode || code;
     }
-    var op;
+    var originalCode = editContext.originalCode;
+    if (custom) {
+        var formatError = validateNodeCodeFormat(code, mode);
+        if (formatError) { toast(formatError, { type: 'error', duration: 7000 }); modalNodeCode.focus(); return; }
+    } else if (mode === 'edit') {
+        // 未开启“自定义编码”时，编码只读，不允许被脚本/输入意外修改
+        code = originalCode;
+    }
+    modalNodeCode.value = code;
     if (mode === 'add') {
-        op = {
-            type: 'node.upsert',
-            code: code,
-            originalCode: null,
-            parentCode: editContext.parentCode || null,
-            baseNode: null,
-            fields: fieldDiff(values, null)
-        };
+        if (findCodeCollision(code, null)) {
+            toast('编码已被占用（节点与库存编码全局唯一）：' + code, { type: 'error', duration: 7000 });
+            return;
+        }
+    } else if (!Z.sameCode(code, originalCode)) {
+        var currentNode = findNodeByCode(originalCode);
+        if (!currentNode) { toast('节点不存在或已被删除', 'error'); return; }
+        var renameCollision = findNodeRenameCollision(code, originalCode, currentNode);
+        if (renameCollision) {
+            toast('改名后的编码与现有记录冲突：' + renameCollision, { type: 'error', duration: 7000 });
+            return;
+        }
+    }
+    var fields;
+    if (mode === 'add') {
+        fields = fieldDiff(values, null);
     } else {
         var baseNode = editContext.baseNode;
-        var fields = fieldDiff(values, baseNode);
+        fields = fieldDiff(values, baseNode);
         // 历史数据节点可能没有 status 字段：默认“在售”不主动写入，避免制造无意义改动
         if (fields.status !== undefined && baseNode.status === undefined && fields.status === STATUS.ON_SALE) {
             delete fields.status;
@@ -2116,33 +3335,44 @@ function saveNode() {
             closeNodeModal();
             return;
         }
-        op = {
-            type: 'node.upsert',
-            code: code,
-            originalCode: originalCode,
-            parentCode: null,
-            baseNode: Z.clone(baseNode),
-            fields: fields
-        };
     }
-    modalNodeSave.disabled = true;
-    modalNodeSave.textContent = '保存中…';
-    nodeSaveStatus.innerHTML = '<span class="spinner"></span> 保存中…';
-    var successMessage = (mode === 'add' ? '已添加节点 ' : '已保存节点 ') + code;
-    saveWithOps([op], {
-        successMessage: successMessage,
-        onError: function (err, tip) {
-            nodeSaveStatus.textContent = '保存失败：' + tip;
-        }
-    }).then(function (result) {
-        if (result) {
-            closeNodeModal();
-        } else {
-            modalNodeSave.disabled = false;
-            modalNodeSave.textContent = '重试保存';
-            if (!nodeSaveStatus.textContent) nodeSaveStatus.textContent = '保存失败，请重试';
-        }
-    });
+    var op = {
+        type: 'node.upsert',
+        code: code,
+        originalCode: mode === 'add' ? null : originalCode,
+        parentCode: mode === 'add' ? (editContext.parentCode || null) : null,
+        baseNode: mode === 'add' ? null : Z.clone(editContext.baseNode),
+        fields: fields
+    };
+    function proceed() {
+        modalNodeSave.disabled = true;
+        modalNodeSave.textContent = '保存中…';
+        nodeSaveStatus.innerHTML = '<span class="spinner"></span> 保存中…';
+        var successMessage = (mode === 'add' ? '已添加节点 ' : '已保存节点 ') + code;
+        return saveWithOps([op], {
+            successMessage: successMessage,
+            onError: function (err, tip) { nodeSaveStatus.textContent = '保存失败：' + tip; }
+        }).then(function (result) {
+            if (result) {
+                closeNodeModal();
+            } else {
+                modalNodeSave.disabled = false;
+                modalNodeSave.textContent = '重试保存';
+                if (!nodeSaveStatus.textContent) nodeSaveStatus.textContent = '保存失败，请重试';
+            }
+            return !!result;
+        });
+    }
+    if (mode === 'edit' && !Z.sameCode(code, originalCode)) {
+        showConfirm({
+            title: '确认修改编码',
+            message: '节点编码将从「' + originalCode + '」改为「' + code + '」。\n保存时会自动级联更新其下所有子节点和库存的编码；旧标签/旧二维码可能无法继续匹配。\n\n确认改名并保存吗？',
+            confirmText: '确认改名并保存',
+            onConfirm: function () { return proceed().then(function () { return true; }); }
+        });
+    } else {
+        proceed();
+    }
 }
 
 // ============================================================
@@ -2164,12 +3394,13 @@ function openItemModal(mode, parentCode, itemCode) {
     if (readOnly) { toast('当前为只读保护状态，无法编辑。请先重试加载。', 'error'); return; }
     if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
     var parent = findNodeByCode(parentCode);
-    if (!parent) { toast('父节点不存在或已被删除', 'error'); return; }
+    if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); return; }
     modalItemParentCode.value = parentCode;
+    modalItemCodeCustom.checked = false;
     if (mode === 'add') {
         var defaultCode = generateItemCode(parentCode);
         if (!defaultCode) return;
-        itemContext = { itemMode: 'add', parentCode: parentCode, originalCode: null, baseItem: null };
+        itemContext = { itemMode: 'add', parentCode: parentCode, originalCode: null, baseItem: null, autoCode: defaultCode };
         modalItemTitle.textContent = '添加库存';
         modalItemCode.value = defaultCode;
         modalItemName.value = '';
@@ -2182,12 +3413,13 @@ function openItemModal(mode, parentCode, itemCode) {
         fillStatusSelect(modalItemStatus, STATUS.ON_SALE);
     } else {
         var item = Z.findItem(parent, itemCode);
-        if (!item) { toast('库存项不存在或已被删除', 'error'); return; }
+        if (!item || Z.isDeleted(item)) { toast('库存项不存在或已在回收站', 'error'); return; }
         itemContext = {
             itemMode: 'edit',
             parentCode: parentCode,
             originalCode: itemCode,
-            baseItem: Z.clone(baseItemOf(parentCode, itemCode) || item)
+            baseItem: Z.clone(baseItemOf(parentCode, itemCode) || item),
+            autoCode: itemCode
         };
         modalItemTitle.textContent = '编辑库存';
         modalItemCode.value = item.code || '';
@@ -2200,6 +3432,7 @@ function openItemModal(mode, parentCode, itemCode) {
         modalItemOriginalCode.value = itemCode;
         fillStatusSelect(modalItemStatus, item.status);
     }
+    updateItemCodeUI();
     modalItemOverlay.classList.add('active');
     resetSaveButton(modalItemSave, itemSaveStatus);
     setTimeout(function () { modalItemName.focus(); }, 30);
@@ -2217,24 +3450,29 @@ function saveItem() {
     if (!itemContext) return;
     var parentCode = itemContext.parentCode;
     var parent = findNodeByCode(parentCode);
-    if (!parent) { toast('父节点不存在或已被删除', 'error'); return; }
-    var items = Array.isArray(parent.items) ? parent.items : [];
+    if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); return; }
+    var custom = !!(modalItemCodeCustom && modalItemCodeCustom.checked);
     var code = Z.normalizeCode(modalItemCode.value);
     if (!code) {
-        if (itemContext.itemMode === 'add') {
-            code = generateItemCode(parentCode);
-            if (!code) return;
-            modalItemCode.value = code;
-        } else {
-            toast('编码不能为空', 'error');
-            return;
-        }
+        code = itemContext.autoCode || generateItemCode(parentCode);
+        if (!code) return;
+    }
+    if (itemContext.itemMode === 'add' && !custom) {
+        code = itemContext.autoCode || code;
     }
     var originalCode = itemContext.originalCode;
-    var duplicated = items.some(function (item) {
-        return item && item.code === code && (!originalCode || item.code !== originalCode);
-    });
-    if (duplicated) { toast('编码已存在：' + code, 'error'); return; }
+    if (custom) {
+        var formatError = validateItemCodeFormat(code, parentCode);
+        if (formatError) { toast(formatError, { type: 'error', duration: 7000 }); modalItemCode.focus(); return; }
+        if (findCodeCollision(code, originalCode)) {
+            toast('编码已被占用（节点与库存编码全局唯一）：' + code, { type: 'error', duration: 7000 });
+            return;
+        }
+    } else if (itemContext.itemMode === 'edit') {
+        // 未开启“自定义编码”时，编码只读
+        code = originalCode;
+    }
+    modalItemCode.value = code;
     var values = collectItemFormValues();
     var op;
     if (itemContext.itemMode === 'add') {
@@ -2294,7 +3532,7 @@ function updateDeleteConfirmState() {
 }
 
 function showDeleteConfirm(opts) {
-    deleteState = { code: opts.code, onConfirm: opts.onConfirm };
+    deleteState = { code: opts.code, onConfirm: opts.onConfirm, okText: opts.okText || '确认删除' };
     setText(deleteConfirmTitle, opts.title || '确认删除');
     deleteConfirmMessage.textContent = opts.message || '';
     setText(deleteConfirmCode, opts.code);
@@ -2302,7 +3540,7 @@ function showDeleteConfirm(opts) {
     setText(deleteConfirmStatus, '');
     deleteConfirmOk.disabled = true;
     deleteConfirmCancel.disabled = false;
-    deleteConfirmOk.textContent = '确认删除';
+    deleteConfirmOk.textContent = deleteState.okText;
     deleteConfirmOverlay.classList.add('active');
     setTimeout(function () { deleteConfirmInput.focus(); }, 40);
 }
@@ -2318,9 +3556,9 @@ function confirmDelete() {
     var state = deleteState;
     deleteConfirmOk.disabled = true;
     deleteConfirmCancel.disabled = true;
-    deleteConfirmOk.textContent = '删除中…';
+    deleteConfirmOk.textContent = '处理中…';
     Promise.resolve(state.onConfirm()).then(function (ok) {
-        deleteConfirmOk.textContent = '确认删除';
+        deleteConfirmOk.textContent = state.okText || '确认删除';
         deleteConfirmCancel.disabled = false;
         if (ok) {
             deleteConfirmOverlay.classList.remove('active');
@@ -2335,30 +3573,31 @@ function deleteNode(code) {
     if (readOnly) { toast('当前为只读保护状态，无法删除。请先重试加载。', 'error'); return; }
     if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
     var entry = findNodeEntry(code);
-    if (!entry) { toast('节点不存在或已被删除', 'error'); return; }
-    var counts = Z.countDescendants(entry.node);
+    if (!entry || Z.isDeleted(entry.node)) { toast('节点不存在或已在回收站', 'error'); return; }
+    var counts = countNodeContents(entry.node, false);
     var baseNode = baseNodeOf(code);
-    var parts = ['将删除节点「' + code + '」'];
-    if (counts.children > 0) parts.push('其下 ' + counts.children + ' 个子类');
-    if (counts.items > 0) parts.push('其下 ' + counts.items + ' 个库存');
-    var message = parts.join('，') + '。此操作不可撤销。';
+    var parts = ['将把节点「' + code + '」'];
+    if (counts.children > 0) parts.push('及其下 ' + counts.children + ' 个子类');
+    if (counts.items > 0) parts.push('、' + counts.items + ' 个库存');
+    var message = parts.join('') + '移入回收站。\n数据仍保留在 Gist 中，可在“数据 → 回收站”中恢复。';
     showDeleteConfirm({
-        title: '删除节点',
+        title: '移入回收站',
         code: code,
+        okText: '移入回收站',
         message: message,
         onConfirm: function () {
-            deleteConfirmStatus.textContent = '删除中…';
-            return saveWithOps([{ type: 'node.delete', code: code, baseNode: baseNode ? Z.clone(baseNode) : null }], {
-                successMessage: '已删除节点 ' + code,
-                onError: function (err, tip) { deleteConfirmStatus.textContent = '删除失败：' + tip; }
+            deleteConfirmStatus.textContent = '处理中…';
+            return saveWithOps([{
+                type: 'node.upsert',
+                code: code,
+                originalCode: code,
+                parentCode: null,
+                baseNode: baseNode ? Z.clone(baseNode) : null,
+                fields: { deletedAt: new Date().toISOString() }
+            }], {
+                successMessage: '已将节点 ' + code + ' 移入回收站（' + counts.children + ' 个子类 / ' + counts.items + ' 个库存）',
+                onError: function (err, tip) { deleteConfirmStatus.textContent = '操作失败：' + tip; }
             }).then(function (result) {
-                if (result) {
-                    if (result.unchanged && result.conflicts && result.conflicts.length) {
-                        toast('检测到远端修改，已按你的选择取消删除节点 ' + code, { type: 'warn', duration: 5000 });
-                    } else {
-                        toast('已删除节点 ' + code + '（' + counts.children + ' 个子类 / ' + counts.items + ' 个库存）', 'success');
-                    }
-                }
                 return !!result;
             });
         }
@@ -2369,32 +3608,28 @@ function deleteItem(parentCode, itemCode) {
     if (readOnly) { toast('当前为只读保护状态，无法删除。请先重试加载。', 'error'); return; }
     if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
     var parent = findNodeByCode(parentCode);
-    if (!parent) { toast('父节点不存在或已被删除', 'error'); return; }
+    if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); return; }
     var item = Z.findItem(parent, itemCode);
-    if (!item) { toast('库存项不存在或已被删除', 'error'); return; }
+    if (!item || Z.isDeleted(item)) { toast('库存项不存在或已在回收站', 'error'); return; }
     var baseItem = baseItemOf(parentCode, itemCode);
     showDeleteConfirm({
-        title: '删除库存',
+        title: '移入回收站',
         code: itemCode,
-        message: '将删除库存「' + itemCode + '」（影响库存：1 项）。此操作不可撤销。',
+        okText: '移入回收站',
+        message: '将把库存「' + itemCode + '」移入回收站。\n数据仍保留在 Gist 中，可在“数据 → 回收站”中恢复。',
         onConfirm: function () {
-            deleteConfirmStatus.textContent = '删除中…';
+            deleteConfirmStatus.textContent = '处理中…';
             return saveWithOps([{
-                type: 'item.delete',
+                type: 'item.upsert',
                 parentCode: parentCode,
                 code: itemCode,
-                baseItem: baseItem ? Z.clone(baseItem) : null
+                originalCode: itemCode,
+                baseItem: baseItem ? Z.clone(baseItem) : null,
+                fields: { deletedAt: new Date().toISOString() }
             }], {
-                successMessage: '已删除库存 ' + itemCode,
-                onError: function (err, tip) { deleteConfirmStatus.textContent = '删除失败：' + tip; }
+                successMessage: '已将库存 ' + itemCode + ' 移入回收站',
+                onError: function (err, tip) { deleteConfirmStatus.textContent = '操作失败：' + tip; }
             }).then(function (result) {
-                if (result) {
-                    if (result.unchanged && result.conflicts && result.conflicts.length) {
-                        toast('检测到远端修改，已按你的选择取消删除库存 ' + itemCode, { type: 'warn', duration: 5000 });
-                    } else {
-                        toast('已删除库存 ' + itemCode, 'success');
-                    }
-                }
                 return !!result;
             });
         }
@@ -2424,18 +3659,21 @@ function batchPrintItems(parentCode) {
     var selected = getSelectedItems(parentCode);
     if (!selected.length) { toast('请先选择要打印的库存项', 'warn'); return; }
     var parent = findNodeByCode(parentCode);
-    if (!parent) return;
-    var dataList = selected.map(function (itemCode) {
+    if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'warn'); return; }
+    var dataList = [];
+    selected.forEach(function (itemCode) {
         var item = Z.findItem(parent, itemCode);
-        return {
+        if (!item || Z.isDeleted(item)) return;
+        dataList.push({
             code: itemCode,
-            name: item ? (item.name || parent.name || '') : (parent.name || ''),
-            cost: item ? item.cost : undefined,
-            orderNumber: item ? item.orderNumber : undefined,
-            trackingNumber: item ? item.trackingNumber : undefined,
-            qrLinks: item ? item.qrLinks : undefined
-        };
+            name: item.name || parent.name || '',
+            cost: item.cost,
+            orderNumber: item.orderNumber,
+            trackingNumber: item.trackingNumber,
+            qrLinks: item.qrLinks
+        });
     });
+    if (!dataList.length) { toast('所选库存均已在回收站，无法打印', 'warn'); return; }
     openPrintPreview(dataList);
 }
 
@@ -2455,13 +3693,13 @@ function applyBatchStatus() {
     if (readOnly) { toast('当前为只读保护状态，无法保存。请先重试加载。', 'error'); return; }
     if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
     var parent = findNodeByCode(batchContext.parentCode);
-    if (!parent) { toast('父节点不存在或已被删除', 'error'); batchStatusOverlay.classList.remove('active'); return; }
+    if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); batchStatusOverlay.classList.remove('active'); return; }
     var target = Z.normalizeStatus(batchStatusSelect.value);
     var baseParent = Z.findNodeByCode(baseDoc.products, batchContext.parentCode);
     var ops = [];
     batchContext.itemCodes.forEach(function (itemCode) {
         var item = Z.findItem(parent, itemCode);
-        if (!item) return;
+        if (!item || Z.isDeleted(item)) return;
         if (Z.normalizeStatus(item.status) === target) return;
         var baseItem = baseParent ? Z.findItem(baseParent, itemCode) : null;
         ops.push({
@@ -2481,6 +3719,25 @@ function applyBatchStatus() {
         batchStatusSave.textContent = '确定修改';
         if (result) batchStatusOverlay.classList.remove('active');
     });
+}
+
+// ---------- 数据菜单动作 ----------
+function closeDataMenu() {
+    if (dataMenu) dataMenu.classList.remove('open');
+}
+function handleDataMenuAction(action) {
+    if (readOnly) {
+        toast('当前为只读保护状态，数据工具不可用。请先重试加载。', { type: 'error', duration: 6000 });
+        return;
+    }
+    switch (action) {
+        case 'export': exportBackupFile('manual'); break;
+        case 'import': importFile.click(); break;
+        case 'inspect': runInspect(); break;
+        case 'history': openHistoryModal(); break;
+        case 'snapshots': openSnapshotsModal(); break;
+        case 'recycle': openRecycleModal(); break;
+    }
 }
 
 // ============================================================
@@ -2518,15 +3775,70 @@ loadErrorLogin.addEventListener('click', showLoginForm);
 treeContainer.addEventListener('click', onTreeClick);
 treeContainer.addEventListener('change', onTreeChange);
 
+// 数据菜单
+dataMenuBtn.addEventListener('click', function (event) {
+    event.stopPropagation();
+    dataMenu.classList.toggle('open');
+});
+document.addEventListener('click', function (event) {
+    if (!dataMenu.classList.contains('open')) return;
+    if (dataMenu.contains(event.target) || event.target === dataMenuBtn) return;
+    closeDataMenu();
+});
+dataMenu.addEventListener('click', function (event) {
+    var btn = event.target.closest('[data-menu-action]');
+    if (!btn) return;
+    var action = btn.getAttribute('data-menu-action');
+    closeDataMenu();
+    handleDataMenuAction(action);
+});
+importFile.addEventListener('change', function () {
+    var file = importFile.files && importFile.files[0];
+    importFile.value = '';
+    if (file) handleImportFile(file);
+});
+
+// 自定义编码开关（默认关闭 = 自动编码且只读）
+modalNodeCodeCustom.addEventListener('change', function () {
+    updateNodeCodeUI();
+    if (!modalNodeCodeCustom.checked && editContext) {
+        modalNodeCode.value = editContext.autoCode || editContext.originalCode || '';
+    } else if (modalNodeCodeCustom.checked) {
+        modalNodeCode.focus();
+    }
+});
+modalItemCodeCustom.addEventListener('change', function () {
+    updateItemCodeUI();
+    if (!modalItemCodeCustom.checked && itemContext) {
+        modalItemCode.value = itemContext.autoCode || itemContext.originalCode || '';
+    } else if (modalItemCodeCustom.checked) {
+        modalItemCode.focus();
+    }
+});
+
+// 通用确认弹窗
+confirmCancel.addEventListener('click', cancelConfirm);
+confirmOk.addEventListener('click', handleConfirmOk);
+confirmRequireInput.addEventListener('input', updateConfirmState);
+confirmRequireInput.addEventListener('keydown', function (event) {
+    if (event.key === 'Enter' && !confirmOk.disabled) {
+        event.preventDefault();
+        handleConfirmOk();
+    }
+});
+
 // Esc 关闭 / Enter 保存
 document.addEventListener('keydown', function (event) {
     var key = event.key;
     if (key === 'Escape') {
+        if (dataMenu.classList.contains('open')) { closeDataMenu(); return; }
+        if (confirmOverlay.classList.contains('active')) { cancelConfirm(); return; }
         if (conflictOverlay.classList.contains('active')) { finishConflict('cancel'); return; }
         if (deleteConfirmOverlay.classList.contains('active')) { cancelDelete(); return; }
         if (modalNodeOverlay.classList.contains('active')) { closeNodeModal(); return; }
         if (modalItemOverlay.classList.contains('active')) { closeItemModal(); return; }
         if (batchStatusOverlay.classList.contains('active')) { batchStatusOverlay.classList.remove('active'); return; }
+        if (dataModalOverlay.classList.contains('active')) { closeDataModal(); return; }
         if (printPreviewOverlay.classList.contains('active')) { printPreviewOverlay.classList.remove('active'); return; }
         return;
     }
@@ -3005,13 +4317,17 @@ window.openBatchStatus = openBatchStatus;
         fillStatusSelect(batchStatusSelect, STATUS.ON_SALE);
         fillStatusSelect(modalNodeStatus, STATUS.ON_SALE);
         updateSyncMeta();
+        updateRecycleCount();
 
-        var savedToken = Z.storage.get(STORAGE_KEYS.TOKEN, '');
-        var savedGistId = Z.storage.get(STORAGE_KEYS.GIST_ID, '');
-        var savedFilename = Z.storage.get(STORAGE_KEYS.FILENAME, 'data.json');
+        var savedToken = readCred(STORAGE_KEYS.TOKEN);
+        var savedGistId = readCred(STORAGE_KEYS.GIST_ID);
+        var savedFilename = readCred(STORAGE_KEYS.FILENAME) || 'data.json';
+        var remembered = false;
+        try { remembered = !!window.localStorage.getItem(STORAGE_KEYS.TOKEN); } catch (e) { remembered = false; }
         loginToken.value = savedToken;
         loginGistId.value = savedGistId || DEFAULT_GIST_ID;
         loginFilename.value = savedFilename;
+        if (loginRemember) loginRemember.checked = remembered || !savedToken;
         if (savedToken && savedGistId) {
             performLogin({ silent: true });
         } else {
@@ -3019,7 +4335,7 @@ window.openBatchStatus = openBatchStatus;
         }
     })();
 
-    console.log('管理后台已加载（ZCFI 核心版：ops 保存 / 三方合并 / 严格加载）');
+    console.log('管理后台已加载（ZCFI R2a：软删除/回收站/导入导出/历史恢复/本地快照/编码规范）');
 </script>
 </body>
 </html>
