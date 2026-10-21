@@ -30,7 +30,7 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '2.0.0';
+    var VERSION = '2.1.0';
     var API_ROOT = 'https://api.github.com';
     var INVISIBLE_RE = /[\u200B-\u200D\u2060\uFEFF]/g;
     var DEFAULT_TIMEOUT = 15000;
