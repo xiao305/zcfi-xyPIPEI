@@ -500,16 +500,18 @@
         var text = file.content;
         // GitHub 对超过约 1MB 的文件会截断 content，此时尝试用 raw_url 拉全量
         if (file.truncated) {
+            var rawSucceeded = false;
             if (file.raw_url) {
                 try {
                     var rawResp = await fetchWithTimeout(file.raw_url, {}, DEFAULT_TIMEOUT);
                     if (rawResp.ok) {
                         text = await rawResp.text();
+                        rawSucceeded = true;
                     }
                 } catch (e) { /* 回退到报错 */ }
             }
-            if (typeof text !== 'string' || !text) {
-                throw makeError('TRUNCATED', '数据文件过大已被 GitHub 截断（' + (file.size || '?') + ' 字节）');
+            if (!rawSucceeded || typeof text !== 'string' || !text) {
+                throw makeError('TRUNCATED', '数据文件过大已被 GitHub 截断（' + (file.size || '?') + ' 字节），且无法读取完整内容');
             }
         }
         if (typeof text !== 'string' || !text.trim()) {
