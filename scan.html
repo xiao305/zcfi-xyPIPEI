@@ -568,6 +568,18 @@
         .result-item.clickable { cursor: pointer; border-radius: 8px; }
         .result-item.clickable:hover { background: #eff6ff; }
         .result-item.clickable:focus { outline: 2px solid #93c5fd; outline-offset: 1px; }
+        .result-item.deleted { opacity: .62; }
+        .result-item.deleted.clickable:hover { background: #f8fafc; }
+        .deleted-badge {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 0 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
         /* 清空历史撤销条 */
         .undo-bar {
             position: fixed;
@@ -614,6 +626,28 @@
                 calc(16px + env(safe-area-inset-bottom, 0px));
         }
         .login-box { margin: 6vh auto 24px; }
+        /* 记住登录（勾选=localStorage；取消=sessionStorage） */
+        .login-box label.login-remember {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 44px;
+            margin-top: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .login-box label.login-remember input {
+            width: 20px;
+            height: 20px;
+            accent-color: #2563eb;
+            margin: 0;
+        }
+        .login-note {
+            font-size: 12px;
+            color: #64748b;
+            line-height: 1.6;
+            margin: 6px 0 0;
+        }
         /* 页脚 */
         .app-footer {
             margin-top: 8px;
@@ -642,6 +676,11 @@
         <input type="text" id="login-gistid" value="f13d97c430522e4851afbf3cd2331e14" />
         <label>文件名</label>
         <input type="text" id="login-filename" value="data.json" />
+        <label class="login-remember" for="login-remember">
+            <input type="checkbox" id="login-remember" checked />
+            记住登录（本机）
+        </label>
+        <p class="login-note">Token 仅保存在本机浏览器（localStorage/sessionStorage），不会上传到任何服务器。</p>
         <div class="btn-group" style="margin-top:20px; justify-content:flex-end;">
             <button class="btn btn-primary" id="login-btn">登录</button>
         </div>
@@ -946,6 +985,7 @@
     const loginGistId = document.getElementById('login-gistid');
     const loginFilename = document.getElementById('login-filename');
     const loginBtn = document.getElementById('login-btn');
+    const loginRemember = document.getElementById('login-remember');
     const loginError = document.getElementById('login-error');
     const appContainer = document.getElementById('app-container');
     const logoutBtn = document.getElementById('logout-btn');
@@ -1221,6 +1261,8 @@
                 updateSyncUI();
                 if (wasOffline) toast('已恢复在线，数据已更新', 'success');
                 else if (options.manual) toast('数据已更新', 'success');
+                // 数据刷新后重新计算历史条目的“已删除”标记
+                if (history.length) renderHistory();
                 // 详情抽屉打开时尽量同步刷新显示；正在编辑备注则不打断
                 if (productDetailOverlay.classList.contains('active') &&
                     !document.querySelector('#detail-content .remark-edit-area.active')) {
@@ -1499,6 +1541,38 @@
         return { key: dateText, dateText: dateText, relative: relative };
     }
 
+    function findNodeStateInTree(container, targetCode, inheritedDeleted) {
+        if (!Z.isPlainObject(container)) return null;
+        const keys = Object.keys(container);
+        for (let i = 0; i < keys.length; i += 1) {
+            const key = keys[i];
+            const node = container[key];
+            if (!node || typeof node !== 'object') continue;
+            const deleted = inheritedDeleted || Z.isDeleted(node);
+            if (key === targetCode) return { found: true, deleted: deleted, node: node };
+            if (Z.isPlainObject(node.children)) {
+                const found = findNodeStateInTree(node.children, targetCode, deleted);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    function historyRefDeleted(ref) {
+        if (!ref || !currentToken || !gistData || !Z.isPlainObject(gistData.products)) return false;
+        if (ref.type === 'node') {
+            const state = findNodeStateInTree(gistData.products, ref.code, false);
+            return !state || state.deleted;
+        }
+        if (ref.type === 'item') {
+            const parentState = findNodeStateInTree(gistData.products, ref.parentCode, false);
+            if (!parentState || parentState.deleted) return true;
+            const item = Z.findItem(parentState.node, ref.itemCode);
+            return !item || Z.isDeleted(item);
+        }
+        return false;
+    }
+
     function renderHistory() {
         if (!history.length) {
             // 静态字符串，不含用户数据
@@ -1520,10 +1594,15 @@
             }
             const time = Z ? Z.formatTime(item.time) : String(item.time);
             const clickable = !!item.ref;
-            html += '<div class="result-item' + (clickable ? ' clickable' : '') + '"' +
-                (clickable ? ' data-history-index="' + index + '" role="button" tabindex="0" title="点击回看"' : '') + '>' +
+            const deletedRef = historyRefDeleted(item.ref);
+            const itemClass = 'result-item' + (clickable ? ' clickable' : '') + (deletedRef ? ' deleted' : '');
+            const itemTitle = deletedRef ? '该商品已删除，请到后台回收站恢复' : '点击回看';
+            html += '<div class="' + itemClass + '"' +
+                (clickable ? ' data-history-index="' + index + '" role="button" tabindex="0" title="' + esc(itemTitle) + '"' : '') + '>' +
                 '<div><span class="timestamp">' + esc(time) + '</span> ' +
-                '<span class="type-badge">' + esc(item.typeLabel) + '</span></div>' +
+                '<span class="type-badge">' + esc(item.typeLabel) + '</span>' +
+                (deletedRef ? '<span class="deleted-badge">已删除</span>' : '') +
+                '</div>' +
                 '<div class="content">' + esc(item.detail) + '</div>' +
                 (item.debug ? '<div class="debug-info">' + esc(item.debug) + '</div>' : '') +
                 '</div>';
@@ -1630,6 +1709,67 @@
         return result;
     }
 
+    // ============================================================
+    // 凭据存储（与 admin 一致：sessionStorage 优先，勾选记住才写 localStorage）
+    // ============================================================
+    function readStoredCredential(key) {
+        try {
+            const sessionValue = window.sessionStorage.getItem(key);
+            if (sessionValue !== null && sessionValue !== '') return sessionValue;
+        } catch (e) { /* sessionStorage 不可用时回退 */ }
+        return Z ? Z.storage.get(key, '') : '';
+    }
+
+    function writeStoredCredential(key, value, remember) {
+        try {
+            if (remember) {
+                window.localStorage.setItem(key, value);
+                window.sessionStorage.removeItem(key);
+            } else {
+                window.sessionStorage.setItem(key, value);
+                window.localStorage.removeItem(key);
+            }
+        } catch (e) {
+            // 隐私模式等异常：至少用 core 的 localStorage 封装兜底
+            if (Z) Z.storage.set(key, value);
+        }
+    }
+
+    function saveCredentials(token, gistId, filename, remember) {
+        writeStoredCredential(STORAGE_KEYS.TOKEN, token, remember);
+        writeStoredCredential(STORAGE_KEYS.GIST_ID, gistId, remember);
+        writeStoredCredential(STORAGE_KEYS.FILENAME, filename, remember);
+    }
+
+    function clearCredentials() {
+        [STORAGE_KEYS.TOKEN, STORAGE_KEYS.GIST_ID, STORAGE_KEYS.FILENAME].forEach(function (key) {
+            try { window.localStorage.removeItem(key); } catch (e) { /* ignore */ }
+            try { window.sessionStorage.removeItem(key); } catch (e) { /* ignore */ }
+            if (Z) Z.storage.remove(key);
+        });
+    }
+
+    function hasSessionCredential(key) {
+        try {
+            const value = window.sessionStorage.getItem(key);
+            return value !== null && value !== '';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function hasLocalCredential(key) {
+        try { return !!window.localStorage.getItem(key); } catch (e) { return false; }
+    }
+
+    /** 自动登录前清理“另一种存储”的残留：session 有值则以 session 为准 */
+    function pruneStaleCredentials() {
+        if (!hasSessionCredential(STORAGE_KEYS.TOKEN)) return;
+        [STORAGE_KEYS.TOKEN, STORAGE_KEYS.GIST_ID, STORAGE_KEYS.FILENAME].forEach(function (key) {
+            try { window.localStorage.removeItem(key); } catch (e) { /* ignore */ }
+        });
+    }
+
     async function performLogin() {
         if (loginBusy) return;
         const token = loginToken.value.trim();
@@ -1646,7 +1786,7 @@
         loginError.textContent = '';
         try {
             const result = await loadDocument(token, gistId, filename);
-            // 仅在读取彻底成功后，才切换页面状态并落 localStorage
+            // 仅在读取彻底成功后，才切换页面状态并保存凭据
             currentToken = token;
             currentGistId = gistId;
             currentFilename = filename;
@@ -1655,9 +1795,7 @@
             dataUpdatedAt = result.updatedAt || null;
             lastSyncAt = new Date();
             offlineMode = false;
-            Z.storage.set(STORAGE_KEYS.TOKEN, token);
-            Z.storage.set(STORAGE_KEYS.GIST_ID, gistId);
-            Z.storage.set(STORAGE_KEYS.FILENAME, filename);
+            saveCredentials(token, gistId, filename, !!(loginRemember && loginRemember.checked));
 
             loginOverlay.classList.remove('active');
             appContainer.style.display = 'block';
@@ -1699,9 +1837,7 @@
         closeSettings();
         hideUndoBar();
         await stopScan().catch(function () {});
-        Z.storage.remove(STORAGE_KEYS.TOKEN);
-        Z.storage.remove(STORAGE_KEYS.GIST_ID);
-        Z.storage.remove(STORAGE_KEYS.FILENAME);
+        clearCredentials();
         currentToken = '';
         currentGistId = '';
         currentFilename = 'data.json';
@@ -1720,6 +1856,7 @@
         loginToken.value = '';
         loginGistId.value = 'f13d97c430522e4851afbf3cd2331e14';
         loginFilename.value = 'data.json';
+        if (loginRemember) loginRemember.checked = true;
         productDetailOverlay.classList.remove('active');
         associateOverlay.classList.remove('active');
         notFoundOverlay.classList.remove('active');
@@ -3031,9 +3168,14 @@
     }
 
     (function autoLogin() {
-        const token = Z ? Z.storage.get(STORAGE_KEYS.TOKEN, '') : '';
-        const gistId = Z ? Z.storage.get(STORAGE_KEYS.GIST_ID, '') : '';
-        const filename = (Z ? Z.storage.get(STORAGE_KEYS.FILENAME, '') : '') || 'data.json';
+        pruneStaleCredentials();
+        const token = readStoredCredential(STORAGE_KEYS.TOKEN);
+        const gistId = readStoredCredential(STORAGE_KEYS.GIST_ID);
+        const filename = readStoredCredential(STORAGE_KEYS.FILENAME) || 'data.json';
+        if (loginRemember) {
+            loginRemember.checked = !hasSessionCredential(STORAGE_KEYS.TOKEN) &&
+                (hasLocalCredential(STORAGE_KEYS.TOKEN) || !token);
+        }
         if (token && gistId) {
             loginToken.value = token;
             loginGistId.value = gistId;
