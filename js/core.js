@@ -363,6 +363,88 @@
         return result;
     }
 
+    /** 软删除标记（回收站） */
+    function isDeleted(entity) {
+        return !!(entity && typeof entity === 'object' && entity.deletedAt);
+    }
+
+    /**
+     * 深度校验 + 数据体检。
+     * 返回 { ok, errors:[], warnings:[], stats:{nodes,items} }
+     * errors 表示结构损坏（应阻止导入/以只读处理），warnings 仅提示。
+     */
+    function validateDocDeep(data) {
+        var errors = [];
+        var warnings = [];
+        var seenNode = Object.create(null);
+        var seenItem = Object.create(null);
+        var seenTracking = Object.create(null);
+        var seenOrder = Object.create(null);
+
+        try {
+            validateDoc(data);
+        } catch (e) {
+            return { ok: false, errors: [e.message], warnings: warnings, stats: { nodes: 0, items: 0 } };
+        }
+
+        function walkNodes(container) {
+            for (var key in container) {
+                if (!Object.prototype.hasOwnProperty.call(container, key)) continue;
+                var node = container[key];
+                if (!isPlainObject(node)) {
+                    errors.push('节点「' + key + '」不是对象');
+                    continue;
+                }
+                if (seenNode[key]) errors.push('节点编码重复：' + key);
+                seenNode[key] = true;
+                if (!node.name && !isDeleted(node)) warnings.push('节点「' + key + '」缺少名称');
+                if (node.children !== undefined && !isPlainObject(node.children)) {
+                    errors.push('节点「' + key + '」的 children 不是对象');
+                }
+                if (node.items !== undefined && !Array.isArray(node.items)) {
+                    errors.push('节点「' + key + '」的 items 不是数组');
+                }
+                if (node.qrLinks !== undefined && !Array.isArray(node.qrLinks)) {
+                    warnings.push('节点「' + key + '」的 qrLinks 不是数组，扫码匹配可能失效');
+                }
+                if (Array.isArray(node.items)) {
+                    node.items.forEach(function (item, idx) {
+                        if (!isPlainObject(item)) {
+                            errors.push('节点「' + key + '」第 ' + (idx + 1) + ' 个库存不是对象');
+                            return;
+                        }
+                        if (!item.code) {
+                            errors.push('节点「' + key + '」存在无编码库存（第 ' + (idx + 1) + ' 个）');
+                        } else {
+                            if (seenItem[item.code]) errors.push('库存编码重复：' + item.code);
+                            seenItem[item.code] = true;
+                            if (item.code.indexOf(key + '/') !== 0) {
+                                warnings.push('库存编码前缀与父节点不一致：' + item.code + '（父节点 ' + key + '）');
+                            }
+                        }
+                        if (item.trackingNumber) {
+                            if (seenTracking[item.trackingNumber]) warnings.push('快递单号重复：' + item.trackingNumber);
+                            seenTracking[item.trackingNumber] = true;
+                        }
+                        if (item.orderNumber) {
+                            if (seenOrder[item.orderNumber]) warnings.push('订单号重复：' + item.orderNumber);
+                            seenOrder[item.orderNumber] = true;
+                        }
+                    });
+                }
+                if (isPlainObject(node.children)) walkNodes(node.children);
+            }
+        }
+
+        walkNodes(data.products);
+        return {
+            ok: errors.length === 0,
+            errors: errors,
+            warnings: warnings,
+            stats: { nodes: Object.keys(seenNode).length, items: Object.keys(seenItem).length }
+        };
+    }
+
     /** 校验文档基本结构 */
     function validateDoc(data) {
         if (!isPlainObject(data)) throw makeError('SCHEMA', '数据结构异常：根节点不是对象');
@@ -501,6 +583,45 @@
             revision = body.history[0].version;
         }
         return { updatedAt: (body && body.updated_at) || null, revision: revision, size: text.length };
+    }
+
+    /** 列出 Gist 历史版本：→ [{ version, committedAt, changeStatus, url }] */
+    async function history(token, gistId) {
+        if (!token || !gistId) throw makeError('AUTH', '缺少 Token 或 Gist ID');
+        var url = API_ROOT + '/gists/' + encodeURIComponent(gistId);
+        var resp = await fetchWithTimeout(url, {
+            headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
+        }, DEFAULT_TIMEOUT);
+        var body = null;
+        try { body = await resp.json(); } catch (e) { body = null; }
+        if (!resp.ok) throw httpError(resp, body, '读取历史版本');
+        return (body && body.history ? body.history : []).map(function (h) {
+            return {
+                version: h.version,
+                committedAt: h.committed_at,
+                changeStatus: h.change_status,
+                url: h.url
+            };
+        });
+    }
+
+    /** 读取指定历史版本的数据 → { data, updatedAt, revision } */
+    async function getAtRevision(token, gistId, sha, filename) {
+        if (!token || !gistId || !sha) throw makeError('AUTH', '缺少 Token / Gist ID / 版本号');
+        if (!filename) filename = 'data.json';
+        var url = API_ROOT + '/gists/' + encodeURIComponent(gistId) + '/' + encodeURIComponent(sha);
+        var resp = await fetchWithTimeout(url, {
+            headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
+        }, DEFAULT_TIMEOUT);
+        var body = null;
+        try { body = await resp.json(); } catch (e) { body = null; }
+        if (!resp.ok) throw httpError(resp, body, '读取历史版本');
+        var files = body && body.files;
+        if (!files || !Object.prototype.hasOwnProperty.call(files, filename)) {
+            throw makeError('FILE_MISSING', '该历史版本中没有文件「' + filename + '」');
+        }
+        var parsed = await parseGistFileContent(files[filename], filename);
+        return { data: parsed.data, updatedAt: body.updated_at || null, revision: sha };
     }
 
     /* ============================================================
@@ -759,9 +880,19 @@
             else if (op.type === 'node.delete') applyNodeDelete(doc, op, baseDoc, decisions, conflicts, i);
             else if (op.type === 'item.upsert') applyItemUpsert(doc, op, baseDoc, decisions, conflicts, i);
             else if (op.type === 'item.delete') applyItemDelete(doc, op, baseDoc, decisions, conflicts, i);
+            else if (op.type === 'doc.replace') applyDocReplace(doc, op);
             else throw makeError('BAD_OP', '未知保存操作：' + op.type);
         }
         return doc;
+    }
+
+    /** 整库替换（仅用于“从备份/历史版本恢复”，需页面二次确认） */
+    function applyDocReplace(doc, op) {
+        if (!op.doc) throw makeError('BAD_OP', '要恢复的数据为空');
+        validateDoc(op.doc);
+        var next = clone(op.doc);
+        // 只替换 products，保留远端根级未知字段
+        doc.products = next.products;
     }
 
     var writeQueues = Object.create(null);
@@ -891,9 +1022,13 @@
         walk: walk,
         countDescendants: countDescendants,
         validateDoc: validateDoc,
+        validateDocDeep: validateDocDeep,
+        isDeleted: isDeleted,
 
         get: get,
         patch: patch,
+        history: history,
+        getAtRevision: getAtRevision,
         save: save,
 
         // 兼容旧命名
