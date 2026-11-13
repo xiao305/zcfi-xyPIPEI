@@ -1,7 +1,7 @@
 # 发布检查清单
 
 适用对象：维护者。每次把页面改动发布到 GitHub Pages 前，按本清单执行。
-当前基线：**`core v2.2.0` + `admin R4` + `scan R3`**（站点版本号 **v2.2.1**，文档更新日期 2026-11-13）。
+当前基线：**`core v2.2.0` + `admin R4` + `scan R3`**（站点版本号 **v2.2.2**，文档更新日期 2026-11-13）。
 
 > ⚠️ 未经用户明确授权，**不要 push 到 GitHub、不要动 `main`、不要删除远端标签**。
 > 发布由用户确认后按第 6 节流程执行；tag 与 commit 在授权后推送。
@@ -83,7 +83,7 @@ node tools/test-lodop-loader.mjs
 - `index.html` 无内联 `<script>`、无 CDN 引用，CSP/referrer meta 存在；
 - `admin.html` / `scan.html` / 站点中无第三方 CDN 引用，扫码库引用本地 `js/vendor/`；
 - 登录页/仓库中无示例 Gist ID、无硬编码默认 Gist ID；
-- README / ARCHITECTURE / CHANGELOG / RELEASE-CHECKLIST 的版本一致性（站点 v2.2.1 / core v2.2.0 / R4 / R3）；
+- README / ARCHITECTURE / CHANGELOG / RELEASE-CHECKLIST 的版本一致性（站点 v2.2.2 / core v2.2.0 / R4 / R3）；
 - 文档中无硬编码的本机绝对路径（旧版本地路径写法）与过期状态表述。
 
 CI：`.github/workflows/ci.yml` 在 push/PR 时自动执行 `node tools/verify.mjs`、`node tools/test-core.mjs`、`node tools/test-lodop-loader.mjs`，并校验 `js/vendor/html5-qrcode.min.js` 的 SHA-256、拒绝跟踪 `local_dev/` 与超过 2 MB 的文件。**CI 不绿不得发布**。
@@ -193,7 +193,8 @@ git tag --list
 - [ ] **无 CDN 引用**：仓库中不存在第三方脚本 CDN 地址，扫码库为 `js/vendor/html5-qrcode.min.js`。
 - [ ] **CSP 存在**：`index.html`、`tools/scanner-test.html` 含 `<meta http-equiv="Content-Security-Policy">`；admin/scan 的 CSP 现状已在文档注明（仍含 `'unsafe-inline'`）。
 - [ ] 仓库中没有 `CLodopFuncs.js` 快照；打印脚本运行时从本机加载。
-- [ ] **HTTPS 页面无混合内容**：线上（或本地 https 环境）打开 `admin.html`，DevTools Network 中不应出现任何 `http://localhost:8000` 请求；地址栏不应因打印脚本变成「不安全」。
+- [ ] **页面加载/登录时不请求本机服务**：打开 `admin.html`（未点打印）后 DevTools Network 中不应出现任何 localhost/127.0.0.1 请求，也不应弹出「访问本地网络/设备」授权。
+- [ ] **打印按需连接**：点打印/预览后才请求本机服务（优先 `http://localhost:8000`），允许本地网络后状态变「已就绪」。
 - [ ] **打印服务就绪**：已装 C-Lodop 的机器上，admin 顶部显示「✅ 打印服务已就绪（N 台打印机）」；未安装时明确提示证书/未启动，不误报。
 - [ ] **备份 tag 已推送**：本次发布 tag 已创建并已推送到远端（`git ls-remote --tags origin` 可见），远端有可回滚点。
 

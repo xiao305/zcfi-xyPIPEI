@@ -9,7 +9,7 @@
 - 扫码端：**R3**（R2 `9dc7bcf` + 一致性修复 `09afad0` + 本轮 R3 修复）
 - 站点：GitHub Pages 静态站，自定义域名 `xypipei.zcfi.cn`；根路径为导航页，`/admin`、`/scan` 为功能入口
 - 文档与代码同步日期：**2026-11-13**
-- 页面版本：**v2.2.1**（admin `R4 · v2.2.1` / scan `R3 · v2.2.1`；v2.2.1 修复 C-Lodop 连接判定与 HTTPS 混合内容）
+- 页面版本：**v2.2.2**（admin `R4 · v2.2.2` / scan `R3 · v2.2.2`；v2.2.2：打印服务改为按需连接、`http://localhost:8000` 优先以绕开 8443 过期证书；v2.2.1：C-Lodop 连接判定修复）
 
 ---
 
@@ -48,7 +48,7 @@
 | --- | --- | --- |
 | `html5-qrcode` | 摄像头/图片扫码 | **本地** `js/vendor/html5-qrcode.min.js`（自托管，锁 `2.3.8`；来源与 SHA-256 见 `js/vendor/README.md`，CI 校验哈希） |
 | `js/core.js` | 共享数据层（读/存/合并/凭据/转义） | 仓库本地，v2.2.0 |
-| `CLodopFuncs.js` | 加载本机 C-Lodop 打印服务 | **运行时从本机加载，不入库**。HTTPS 页面只用 `https://localhost.lodop.net:8443/CLodopFuncs.js`（禁止 http，避免混合内容）；HTTP 页面才用 `http://localhost:8000/CLodopFuncs.js`，失败再试 HTTPS |
+| `CLodopFuncs.js` | 加载本机 C-Lodop 打印服务 | **运行时从本机加载，不入库**。**优先 `http://localhost:8000/CLodopFuncs.js`**（localhost 属可信来源，不构成混合内容；可绕开 8443 可能过期的证书），失败再试 `https://localhost.lodop.net:8443`。**页面加载时不主动连接**，仅点打印/预览时按需加载 |
 | GitHub API | Gist 读写/历史 | `api.github.com` |
 | Gist raw | 大文件回退读取 | `gist.githubusercontent.com` |
 
@@ -309,7 +309,7 @@ ZCFI.save()
 | --- | --- | --- | --- |
 | `api.github.com` | 登录、读取、保存、历史版本 | Token（仅 `Authorization` 头）、Gist 内容 | GitHub 官方 API；Token 不进 URL/Gist/日志。泄露即可读写账号全部 Gist |
 | `gist.githubusercontent.com` | 大文件（>1 MB）`raw_url` 回退 | 公开/Secret Gist 的 raw 内容 | 无需 Token 即可读取；Secret Gist 的 raw 链接同样可被拿到链接者读取 |
-| `https://localhost.lodop.net:8443` / `http://localhost:8000` | 打印 | 标签数据（名称/编码/单号等） | **本机** C-Lodop 服务，运行时加载的第三方脚本通道；自签证书需手动信任；只应在本机使用。**HTTPS 页面只允许 https:8443，绝不加载 http:8000**（混合内容会让地址栏显示“不安全”） |
+| `https://localhost.lodop.net:8443` / `http://localhost:8000` | 打印（仅点打印/预览时才访问） | 标签数据（名称/编码/单号等） | **本机** C-Lodop 服务，运行时加载的第三方脚本通道；只应在本机使用。**优先 http://localhost:8000**（localhost 属可信来源，不构成混合内容；可绕开 8443 可能过期的证书），失败再试 https:8443。页面加载/登录时**不发起**本机请求 |
 | CDN（原第三方脚本源） | — | — | **已移除**：`html5-qrcode` 自托管到 `js/vendor/`，站点不再从 CDN 加载脚本 |
 
 ### 8.3 CSP 现状与残留
@@ -338,6 +338,8 @@ ZCFI.save()
 - **Secret Gist 非私有**：无法阻止拿到链接者读取；敏感数据不应放 Gist。
 - **内联脚本导致 CSP 需 `'unsafe-inline'`**：admin/scan 尚未外置脚本，严格 CSP 是后续项。
 - Gist 单文件约 1 MB 限制；超大数据的拆分/压缩策略尚未实现；>1.5 MB 自动快照跳过。
+- **本机 C-Lodop 8443 证书可能过期**（实测 `ERR_CERT_DATE_INVALID`）：页面优先 `http://localhost:8000`；两地址都失败时升级/重装 C-Lodop。
+- **浏览器本地网络授权（LNA）**：页面加载/登录时不请求本机服务，仅点打印时按需连接并触发授权提示。
 - 打印必须在本机安装并启动 C-Lodop，效果受本机 C-Lodop/打印机/驱动影响，需**真实打印机现场验收**；内置 canvas 预览只是示意图。
 - 扫码历史仅本机，不跨设备同步；按 gistId 隔离，退出可清理。
 - 编码大小写/重复：后台导入/体检会拦截大小写重复、提示非大写；历史遗留数据仍建议规范化。

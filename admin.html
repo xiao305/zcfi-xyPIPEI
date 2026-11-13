@@ -1433,7 +1433,7 @@
                     <span id="user-status">已登录</span>
                     <span id="sync-time" class="sync-meta">最后同步：—</span>
                     <span id="data-revision" class="sync-meta">版本：未知</span>
-                    <span id="lodop-status" role="status" aria-live="polite">⏳ 正在检测本机 C-Lodop…</span>
+                    <span id="lodop-status" role="status" aria-live="polite">⏳ 打印服务：未检测（点打印时自动连接本机 C-Lodop）</span>
                 </div>
                 <div class="summary-bar" id="summary-bar" aria-label="数据汇总">
                     <span class="summary-chip">节点 <b id="sum-nodes">0</b></span>
@@ -1689,18 +1689,13 @@
 <script>
     /* C-Lodop 运行时加载与就绪判定（v2.2.1 修复）
      * - 不引用仓库根目录的 CLodopFuncs.js（那是作者本机的静态快照），只从本机服务加载；
-     * - 协议选择：HTTPS 页面**只允许** https://localhost.lodop.net:8443，
-     *   绝不回退 http://localhost:8000 —— http 子资源会构成混合内容，浏览器地址栏会显示"不安全"；
-     *   HTTP 页面（本机调试）才用 http://localhost:8000，失败再试 https；
+     * - 协议选择（v2.2.2）：优先 http://localhost:8000（本机 C-Lodop 的 8443 证书可能已过期；
+     *   浏览器把 http://localhost 视为可信来源，https 页面加载它不构成混合内容），失败再试 https://localhost.lodop.net:8443；
      * - 兼容性：本机服务脚本只定义 getCLodop() 与 window.CLODOP，不定义 getLodop()，这里补别名；
      * - 就绪判定：实例存在 + WebSocket 已连接（SocketOpened / readyState=1）+ 能取到打印机数量。 */
     var LODOP_HTTPS_URL = 'https://localhost.lodop.net:8443/CLodopFuncs.js';
     var LODOP_HTTP_URL = 'http://localhost:8000/CLodopFuncs.js';
     var lodopLoaderState = { loading: false, loaded: false, tried: [], lastError: '', lastAttemptAt: 0, scriptLoaded: false, socketOpened: false };
-
-    function lodopIsHttpsPage() {
-        return window.location.protocol === 'https:';
-    }
 
     /** 本机 C-Lodop 6.x 只提供 getCLodop()；网页端惯例写 getLodop()，补一个兼容别名 */
     function lodopEnsureCompatAlias() {
@@ -1786,12 +1781,13 @@
         window.setTimeout = wrapped;
     })();
 
-    function lodopStatusDetail(reason) {        if (reason === 'script') {
-            return '脚本加载失败：未安装/未启动 C-Lodop，或 HTTPS 页面未信任本机证书。请先在浏览器打开 ' +
-                LODOP_HTTPS_URL.replace('/CLodopFuncs.js', '') + ' 并选择"继续访问"，然后刷新本页';
+    function lodopStatusDetail(reason) {
+        if (reason === 'script') {
+            return '无法连接本机 C-Lodop：请确认已安装并启动 C-Lodop；浏览器询问"访问本地网络/其他应用和服务"时请选择允许；' +
+                '若提示 8443 证书过期，请升级/重装 C-Lodop（页面已优先尝试 http://localhost:8000）';
         }
         if (reason === 'socket') {
-            return '已加载 C-Lodop 脚本但服务连接未建立：请确认 C-Lodop 正在运行；HTTPS 页面还需信任本机证书';
+            return '已加载 C-Lodop 脚本但服务连接未建立：请确认 C-Lodop 正在运行，并在浏览器提示"访问本地网络"时选择允许';
         }
         return '';
     }
@@ -1854,8 +1850,8 @@
         }
         lodopLoaderState.loading = true;
         lodopLoaderState.lastAttemptAt = Date.now();
-        // v2.2.1：HTTPS 页面只允许 HTTPS 脚本（绝不加载 http，否则构成混合内容 → 地址栏"不安全"）
-        var urls = lodopIsHttpsPage() ? [LODOP_HTTPS_URL] : [LODOP_HTTP_URL, LODOP_HTTPS_URL];
+        // v2.2.2：http 优先（绕开 C-Lodop 8443 可能过期的证书；localhost 属可信来源，不构成混合内容）
+        var urls = [LODOP_HTTP_URL, LODOP_HTTPS_URL];
         lodopLoaderState.tried = urls.slice();
         function tryScript(url) {
             return loadLodopScript(url).then(function (loaded) {
@@ -1912,13 +1908,9 @@
         }
     };
 
-    // H-2：首屏渲染完成后再在后台探测/加载本机 C-Lodop（不阻塞页面，也不在首屏就注入外部脚本）；
-    // 用户打开打印弹窗时 getLodopInstance() 会立即再次触发 ensureLodopLoaded()。
-    function scheduleInitialLodopLoad() {
-        setTimeout(function () { ensureLodopLoaded(); }, 1200);
-    }
-    if (document.readyState === 'complete') scheduleInitialLodopLoad();
-    else window.addEventListener('load', scheduleInitialLodopLoad);
+    // v2.2.2：页面加载/登录时**不自动请求本机服务**。
+    // 原因：任何 localhost 请求都会触发浏览器的"访问本地网络/其他应用和服务"授权提示；
+    // 旧实现在此阶段请求还可能因 8443 证书过期而失败。现在只在用户点"打印/预览"或显式检测时才加载。
 </script>
 
 <!-- ========== 主脚本（ZCFI 核心：严格加载 / ops 保存 / 字段级三方合并） ========== -->
@@ -5869,7 +5861,7 @@ window.openBatchStatus = openBatchStatus;
         printersAvailable = printers.length > 0;
         if (!printersAvailable) {
             const option = document.createElement('option');
-            option.textContent = '未连接打印机（请检查 C-Lodop / 打印机）';
+            option.textContent = (lodopLoaderState && lodopLoaderState.loading) ? '正在连接本机 C-Lodop…' : '未检测到打印机（点打印会自动连接 C-Lodop）';
             option.disabled = true;
             printerSelect.appendChild(option);
             return { printers: printers, fallback: false };
@@ -5927,6 +5919,15 @@ window.openBatchStatus = openBatchStatus;
 
         selectedTemplateIndex = clampInt(printSettings.templateIndex, 0, printTemplates.length - 1, 0);
         var printerResult = populatePrinters();
+        if (!printersAvailable) {
+            setPrintStatus('正在连接本机 C-Lodop…（首次使用请在浏览器提示"访问本地网络/设备"时选择允许）', false);
+            if (typeof window.ensureLodopLoaded === 'function') {
+                window.ensureLodopLoaded().then(function (ok) {
+                    if (ok) return; // 连上后由 zcfi:lodop-ready 刷新打印机与状态
+                    setPrintStatus('打印服务未连接：确认 C-Lodop 已启动；浏览器提示"访问本地网络"时选允许；若提示 8443 证书过期请升级 C-Lodop。', true);
+                });
+            }
+        }
         printCopiesInput.value = clampInt(printSettings.copies, 1, 100, 1);
         if (printPreviewMode) printPreviewMode.checked = !!printSettings.previewBeforePrint;
 
@@ -6256,8 +6257,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R4 · v2.2.1
-        setText(appVersionEl, 'R4 · v2.2.1 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R4 · v2.2.2
+        setText(appVersionEl, 'R4 · v2.2.2 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         document.querySelectorAll('.modal-overlay .modal, #print-preview-overlay .print-preview-box').forEach(function (el) {
             el.setAttribute('role', 'dialog');
             el.setAttribute('aria-modal', 'true');

@@ -1,9 +1,9 @@
 // admin.html C-Lodop 加载/就绪判定单元测试（vm 沙箱，模拟本机服务脚本）
+// v2.2.2：验证「加载时不自动请求」「http:8000 优先」「getCLodop 兼容」「Socket 判定」
 // 用法：node tools/test-lodop-loader.mjs（CI 必跑，无外部依赖）
 import fs from 'node:fs';
-import vm from 'node:vm';
-
 import path from 'node:path';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
 const ADMIN = path.join(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), 'admin.html');
@@ -13,7 +13,6 @@ const results = [];
 function record(name, ok, detail) { results.push({ name, ok: !!ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`); }
 function eq(a, b, name) { const cond = JSON.stringify(a) === JSON.stringify(b); record(name, cond, `got=${JSON.stringify(a)} want=${JSON.stringify(b)}`); }
 
-// 抽取第一个内联脚本（C-Lodop loader）
 function extractLoaderScript(source) {
     const re = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
     let m;
@@ -36,7 +35,7 @@ function makeInst(opts = {}) {
     };
 }
 
-function createEnv(opts) {
+function createEnv(opts = {}) {
     const requests = [];
     const statusEl = { textContent: '', className: '' };
     const sandbox = {};
@@ -67,23 +66,15 @@ function createEnv(opts) {
             appendChild(script) {
                 const url = script.src;
                 requests.push(url);
-                const behavior = opts.behaviors || {};
+                const spec = (opts.behaviors || {})[url] || 'ok';
                 setTimeout(() => {
-                    const kind = behavior[url] || 'ok';
-                    if (kind === 'error') { if (script.onerror) script.onerror(); return; }
-                    if (kind === 'ok') {
-                        const inst = makeInst(opts);
-                        sandbox.CLODOP = inst;
-                        sandbox.LODOP = inst;
-                        sandbox.getCLodop = function () { return inst; };
-                        if (script.onload) script.onload();
-                    } else if (kind === 'script-no-socket') {
-                        const inst = makeInst({ socketOpen: false, wsReady: false });
-                        sandbox.CLODOP = inst;
-                        sandbox.LODOP = inst;
-                        sandbox.getCLodop = function () { return inst; };
-                        if (script.onload) script.onload();
-                    }
+                    if (spec === 'error') { if (script.onerror) script.onerror(); return; }
+                    const ip = spec === 'ok' ? { socketOpen: true } : spec;
+                    const inst = makeInst(ip);
+                    sandbox.CLODOP = inst;
+                    sandbox.LODOP = inst;
+                    sandbox.getCLodop = function () { return inst; };
+                    if (script.onload) script.onload();
                 }, 1);
             },
         },
@@ -94,71 +85,81 @@ function createEnv(opts) {
 }
 
 async function main() {
-    // 1. HTTPS 页面：只允许 https 脚本；服务连上 → 就绪，且补 getLodop 别名
+    // 1. 加载时不自动请求本机（v2.2.2 关键行为：不再触发浏览器本地网络授权提示）
     {
-        const { sandbox, requests, statusEl } = createEnv({ protocol: 'https:', socketOpen: true });
+        const { sandbox, requests } = createEnv({ protocol: 'https:' });
+        await new Promise((r) => setTimeout(r, 150));
+        eq(requests, [], '页面加载时不自动请求本机 C-Lodop（v2.2.2）');
+        record('ensureLodopLoaded 仍可手动调用', typeof sandbox.ensureLodopLoaded === 'function');
+    }
+
+    // 2. 手动加载（模拟点打印）：HTTPS 页面也优先 http://localhost:8000
+    {
+        const { sandbox, requests, statusEl } = createEnv({ protocol: 'https:', behaviors: { 'http://localhost:8000/CLodopFuncs.js': 'ok' } });
         const ok = await sandbox.ensureLodopLoaded();
-        eq(ok, true, 'https: 服务已连接 → ensureLodopLoaded() = true');
-        eq(requests, ['https://localhost.lodop.net:8443/CLodopFuncs.js'], 'https: 只请求 https 脚本（无 http，避免混合内容）');
-        record(requests.every((u) => u.startsWith('https://')), 'https: 未发起任何 http 请求');
-        record(typeof sandbox.getLodop === 'function', '补全 getLodop 兼容别名');
+        eq(ok, true, '点打印后 http:8000 连接成功 → true');
+        eq(requests, ['http://localhost:8000/CLodopFuncs.js'], 'HTTPS 页面优先请求 http://localhost:8000');
+        record('未再请求 8443（绕开可能过期的证书）', !requests.some((u) => u.startsWith('https://')));
+        record('补全 getLodop 兼容别名', typeof sandbox.getLodop === 'function');
         eq(sandbox.lodopCanCallService(), true, 'lodopCanCallService() = true');
-        record(statusEl.textContent.includes('已就绪'), '状态显示已就绪', statusEl.textContent);
-        record(statusEl.className === 'success', '状态样式 success');
+        record('状态显示已就绪', statusEl.textContent.includes('已就绪'), statusEl.textContent);
     }
 
-    // 2. HTTPS 页面：脚本加载成功但服务连不上 → 明确提示"连接未建立"，且仍不请求 http
+    // 3. http:8000 不可用时回退 https:8443
     {
-        const { sandbox, requests, statusEl } = createEnv({ protocol: 'https:', socketOpen: false, wsReady: false });
+        const { sandbox, requests } = createEnv({
+            protocol: 'https:',
+            behaviors: {
+                'http://localhost:8000/CLodopFuncs.js': 'error',
+                'https://localhost.lodop.net:8443/CLodopFuncs.js': 'ok',
+            },
+        });
         const ok = await sandbox.ensureLodopLoaded();
-        eq(ok, false, 'https: 服务未连接 → false');
-        eq(requests, ['https://localhost.lodop.net:8443/CLodopFuncs.js'], 'https: 服务未连接时也不回退 http');
-        record(statusEl.textContent.includes('连接未建立'), '状态提示服务连接未建立', statusEl.textContent);
-        record(!/http:\/\/localhost:8000/.test(requests.join(',')), '未出现 http://localhost:8000');
+        eq(ok, true, 'http 失败后回退 https 成功');
+        eq(requests, ['http://localhost:8000/CLodopFuncs.js', 'https://localhost.lodop.net:8443/CLodopFuncs.js'], '回退顺序正确');
     }
 
-    // 3. HTTPS 页面：脚本加载失败（证书/未安装）→ 提示证书，且只请求 https
+    // 4. 脚本能加载但 WebSocket 连不上 → 明确「连接未建立」
     {
         const { sandbox, requests, statusEl } = createEnv({
             protocol: 'https:',
-            behaviors: { 'https://localhost.lodop.net:8443/CLodopFuncs.js': 'error' },
+            behaviors: {
+                'http://localhost:8000/CLodopFuncs.js': { socketOpen: false, wsReady: false },
+                'https://localhost.lodop.net:8443/CLodopFuncs.js': { socketOpen: false, wsReady: false },
+            },
         });
         const ok = await sandbox.ensureLodopLoaded();
-        eq(ok, false, 'https: 脚本加载失败 → false');
-        eq(requests, ['https://localhost.lodop.net:8443/CLodopFuncs.js'], 'https: 失败后不回退 http');
-        record(/证书/.test(statusEl.textContent), '状态提示证书/安装问题', statusEl.textContent);
+        eq(ok, false, '服务未连接 → false');
+        record('状态提示服务连接未建立', statusEl.textContent.includes('连接未建立'), statusEl.textContent);
+        eq(requests, ['http://localhost:8000/CLodopFuncs.js', 'https://localhost.lodop.net:8443/CLodopFuncs.js'], '两个地址都尝试后失败');
     }
 
-    // 4. HTTP 页面（本机调试）：先 http，成功即用；失败可回退 https
+    // 5. 两个地址都失败 → 给出启动服务/允许本地网络/证书的提示
     {
-        const { sandbox, requests } = createEnv({ protocol: 'http:', socketOpen: true });
-        const ok = await sandbox.ensureLodopLoaded();
-        eq(ok, true, 'http: 本机服务可用 → true');
-        eq(requests, ['http://localhost:8000/CLodopFuncs.js'], 'http: 先请求 http:8000');
-    }
-    {
-        const { sandbox, requests } = createEnv({
-            protocol: 'http:',
-            socketOpen: true,
-            behaviors: { 'http://localhost:8000/CLodopFuncs.js': 'error' },
+        const { sandbox, statusEl } = createEnv({
+            protocol: 'https:',
+            behaviors: {
+                'http://localhost:8000/CLodopFuncs.js': 'error',
+                'https://localhost.lodop.net:8443/CLodopFuncs.js': 'error',
+            },
         });
         const ok = await sandbox.ensureLodopLoaded();
-        eq(ok, true, 'http: 8000 失败后可回退 https 并成功');
-        eq(requests, ['http://localhost:8000/CLodopFuncs.js', 'https://localhost.lodop.net:8443/CLodopFuncs.js'], 'http: 回退顺序正确');
+        eq(ok, false, '全部失败 → false');
+        record('状态给出可操作提示', /无法连接|证书|本地网络/.test(statusEl.textContent), statusEl.textContent);
     }
 
-    // 5. 回归：不得再出现"HTTPS 页面尝试 http"的旧实现特征
+    // 6. 静态实现约束
     {
         const src = extractLoaderScript(html);
-        record('旧的双协议 fallback 逻辑已移除', !/var fallback = isHttps \? LODOP_HTTP_URL/.test(src));
-        record('HTTPS 仅 https、HTTP 才 http 的协议选择存在', /lodopIsHttpsPage\(\) \? \[LODOP_HTTPS_URL\] : \[LODOP_HTTP_URL, LODOP_HTTPS_URL\]/.test(src));
+        record('实现为 http 优先', /var urls = \[LODOP_HTTP_URL, LODOP_HTTPS_URL\]/.test(src));
         record('兼容 getCLodop（本机脚本只提供它）', /getCLodop/.test(src));
         record('就绪判定检查 SocketOpened', /SocketOpened/.test(src));
+        record('已移除加载时自动探测逻辑', !/scheduleInitialLodopLoad/.test(src));
+        record('loader 不使用 eval / new Function（不依赖 unsafe-eval）', !/\beval\s*\(/.test(src) && !/new Function/.test(src));
     }
 
     const failed = results.filter((r) => !r.ok);
-    console.log(`
-结果：${results.length - failed.length}/${results.length} 通过，${failed.length} 失败`);
+    console.log(`\n结果：${results.length - failed.length}/${results.length} 通过，${failed.length} 失败`);
     if (failed.length) process.exit(1);
 }
 

@@ -6,7 +6,7 @@
 - 站点入口：`https://xypipei.zcfi.cn/`（导航页，选择下面两个入口）
 - 管理后台：`https://xypipei.zcfi.cn/admin`（商品树、库存、回收站、数据工具、标签打印）
 - 智能扫码：`https://xypipei.zcfi.cn/scan`（手机端连续扫码、关联快递/订单/链接、标记售出）
-- 当前版本：**v2.2.1**（核心 `js/core.js` v2.2.0 / 管理后台 **R4** / 扫码端 **R3**），文档更新日期 **2026-11-13**；v2.2.1 为打印服务连接修复（详见 [CHANGELOG](CHANGELOG.md)）。
+- 当前版本：**v2.2.2**（核心 `js/core.js` v2.2.0 / 管理后台 **R4** / 扫码端 **R3**），文档更新日期 **2026-11-13**；v2.2.2 修复打印服务连接与本地网络授权问题（详见 [CHANGELOG](CHANGELOG.md)）。
 
 > ## ⚠️ 使用前必读：Secret Gist 不是私有仓库
 >
@@ -368,8 +368,9 @@ GitHub Gist 的 data.json（你自己的 Gist —— Secret 也只是「不公�
 
 ### 页面如何加载打印脚本
 
-- **协议规则（v2.2.1 起）**：HTTPS 页面只加载 `https://localhost.lodop.net:8443/CLodopFuncs.js`，**不会尝试 http**——http 子资源属于混合内容，会让浏览器地址栏显示「不安全」；只有 HTTP 页面（本机调试）才先加载 `http://localhost:8000/CLodopFuncs.js`，失败再试 HTTPS。
-- 本机 C-Lodop 使用**自签名证书**，浏览器可能提示证书不受信任。第一次需要在浏览器中打开 `https://localhost.lodop.net:8443`，手动选择「继续访问/信任证书」，然后刷新 `/admin`。
+- **协议规则（v2.2.2 起）**：优先加载 `http://localhost:8000/CLodopFuncs.js`——浏览器把 `http://localhost` 视为可信来源，HTTPS 页面加载它**不构成混合内容**，同时可以绕开本机 C-Lodop 8443 可能**已过期**的证书；失败再试 `https://localhost.lodop.net:8443/CLodopFuncs.js`。
+- **页面加载/登录时不会请求本机服务**（v2.2.2 起）：只有点「打印/系统预览」时才连接，避免一打开后台就弹出浏览器「访问本地网络/其他应用和服务」授权提示。首次打印时浏览器会询问，请选择「允许」。
+- 本机 C-Lodop 的 8443 使用自签名证书，且**可能已经过期**（实测 `ERR_CERT_DATE_INVALID`）；页面优先用 `http://localhost:8000` 正是为了绕开它。若仍看到证书错误，请升级/重装 C-Lodop。
 - 本机脚本只提供 `getCLodop()`（页面已补 `getLodop()` 别名）；**就绪判定要求 C-Lodop 的 WebSocket 真正连上**，而不是“脚本加载成功”。C-Lodop 内部用字符串定时器做握手/重连，页面已用定向垫片处理，因此**不需要放开 CSP 的 `'unsafe-eval'`**。
 - 打印机列表来自**本机 C-Lodop 的实时列表**，不再使用作者本机的静态快照；换电脑/换打印机后会显示当前机器的设备。
 
@@ -419,7 +420,8 @@ GitHub Gist 的 data.json（你自己的 Gist —— Secret 也只是「不公�
 | --- | --- |
 | 顶部显示「打印服务未连接」 | 启动 C-Lodop；确认没有被杀毒软件拦截 |
 | 提示证书错误/无法加载 | 浏览器打开 `https://localhost.lodop.net:8443` 信任证书，再刷新 |
-| 地址栏显示「不安全」/控制台报混合内容 | v2.2.1 起 HTTPS 页面不再加载 http 脚本；若仍出现，强制刷新（Ctrl+F5）并检查是否有旧缓存/代理 |
+| 打开后台就弹出「访问本地网络/其他应用和服务」 | v2.2.2 起页面加载/登录时不再请求本机服务；该提示只应在点打印时出现，选「允许」即可 |
+| 地址栏显示「不安全」或提示 8443 证书过期 | v2.2.2 起优先用 `http://localhost:8000` 绕开过期证书，且加载阶段不发起本机请求；仍出现请强制刷新（Ctrl+F5）并检查旧缓存/代理 |
 | 控制台报 CSP 拦截 eval（C-Lodop 相关） | 页面已用定向垫片兼容 C-Lodop 的字符串定时器；若仍出现，请记录 C-Lodop 版本与报错 |
 | 能预览但打印没反应 | 检查是否选择了真实打印机；查看 C-Lodop 打印队列/日志；再看状态栏的 `On_Return` 结果 |
 | 标签内容错位/字体不对 | 与打印机驱动、纸张尺寸（50×30 或 40×30mm）、C-Lodop 版本有关；需现场调 |
@@ -502,6 +504,8 @@ git checkout backup-r1-core21 -- js/core.js
 ## 已知限制
 
 - **Secret Gist 非私有**：链接即权限，无法阻止拿到链接的人读取；敏感数据不应放 Gist。
+- **本机 C-Lodop 的 8443 证书可能已过期**（`ERR_CERT_DATE_INVALID`）：页面已改为优先 `http://localhost:8000` 绕开它；若两个地址都失败，请升级/重装 C-Lodop。
+- **浏览器「访问本地网络」授权**：v2.2.2 起页面加载/登录时不再请求本机服务，只有点打印时才会出现该授权提示，选择「允许」即可。
 - **真实打印需现场验收**：内置 canvas 预览只是示意图；纸张/打印机/驱动/C-Lodop 版本不同，实际效果以现场打印为准；**打印必须在本机安装并启动 C-Lodop**。
 - **没有 Service Worker/PWA 离线包**：页面需先打开；断网时可用缓存继续匹配，但保存需要联网。
 - **Gist 单文件约 1 MB 限制**：超大商品库需精简数据或拆分使用；超过约 1.5 MB 时本机自动快照会跳过。
@@ -599,7 +603,7 @@ git checkout backup-r1-core21 -- js/core.js
 
 ## 版本与路线图
 
-- 当前（2026-11-13）：**v2.2.1** = `core v2.2.0` + `admin R4` + `scan R3` + 站点/文档终稿；v2.2.1 为打印服务连接修复（HTTPS 页面不再触发混合内容、兼容 `getCLodop`）。
+- 当前（2026-11-13）：**v2.2.2** = `core v2.2.0` + `admin R4` + `scan R3` + 站点/文档终稿；v2.2.2 修复“打开后台就请求本机服务/触发本地网络授权、8443 证书过期导致打印不可用”。
 - 本版本已完成：
   - **安全**：移除硬编码默认 Gist ID；扫码库本地化（`js/vendor/html5-qrcode.min.js`）；新增 CSP/referrer；Secret Gist 文案全面修正；`CLodopFuncs.js` 不再入库。
   - **打印**：运行时加载本机 C-Lodop、打印结果真实反馈（`On_Return`）、打印机取本机实时列表、批量 strict、null 健壮性。
@@ -607,10 +611,10 @@ git checkout backup-r1-core21 -- js/core.js
   - **管理后台 R4**：筛选/汇总修复、快照隔离、恢复前远端备份、IME、确认弹窗、竞态、a11y。
   - **扫码端 R3**：错误分类、多标签页、逐字段冲突、历史隔离、启动取消、扫码枪、卸载兜底。
   - **站点**：根路径导航页、`tools/scanner-test.html`、删除废弃示例目录。
-  - **文档**：README/CHANGELOG/docs 全量同步到 v2.2.1。
+  - **文档**：README/CHANGELOG/docs 全量同步到 v2.2.2。
 - 历史轮次：R2a（数据菜单/回收站）、R2b（搜索/排序/汇总/复制/响应式）、R3 打印 v2（并入本版本基线）、scan R2 与一致性修复。
 - 后续方向（未承诺）：外置内联脚本以收紧 CSP、`schemaVersion` 迁移框架、后台列表字段可见性增强、PWA/Service Worker、多用户权限模型。
 
-> 文档与一致性审查已同步到 v2.2.1 最终代码；后续改动请继续更新本 README 与 [CHANGELOG](CHANGELOG.md)。
+> 文档与一致性审查已同步到 v2.2.2 最终代码；后续改动请继续更新本 README 与 [CHANGELOG](CHANGELOG.md)。
 
 变更记录见 [CHANGELOG.md](CHANGELOG.md)。

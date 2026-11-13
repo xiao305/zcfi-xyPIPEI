@@ -93,6 +93,7 @@ const forbidden = [
     { re: /脚本存放/, msg: '仍存在过期本地路径 E:\\脚本存放' },
     { re: /user-scalable=no/i, msg: '仍禁用页面缩放（可访问性）' },
     { re: /DEFAULT_GIST_ID\s*=\s*['"][0-9a-f]{20,}/, msg: '仍硬编码默认 Gist ID' },
+    { re: /setTimeout\(function \(\) \{ ensureLodopLoaded\(\); \}/, msg: '页面加载时仍自动探测 C-Lodop（v2.2.2 应改为按需）' },
 ];
 for (const rel of tracked) {
     if (!exists(rel)) continue;
@@ -121,7 +122,8 @@ const requirements = [
     ['admin.html', /On_Return/, 'admin 未处理打印异步结果'],
     ['admin.html', /getCLodop/, 'admin 未兼容本机脚本的 getCLodop()'],
     ['admin.html', /__zcfiLodopShim/, 'admin 缺少 C-Lodop 字符串定时器兼容垫片'],
-    ['admin.html', /lodopIsHttpsPage\(\) \? \[LODOP_HTTPS_URL\]/, 'admin 未限制 HTTPS 页面只加载 https 脚本'],
+    ['admin.html', /var urls = \[LODOP_HTTP_URL, LODOP_HTTPS_URL\]/, 'admin 未采用 http 优先加载 C-Lodop'],
+    ['admin.html', /未检测（点打印/, 'admin 状态栏未改为按需连接'],
     ['admin.html', /ws:\/\/127\.0\.0\.1:8000/, 'admin CSP 未放行 ws://127.0.0.1:8000'],
     ['admin.html', /zcfi:lodop-ready/, 'admin 缺少 C-Lodop 就绪事件'],
     ['admin.html', /localhost\.lodop\.net:8443/, 'admin 未运行时加载本机 C-Lodop'],
@@ -146,9 +148,9 @@ check(/2\.2\.0/.test(read('js/core.js')), 'core 未标记 v2.2.0');
     const cspMeta = (read('admin.html').match(/Content-Security-Policy" content="([^"]*)"/) || [null, ''])[1];
     check(!/unsafe-eval/.test(cspMeta), 'admin CSP 不应放开 unsafe-eval');
 }
-check(/R4 · v2\.2\.1/.test(read('admin.html')), 'admin 未标记 R4 · v2.2.1');
-check(/R3 · v2\.2\.1/.test(read('scan.html')), 'scan 未标记 R3 · v2.2.1');
-check(/\[2\.2\.1\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.2.1] 条目');
+check(/R4 · v2\.2\.2/.test(read('admin.html')), 'admin 未标记 R4 · v2.2.2');
+check(/R3 · v2\.2\.2/.test(read('scan.html')), 'scan 未标记 R3 · v2.2.2');
+check(/\[2\.2\.2\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.2.2] 条目');
 
 console.log('== 5. 文件结构与存在性 ==');
 check(!exists('CLodopFuncs.js'), 'CLodopFuncs.js 仍被提交（应删除，运行时加载）');
