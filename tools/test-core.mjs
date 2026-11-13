@@ -73,7 +73,7 @@ function resp(data, status = 200, headers = {}) {
 {
     const ctx = createCtx(mkFetch(async () => resp({})));
     const Z = ctx.ZCFI;
-    eq(Z.VERSION, '2.2.0', 'VERSION = 2.2.0');
+    eq(Z.VERSION, '2.3.0', 'VERSION = 2.3.0');
     eq(Z.SCHEMA_VERSION, 1, 'SCHEMA_VERSION = 1');
 
     const nested = Z.findNodeEntry(FIXTURE.products, 'A001/B001/001');
@@ -219,6 +219,37 @@ function resp(data, status = 200, headers = {}) {
         await ctx2.ZCFI.get('t', 'g', 'data.json');
         ok(false, '损坏 JSON 应抛 PARSE');
     } catch (e) { eq(e.code, 'PARSE', '损坏 JSON 抛 PARSE（严格读取）'); }
+}
+
+// ---------- 6. 类目条码状态汇总 + applyOps 导出 ----------
+{
+    const ctx = createCtx(mkFetch(async () => resp({})));
+    const Z = ctx.ZCFI;
+    const unified = {
+        name: '类目', unified: true,
+        items: [
+            { code: 'N/001', status: '在售' },
+            { code: 'N/002', status: '在售' },
+        ],
+    };
+    let agg = Z.aggregateItemStatus(unified);
+    eq(agg.label, '全部在售', 'aggregateItemStatus 全部在售');
+    eq(agg.total, 2, 'aggregateItemStatus 计数');
+    unified.items.push({ code: 'N/003', status: '售出' });
+    agg = Z.aggregateItemStatus(unified);
+    eq(agg.label, '部分在售', 'aggregateItemStatus 混合 → 部分在售');
+    eq(agg.counts['售出'], 1, 'aggregateItemStatus 分状态计数');
+    unified.items.push({ code: 'N/004', status: '售出', deletedAt: '2026-01-01T00:00:00Z' });
+    agg = Z.aggregateItemStatus(unified);
+    eq(agg.total, 3, 'aggregateItemStatus 排除已删除库存');
+    eq(Z.aggregateItemStatus({ name: '空', items: [] }).label, '无库存', 'aggregateItemStatus 无库存');
+    eq(Z.aggregateItemStatus({ name: '待售', items: [{ code: 'X/1', status: '待售' }] }).label, '全部待售', 'aggregateItemStatus 全部待售');
+
+    // applyOps 导出：可在本地乐观应用
+    const work = JSON.parse(JSON.stringify(FIXTURE));
+    Z.applyOps(work, [{ type: 'node.upsert', code: 'A002', originalCode: 'A002', fields: { remark: 'optimistic' } }], JSON.parse(JSON.stringify(FIXTURE)), null, []);
+    eq(work.products.A002.remark, 'optimistic', 'ZCFI.applyOps 可在本地应用 ops');
+    ok(typeof Z.applyOps === 'function', 'ZCFI.applyOps 已导出');
 }
 
 const failed = results.filter((r) => !r.ok);

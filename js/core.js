@@ -30,7 +30,7 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '2.2.0';
+    var VERSION = '2.3.0';
     /** 数据文件结构版本；根级 schemaVersion 缺失视为 0/未标记，保存时补写当前版本 */
     var SCHEMA_VERSION = 1;
     var API_ROOT = 'https://api.github.com';
@@ -850,7 +850,7 @@
      * ============================================================ */
     var FIELD_LABELS = {
         name: '名称',
-        unified: '统一条码',
+        unified: '类目条码',
         cost: '成本',
         trackingNumber: '快递单号',
         orderNumber: '订单号',
@@ -1257,6 +1257,49 @@
     }
 
     /* ============================================================
+     * 七点五、类目条码（unified 节点）状态汇总
+     * 语义：unified=true 的节点代表"整个类目"，其状态由类目下所有未删除库存
+     *       的状态自动汇总：全部在售 / 部分在售 / 全部售出 / 部分售出 / 全部待售 / 部分待售。
+     * ============================================================ */
+    function aggregateItemStatus(node) {
+        var counts = { '待售': 0, '在售': 0, '售出': 0 };
+        var other = 0;
+        var total = 0;
+        function visit(current) {
+            if (!current || typeof current !== 'object') return;
+            if (Array.isArray(current.items)) {
+                for (var i = 0; i < current.items.length; i++) {
+                    var item = current.items[i];
+                    if (!item || isDeleted(item)) continue;
+                    var s = normalizeStatus(item.status);
+                    if (Object.prototype.hasOwnProperty.call(counts, s)) counts[s] += 1;
+                    else other += 1;
+                    total += 1;
+                }
+            }
+            if (isPlainObject(current.children)) {
+                for (var key in current.children) {
+                    if (!Object.prototype.hasOwnProperty.call(current.children, key)) continue;
+                    var child = current.children[key];
+                    if (!child || isDeleted(child)) continue;
+                    visit(child);
+                }
+            }
+        }
+        visit(node);
+        var result = { total: total, counts: counts, other: other, label: '无库存', cls: 'status-unknown' };
+        if (!total) return result;
+        if (counts['售出'] === total) { result.label = '全部售出'; result.cls = 'status-sold'; return result; }
+        if (counts['在售'] === total) { result.label = '全部在售'; result.cls = 'status-onsale'; return result; }
+        if (counts['待售'] === total) { result.label = '全部待售'; result.cls = 'status-pending'; return result; }
+        if (counts['在售'] > 0) { result.label = '部分在售'; result.cls = 'status-onsale'; return result; }
+        if (counts['售出'] > 0) { result.label = '部分售出'; result.cls = 'status-sold'; return result; }
+        result.label = '部分待售';
+        result.cls = 'status-pending';
+        return result;
+    }
+
+    /* ============================================================
      * 八、导出
      * ============================================================ */
     global.ZCFI = {
@@ -1299,6 +1342,7 @@
         findItem: findItem,
         walk: walk,
         countDescendants: countDescendants,
+        aggregateItemStatus: aggregateItemStatus,
         validateDoc: validateDoc,
         validateDocDeep: validateDocDeep,
         migrateDoc: migrateDoc,
@@ -1309,6 +1353,7 @@
         history: history,
         getAtRevision: getAtRevision,
         save: save,
+        applyOps: applyOps,
 
         // 兼容旧命名
         getGistContent: async function (token, gistId, filename) {

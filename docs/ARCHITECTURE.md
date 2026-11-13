@@ -4,12 +4,12 @@
 
 当前基线（2026-11-13 最终）：
 
-- 核心：`js/core.js` **v2.2.0**
-- 管理后台：**R4**（R2b `65b8713` + R3 `63c9ca8` + 本轮 R4 修复）
+- 核心：`js/core.js` **v2.3.0**
+- 管理后台：**R5**（R4 审计修复 + v2.3.0 编码/类目/保存/打印优化）
 - 扫码端：**R3**（R2 `9dc7bcf` + 一致性修复 `09afad0` + 本轮 R3 修复）
 - 站点：GitHub Pages 静态站，自定义域名 `xypipei.zcfi.cn`；根路径为导航页，`/admin`、`/scan` 为功能入口
 - 文档与代码同步日期：**2026-11-13**
-- 页面版本：**v2.2.2**（admin `R4 · v2.2.2` / scan `R3 · v2.2.2`；v2.2.2：打印服务改为按需连接、`http://localhost:8000` 优先以绕开 8443 过期证书；v2.2.1：C-Lodop 连接判定修复）
+- 页面版本：**v2.3.0**（admin `R5 · v2.3.0` / scan `R3 · v2.3.0`；v2.3.0：自定义编码/同级推断/类目条码/保存体验/打印弹窗；v2.2.2：打印按需连接、http:8000 优先绕开过期证书）
 
 ---
 
@@ -89,6 +89,7 @@
 - 库存 `code` 为完整编码，且必须在父节点 `items` 中。
 - 状态词表由 `ZCFI.STATUS` / `normalizeStatus` 统一；`已售`、`已卖出` 等历史别名读入后会归一为 `售出`。
 - `deletedAt` 为软删除标记；值存在即视为在回收站。
+- **`unified`（类目条码）**：`true`=整个类目共用一个编码，不记 `cost/trackingNumber/orderNumber`，节点状态由类目下商品状态聚合（`ZCFI.aggregateItemStatus` → 全部在售/部分在售/全部售出/部分售出/全部待售/部分待售/无库存）；`false`=单件条码，每个库存独立编码并可记成本/单号。
 - 字段级 diff 使用 `NODE_DIFF_FIELDS` / `ITEM_DIFF_FIELDS`（admin.html），包含 `deletedAt`。
 
 ### 2.1 `schemaVersion` 与未知根字段
@@ -99,13 +100,13 @@
 
 ---
 
-## 3. `js/core.js` API 一览（v2.2.0）
+## 3. `js/core.js` API 一览（v2.3.0）
 
 ### 3.1 状态/工具
 
 | API | 说明 |
 | --- | --- |
-| `ZCFI.VERSION` | 核心版本（当前 `2.2.0`） |
+| `ZCFI.VERSION` | 核心版本（当前 `2.3.0`） |
 | `ZCFI.SCHEMA_VERSION` | 数据结构版本（当前 `1`） |
 | `ZCFI.STATUS` / `STATUS_LIST` | `待售/在售/售出` |
 | `ZCFI.normalizeStatus(v)` | 历史别名归一 |
@@ -115,6 +116,8 @@
 | `ZCFI.normalizeQuery` | 搜索词归一 |
 | `ZCFI.normalizeUrl/sameUrl/isHttpUrl` | 链接比较/识别 |
 | `ZCFI.clone/valuesEqual` | 深拷贝/相等（`valuesEqual` 基于 `deepEqual`） |
+| `ZCFI.aggregateItemStatus(node)` | 类目条码状态汇总：返回 `{total,counts,label,cls}`（全部在售/部分在售/…） |
+| `ZCFI.applyOps(doc, ops, baseDoc, decisions, conflicts)` | 在本地文档上应用 ops（admin 乐观更新用） |
 | `ZCFI.deepEqual(a, b)` | 深比较，**键序无关**；用于保存 `unchanged` 判定等 |
 | `ZCFI.sizeBytes(value)` | 按 `TextEncoder` 计算的 UTF-8 **真实字节数**（中文不再被低估） |
 | `ZCFI.isPlainObject` | 普通对象判断 |

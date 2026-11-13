@@ -786,6 +786,10 @@
             color: var(--color-gray-500);
             white-space: nowrap;
         }
+        /* 保存状态指示：非阻塞式（⟳ 保存中 / ✓ 已保存 / ⚠ 保存失败可点击重试） */
+        .save-state.is-saving { color: var(--color-primary); }
+        .save-state.is-saved { color: #059669; }
+        .save-state.is-error { color: var(--color-danger); cursor: pointer; text-decoration: underline; }
 
         /* ===== 严格加载错误遮罩 ===== */
         #load-error-overlay {
@@ -1274,23 +1278,6 @@
             white-space: nowrap;
         }
 
-        /* ===== 树级保存遮罩 ===== */
-        .tree-saving-mask {
-            display: none;
-            position: absolute;
-            inset: 0;
-            z-index: 30;
-            background: rgba(248, 250, 252, 0.72);
-            backdrop-filter: blur(1.5px);
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            border-radius: 12px;
-            font-size: 13px;
-            color: var(--color-gray-600);
-        }
-        .tree-saving-mask.active { display: flex; }
-
         /* ===== 页脚 ===== */
         .app-footer {
             text-align: center;
@@ -1432,6 +1419,7 @@
                 <div class="sub">
                     <span id="user-status">已登录</span>
                     <span id="sync-time" class="sync-meta">最后同步：—</span>
+                    <span id="save-state" class="sync-meta save-state" role="status" aria-live="polite"></span>
                     <span id="data-revision" class="sync-meta">版本：未知</span>
                     <span id="lodop-status" role="status" aria-live="polite">⏳ 打印服务：未检测（点打印时自动连接本机 C-Lodop）</span>
                 </div>
@@ -1494,7 +1482,6 @@
                 <button type="button" class="btn btn-secondary btn-sm" id="global-batch-print-btn">跨节点批量打印</button>
             </div>
             <div class="card-body-wrap" style="position:relative;">
-                <div id="tree-saving-mask" class="tree-saving-mask"><span class="spinner"></span> 保存中…</div>
                 <div class="tree-container" id="tree-container">
                     <p style="color:var(--color-gray-500);">加载中…</p>
                 </div>
@@ -1510,25 +1497,34 @@
 <div class="modal-overlay" id="modal-node-overlay">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-node-title">
         <h3 id="modal-node-title">编辑节点</h3>
-        <label for="modal-node-code">编码</label>
-        <input type="text" id="modal-node-code" placeholder="自定义编码（留空自动生成）" />
+        <div id="node-parent-prefix-row" style="display:none;">
+            <label for="modal-node-parent-prefix">父编码前缀（只读，不可修改）</label>
+            <input type="text" id="modal-node-parent-prefix" readonly tabindex="-1" />
+        </div>
+        <label for="modal-node-code" id="modal-node-code-label">编码</label>
+        <input type="text" id="modal-node-code" placeholder="留空自动生成" autocomplete="off" spellcheck="false" />
         <label class="code-toggle" for="modal-node-code-custom"><input type="checkbox" id="modal-node-code-custom" /> 自定义编码（高级）</label>
         <p class="code-hint" id="modal-node-code-hint"></p>
         <label for="modal-node-name">名称 *</label>
         <input type="text" id="modal-node-name" />
-        <label for="modal-node-unified">统一条码</label>
+        <label for="modal-node-unified">类目条码</label>
         <select id="modal-node-unified">
-            <option value="true">是（统一）</option>
-            <option value="false">否（不统一，可添加库存）</option>
+            <option value="true">是（类目条码：整个类目共用一个编码）</option>
+            <option value="false">否（单件条码：每个库存单独编码）</option>
         </select>
-        <label for="modal-node-status">状态</label>
-        <select id="modal-node-status"></select>
-        <label for="modal-node-cost">成本</label>
-        <input type="number" id="modal-node-cost" step="0.01" min="0" />
-        <label for="modal-node-tracking">快递单号</label>
-        <input type="text" id="modal-node-tracking" />
-        <label for="modal-node-order">订单号</label>
-        <input type="text" id="modal-node-order" placeholder="订单编号" />
+        <div id="modal-node-status-row">
+            <label for="modal-node-status">状态</label>
+            <select id="modal-node-status"></select>
+        </div>
+        <p class="code-hint" id="modal-node-status-note" style="display:none;"></p>
+        <div id="modal-node-manual-fields">
+            <label for="modal-node-cost">成本</label>
+            <input type="number" id="modal-node-cost" step="0.01" min="0" />
+            <label for="modal-node-tracking">快递单号</label>
+            <input type="text" id="modal-node-tracking" />
+            <label for="modal-node-order">订单号</label>
+            <input type="text" id="modal-node-order" placeholder="订单编号" />
+        </div>
         <label for="modal-node-qrlinks">QR关联链接（多个链接用逗号或换行分隔）</label>
         <textarea id="modal-node-qrlinks" rows="2" placeholder="https://link1.com, https://link2.com"></textarea>
         <label for="modal-node-remark">备注</label>
@@ -1554,8 +1550,10 @@
             <label for="modal-item-qty">数量（件）</label>
             <input type="number" id="modal-item-qty" value="1" min="1" max="100" step="1" placeholder="批量添加数量 1-100" />
         </div>
-        <label for="modal-item-code">库存编码</label>
-        <input type="text" id="modal-item-code" placeholder="自定义编码（留空自动生成）" />
+        <label for="modal-item-parent-prefix">父节点编码前缀（只读，不可修改）</label>
+        <input type="text" id="modal-item-parent-prefix" readonly tabindex="-1" />
+        <label for="modal-item-code" id="modal-item-code-label">库存编码（本级段，留空自动生成）</label>
+        <input type="text" id="modal-item-code" placeholder="本级编码（留空自动生成）" autocomplete="off" spellcheck="false" />
         <label class="code-toggle" for="modal-item-code-custom"><input type="checkbox" id="modal-item-code-custom" /> 自定义编码（高级）</label>
         <p class="code-hint" id="modal-item-code-hint"></p>
         <label for="modal-item-name">名称（可选）</label>
@@ -1960,7 +1958,11 @@ var currentGistId = '';
 var currentFilename = 'data.json';
 var readOnly = true;                    // 未成功加载前一律只读
 var isLoading = false;
-var isSaving = false;
+var isSaving = false;                   // 是否有一批保存正在后台进行（不再阻塞编辑）
+/** R5：乐观更新 + 后台合并保存队列。pendingOps 累积待写入操作；inFlight 表示有一批正在写远端 */
+var saveQueue = { inFlight: false, pendingOps: [], lastMessage: '', failed: null };
+var localEditSeq = 0;                   // 本地编辑序号：保存返回时用于判断是否又有新编辑
+var saveStateEl = null;                 // 顶栏保存状态指示（初始化时取 DOM）
 var loginBusy = false;                  // L-13：登录并发保护
 var loadEpoch = 0;                      // L-14：退出登录时自增，丢弃在途刷新结果
 var syncMeta = { updatedAt: null, revision: null, size: null, lastSyncAt: null };
@@ -1996,15 +1998,20 @@ var PRINT_SETTINGS_KEY = 'zcfi_print_settings_v1';
 var printSettings = { templateIndex: 0, printerName: '', copies: 1, previewBeforePrint: false };
 var printBusy = false;
 
-// 编码规范
+// 编码规范（R5/v2.3.0：自定义编码只允许英文字母+数字混搭，禁中文/空格/斜杠/下划线等符号；
+// 子节点/库存输入框只填“本级段”，父编码前缀只读）
+var CODE_SEGMENT_RE = /^[A-Za-z0-9]{1,32}$/;
+var CODE_SEGMENT_ERROR = '编码只能使用英文字母与数字（可混搭），不能包含中文或其它符号';
+/** 旧版编号格式（仅用于“无同级可推断时”的回退默认编码：根 A001 / 子 B001 / 库存 001） */
 var CODE_RE = {
     root: /^A\d{3}$/,
     node: /^A\d{3}(\/B\d{3})+$/,
     itemSuffix: /\/\d{3}$/
 };
 var AUTO_CODE_HINT = '编码由系统自动生成（推荐）。如需手动指定/改名，请勾选“自定义编码”。';
-var CUSTOM_NODE_HINT = '自定义编码规则：大类 ^A\\d{3}$；子类 ^A\\d{3}(/B\\d{3})+$；必须与父编码前缀一致；节点与库存编码全局唯一。';
-var CUSTOM_ITEM_HINT = '自定义编码规则：库存编码必须为 父编码/三位数字（如 A001/B001/001），且与节点、库存编码全局唯一。';
+var CODE_HELP_RULE = '本级段只允许英文字母与数字（可混搭），1-32 位；不能包含中文、空格、斜杠（/）或下划线等其它符号；保存时自动转大写。';
+var CUSTOM_NODE_HINT = '自定义编码只填“本级段”：' + CODE_HELP_RULE + '父编码前缀只读，完整编码 = 父编码/本级段。';
+var CUSTOM_ITEM_HINT = '自定义编码只填“本级段”：' + CODE_HELP_RULE + '完整库存编码 = 父节点编码/本级段。';
 
 function $(id) { return document.getElementById(id); }
 function setText(el, text) { if (el) el.textContent = text === null || text === undefined ? '' : String(text); }
@@ -2063,7 +2070,7 @@ var globalSelectAllEl = $('global-select-all');
 var globalSelectedCount = $('global-selected-count');
 var globalBatchStatusBtn = $('global-batch-status-btn');
 var globalBatchPrintBtn = $('global-batch-print-btn');
-var treeSavingMask = $('tree-saving-mask');
+var saveStateEl = $('save-state');
 var appVersionEl = $('app-version');
 
 var modalNodeOverlay = $('modal-node-overlay');
@@ -2082,6 +2089,12 @@ var modalNodeParent = $('modal-node-parent');
 var modalNodeMode = $('modal-node-mode');
 var modalNodeCodeCustom = $('modal-node-code-custom');
 var modalNodeCodeHint = $('modal-node-code-hint');
+var modalNodeCodeLabel = $('modal-node-code-label');
+var nodeParentPrefixRow = $('node-parent-prefix-row');
+var modalNodeParentPrefix = $('modal-node-parent-prefix');
+var modalNodeStatusRow = $('modal-node-status-row');
+var modalNodeStatusNote = $('modal-node-status-note');
+var modalNodeManualFields = $('modal-node-manual-fields');
 var modalNodeSave = $('modal-node-save');
 var modalNodeCancel = $('modal-node-cancel');
 var nodeSaveStatus = $('node-save-status');
@@ -2100,6 +2113,8 @@ var modalItemParentCode = $('modal-item-parent-code');
 var modalItemOriginalCode = $('modal-item-original-code');
 var modalItemCodeCustom = $('modal-item-code-custom');
 var modalItemCodeHint = $('modal-item-code-hint');
+var modalItemCodeLabel = $('modal-item-code-label');
+var modalItemParentPrefix = $('modal-item-parent-prefix');
 var itemQtyRow = $('item-qty-row');
 var modalItemQty = $('modal-item-qty');
 var modalItemSave = $('modal-item-save');
@@ -2454,6 +2469,13 @@ function cloneNodeFields(node, isCopyRoot) {
         qrLinks: node.qrLinks ? Z.clone(node.qrLinks) : undefined,
         status: node.status !== undefined ? Z.normalizeStatus(node.status) : undefined
     };
+    // 类目条码节点：成本/快递/订单/状态由类目下商品承载，复制时不携带陈旧字段
+    if (fields.unified) {
+        fields.cost = undefined;
+        fields.trackingNumber = undefined;
+        fields.orderNumber = undefined;
+        fields.status = undefined;
+    }
     Object.keys(fields).forEach(function (key) { if (fields[key] === undefined) delete fields[key]; });
     return fields;
 }
@@ -2472,7 +2494,7 @@ function cloneItemFields(item) {
 }
 function requestCopyNode(code) {
     if (readOnly) { toast('当前为只读保护状态，无法复制', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var entry = findNodeEntry(code);
     if (!entry || Z.isDeleted(entry.node)) { toast('节点不存在或已在回收站', 'error'); return; }
     var hasChildren = entry.node.children && Object.keys(entry.node.children).length > 0;
@@ -2534,7 +2556,7 @@ function performCopyNode(code, parentCode, node) {
 }
 function requestCopyItem(parentCode, itemCode) {
     if (readOnly) { toast('当前为只读保护状态，无法复制', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var parent = findNodeByCode(parentCode);
     if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); return; }
     var item = Z.findItem(parent, itemCode);
@@ -2564,23 +2586,26 @@ function requestCopyItem(parentCode, itemCode) {
 }
 function generateItemCodes(parentCode, count) {
     var parent = findNodeByCode(parentCode);
-    if (!parent) return [];
-    var maxNum = 0;
-    (Array.isArray(parent.items) ? parent.items : []).forEach(function (item) {
-        if (!item || !item.code) return;
-        var last = String(item.code).split('/').pop();
-        if (/^\d+$/.test(last)) maxNum = Math.max(maxNum, parseInt(last, 10));
-    });
+    var qty = parseInt(count, 10);
+    if (!parent || !isFinite(qty) || qty <= 0) return [];
+    var items = Array.isArray(parent.items) ? parent.items : [];
+    var siblingCodes = items.map(function (item) { return item && item.code; });
+    var baseSegment = inferContainerSegment(siblingCodes, legacyDefaultItemSegment(parent), '库存');
+    if (!baseSegment) return [];
     var allCodes = collectAllCodes();
     var codes = [];
-    var num = maxNum;
-    while (codes.length < count) {
-        num += 1;
-        if (num > 999) break;
-        var candidate = parentCode + '/' + String(num).padStart(3, '0');
-        if (allCodes[String(candidate).toLowerCase()]) continue;
-        allCodes[String(candidate).toLowerCase()] = true;
-        codes.push(candidate);
+    var segment = baseSegment;
+    var guard = 0;
+    while (codes.length < qty && guard < 5000) {
+        guard += 1;
+        var candidate = composeFullCode(parentCode, segment);
+        if (!allCodes[String(candidate).toLowerCase()]) {
+            allCodes[String(candidate).toLowerCase()] = true;
+            codes.push(candidate);
+        }
+        var next = incrementCodeSegment(segment);
+        if (!next) break;
+        segment = next;
     }
     return codes;
 }
@@ -2794,26 +2819,40 @@ function collectSubtreeCodes(node, code) {
     return codes;
 }
 function escapeRegExp(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-function validateNodeCodeFormat(code, mode) {
-    var parentCode = null;
-    if (mode === 'add') {
-        parentCode = editContext && editContext.parentCode ? editContext.parentCode : null;
-    } else if (editContext && editContext.originalCode) {
-        var entry = findNodeEntry(editContext.originalCode);
-        parentCode = entry ? entry.parentCode : null;
-    }
-    if (parentCode) {
-        if (!CODE_RE.node.test(code)) return '子节点编码格式应为 A001/B001（可更深层级），当前为“' + code + '”';
-        if (code.indexOf(parentCode + '/') !== 0) return '子节点编码必须以父编码「' + parentCode + '/」开头，当前为“' + code + '”';
-    } else if (!CODE_RE.root.test(code)) {
-        return '大类编码格式应为 A001（A + 三位数字），当前为“' + code + '”';
+/** 校验单个“本级段”：只允许英文字母与数字（可混搭），1-32 位，禁中文/空格/斜杠/下划线等 */
+function validateCodeSegment(segment) {
+    var raw = String(segment === undefined || segment === null ? '' : segment).trim();
+    if (!raw) return '编码不能为空';
+    if (!CODE_SEGMENT_RE.test(raw)) {
+        return CODE_SEGMENT_ERROR + '，当前为“' + raw + '”（本级段 1-32 位，不能带 /）';
     }
     return '';
 }
+function validateNodeCodeFormat(code, mode) {
+    var parentCode = '';
+    if (mode === 'add') {
+        parentCode = editContext && editContext.parentCode ? editContext.parentCode : '';
+    } else if (editContext && editContext.originalCode) {
+        var entry = findNodeEntry(editContext.originalCode);
+        parentCode = entry && entry.parentCode ? entry.parentCode : '';
+    }
+    var fullCode = String(code === undefined || code === null ? '' : code);
+    if (parentCode) {
+        if (fullCode.indexOf(parentCode + '/') !== 0) {
+            return '子节点完整编码必须以父编码前缀「' + parentCode + '/」开头，当前为“' + fullCode + '”';
+        }
+        return validateCodeSegment(fullCode.slice(parentCode.length + 1));
+    }
+    return validateCodeSegment(fullCode);
+}
 function validateItemCodeFormat(code, parentCode) {
-    var re = new RegExp('^' + escapeRegExp(parentCode) + '\\/\\d{3}$');
-    if (!re.test(code)) return '库存编码必须为「' + parentCode + '/三位数字」（如 ' + parentCode + '/001），当前为“' + code + '”';
-    return '';
+    var prefix = String(parentCode === undefined || parentCode === null ? '' : parentCode);
+    var fullCode = String(code === undefined || code === null ? '' : code);
+    if (!prefix) return validateCodeSegment(fullCode);
+    if (fullCode.indexOf(prefix + '/') !== 0) {
+        return '库存完整编码必须以父节点编码前缀「' + prefix + '/」开头，当前为“' + fullCode + '”';
+    }
+    return validateCodeSegment(fullCode.slice(prefix.length + 1));
 }
 function findCodeCollision(code, ignoreCode) {
     var set = collectAllCodes();
@@ -2856,15 +2895,39 @@ function collectCodeCaseIssues(doc) {
     });
     return result;
 }
+/** 节点弹窗编码区：子节点显示只读父编码前缀，输入框只放本级段 */
 function updateNodeCodeUI() {
+    var prefix = editContext && editContext.parentCode ? editContext.parentCode : '';
     var custom = !!(modalNodeCodeCustom && modalNodeCodeCustom.checked);
+    if (nodeParentPrefixRow) nodeParentPrefixRow.style.display = prefix ? 'block' : 'none';
+    if (modalNodeParentPrefix) modalNodeParentPrefix.value = prefix ? prefix + '/' : '';
+    setText(modalNodeCodeLabel, prefix ? '本级编码（子节点只填本级段，父前缀只读）' : '编码（大类完整编码）');
     modalNodeCode.readOnly = !custom;
     setText(modalNodeCodeHint, custom ? CUSTOM_NODE_HINT : AUTO_CODE_HINT);
 }
+/** 库存弹窗编码区：父节点编码前缀只读，输入框只放本级段 */
 function updateItemCodeUI() {
+    var prefix = itemContext && itemContext.parentCode ? itemContext.parentCode : '';
     var custom = !!(modalItemCodeCustom && modalItemCodeCustom.checked);
+    if (modalItemParentPrefix) modalItemParentPrefix.value = prefix ? prefix + '/' : '';
+    setText(modalItemCodeLabel, prefix ? '库存编码（只填本级段）' : '库存编码');
     modalItemCode.readOnly = !custom;
     setText(modalItemCodeHint, custom ? CUSTOM_ITEM_HINT : AUTO_CODE_HINT);
+}
+/** 类目条码节点：隐藏成本/快递/订单与状态下拉，状态改为只读汇总提示 */
+function updateUnifiedFieldsUI() {
+    var unified = !modalNodeUnified || modalNodeUnified.value === 'true';
+    if (modalNodeManualFields) modalNodeManualFields.style.display = unified ? 'none' : 'block';
+    if (modalNodeStatusRow) modalNodeStatusRow.style.display = unified ? 'none' : 'block';
+    if (modalNodeStatusNote) {
+        modalNodeStatusNote.style.display = unified ? 'block' : 'none';
+        if (unified) {
+            var node = editContext && editContext.nodeMode === 'edit' && editContext.originalCode
+                ? findNodeByCode(editContext.originalCode) : null;
+            var agg = (node && Z.aggregateItemStatus) ? Z.aggregateItemStatus(node) : null;
+            setText(modalNodeStatusNote, '类目条码：状态由类目下商品自动汇总（当前：' + (agg ? agg.label : '无库存') + '）');
+        }
+    }
 }
 
 // ---------- 文档差异（历史版本对比用） ----------
@@ -3050,8 +3113,8 @@ function showConfirm(options) {
 function updateConfirmState() {
     if (!confirmState) return;
     var options = confirmState.options || {};
-    if (options.requireText) confirmOk.disabled = confirmState.busy || confirmRequireInput.value.trim() !== options.requireText || isSaving;
-    else confirmOk.disabled = confirmState.busy || !!isSaving;
+    if (options.requireText) confirmOk.disabled = confirmState.busy || confirmRequireInput.value.trim() !== options.requireText;
+    else confirmOk.disabled = !!confirmState.busy;
 }
 function finishConfirm(ok) {
     if (!confirmState) return;
@@ -3073,7 +3136,7 @@ function cancelConfirm() {
     finishConfirm(false);
 }
 function handleConfirmOk() {
-    // 注意：不能因为 isSaving 为真就忽略确认——doc.replace 冲突确认本身就是保存流程在等待用户决定
+    // 注意：保存/冲突确认不因 isSaving 丢弃——doc.replace 冲突确认本身就是保存流程在等待用户决定
     if (!confirmState || confirmState.busy) return;
     var options = confirmState.options || {};
     if (options.requireText && confirmRequireInput.value.trim() !== options.requireText) return;
@@ -3586,7 +3649,7 @@ function openRecycleModal() {
 }
 function restoreRecycleNode(entry) {
     if (readOnly) { toast('当前为只读保护状态，无法恢复', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var ancestor = ancestorsDeleted(entry.code);
     if (ancestor) { toast('上级节点「' + ancestor + '」仍在回收站，请先恢复上级节点', 'warn'); return; }
     var baseNode = Z.findNodeByCode(baseDoc.products, entry.code);
@@ -3604,7 +3667,7 @@ function restoreRecycleNode(entry) {
 }
 function restoreRecycleItem(entry) {
     if (readOnly) { toast('当前为只读保护状态，无法恢复', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var parent = Z.findNodeByCode(gistData.products, entry.parentCode);
     if (!parent || Z.isDeleted(parent)) { toast('父节点仍在回收站，请先恢复父节点', 'warn'); return; }
     var baseItem = baseItemOf(entry.parentCode, entry.code);
@@ -3705,6 +3768,13 @@ function applyLoaded(result) {
     readOnly = false;
     hideLoadError();
     updateSyncMeta();
+    // R5：加载到远端最新数据后清空排队改动（在途保存会在 refresh 前被拒绝）；失败重试状态保留
+    saveQueue.pendingOps = [];
+    saveQueue.inFlight = false;
+    saveQueue.lastMessage = '';
+    isSaving = false;
+    localEditSeq = 0;
+    if (!saveQueue.failed) updateSaveState('idle');
     invalidateViewCaches();
     // 恢复上次的搜索词 / 节点排序 / 筛选 / 展开状态
     if (searchInput) searchInput.value = viewState.search || '';
@@ -3842,6 +3912,9 @@ function logout() {
     gistData = { products: {} };
     baseDoc = Z.clone(gistData);
     syncMeta = { updatedAt: null, revision: null, size: null, lastSyncAt: null };
+    saveQueue = { inFlight: false, pendingOps: [], lastMessage: '', failed: null };
+    localEditSeq = 0;
+    updateSaveState('idle');
     readOnly = true;
     pendingImport = null;
     revisionState = null;
@@ -3880,53 +3953,192 @@ function baseItemOf(parentCode, itemCode) {
 }
 
 // ============================================================
-// 编码生成
+// 编码生成（R5/v2.3.0：按同级编码格式自动推断，如 YO1/YO2 → YO3）
 // ============================================================
-function generateRootCode() {
-    var products = gistData.products || {};
+/** 取完整编码的本级段（最后一个 / 之后的部分） */
+function codeSegmentOf(fullCode) {
+    var text = String(fullCode === undefined || fullCode === null ? '' : fullCode);
+    var idx = text.lastIndexOf('/');
+    return idx === -1 ? text : text.slice(idx + 1);
+}
+/** 拼接完整编码：前缀 + '/' + 本级段（根级直接返回本级段） */
+function composeFullCode(prefix, segment) {
+    var seg = String(segment === undefined || segment === null ? '' : segment).trim();
+    if (!seg) return '';
+    var pre = String(prefix === undefined || prefix === null ? '' : prefix).trim();
+    while (pre.charAt(pre.length - 1) === '/') pre = pre.slice(0, -1);
+    return pre ? pre + '/' + seg : seg;
+}
+/** 数字补零到指定宽度（实际位数超过宽度时按实际位数） */
+function padCodeNumber(num, width) {
+    var text = String(num);
+    var w = parseInt(width, 10) || 0;
+    while (text.length < w) text = '0' + text;
+    return text;
+}
+/** 在本级段基础上 +1（保留字母前缀与补零宽度）；不可递增/超 999 时返回 null */
+function incrementCodeSegment(segment) {
+    var seg = String(segment === undefined || segment === null ? '' : segment);
+    var withPrefix = /^([A-Za-z]+)(\d+)$/.exec(seg);
+    var digits = withPrefix ? withPrefix[2] : (/^(\d+)$/.test(seg) ? seg : null);
+    if (digits === null || digits === undefined) return null;
+    var next = parseInt(digits, 10) + 1;
+    if (!isFinite(next) || next > 999) return null;
+    return (withPrefix ? withPrefix[1] : '') + padCodeNumber(next, digits.length);
+}
+/**
+ * 根据同级完整编码推断下一个本级段（分析每段最后一个 / 之后的部分）。
+ * 1) 有“字母前缀+数字”段（YO1/YO2、B001/B002…）：取出现次数最多的字母前缀（同次数取数字更大者），
+ *    数字取该前缀下最大值 +1，补零宽度沿用最大值原宽度；
+ * 2) 否则有纯数字段（001/002…）：沿用纯数字并保持宽度；
+ * 3) 同级全是纯字母（NN 等）：返回“该字母 + 1”（冲突则递增）并给出提示；
+ * 4) 没有同级/无法推断：返回 fallbackSegment（旧版默认值）。
+ * 返回 { segment, note, limit }；limit=true 表示数字已超过 999 上限。
+ */
+function inferNextCode(siblingCodes, fallbackSegment) {
+    var segments = [];
+    var seenSegments = Object.create(null);
+    (Array.isArray(siblingCodes) ? siblingCodes : []).forEach(function (fullCode) {
+        if (fullCode === undefined || fullCode === null || fullCode === '') return;
+        var seg = codeSegmentOf(fullCode);
+        seenSegments[seg.toLowerCase()] = true;
+        segments.push(seg);
+    });
+    var prefixed = Object.create(null);
+    var numeric = null;
+    var pureLetters = [];
+    segments.forEach(function (seg) {
+        var m = /^([A-Za-z]+)(\d+)$/.exec(seg);
+        if (m) {
+            var key = m[1].toLowerCase();
+            var stat = prefixed[key];
+            if (!stat) stat = prefixed[key] = { display: m[1], count: 0, max: -1, width: m[2].length };
+            stat.count += 1;
+            var value = parseInt(m[2], 10);
+            if (value > stat.max) {
+                stat.max = value;
+                stat.width = m[2].length;
+            } else if (value === stat.max && m[2].length > stat.width) {
+                stat.width = m[2].length;
+            }
+            return;
+        }
+        if (/^\d+$/.test(seg)) {
+            var num = parseInt(seg, 10);
+            if (!numeric) numeric = { max: num, width: seg.length };
+            else if (num > numeric.max) { numeric.max = num; numeric.width = seg.length; }
+            else if (num === numeric.max && seg.length > numeric.width) numeric.width = seg.length;
+            return;
+        }
+        if (/^[A-Za-z]+$/.test(seg)) pureLetters.push(seg);
+    });
+    var best = null;
+    Object.keys(prefixed).forEach(function (key) {
+        var stat = prefixed[key];
+        if (!best) { best = stat; return; }
+        if (stat.count > best.count) { best = stat; return; }
+        if (stat.count !== best.count) return;
+        if (stat.max > best.max) { best = stat; return; }
+        if (stat.max === best.max && stat.width > best.width) best = stat;
+    });
+    if (best) {
+        var nextNumber = best.max + 1;
+        if (nextNumber > 999) return { segment: null, note: '', limit: true };
+        return { segment: best.display + padCodeNumber(nextNumber, best.width), note: '', limit: false };
+    }
+    if (numeric) {
+        var nextNumeric = numeric.max + 1;
+        if (nextNumeric > 999) return { segment: null, note: '', limit: true };
+        return { segment: padCodeNumber(nextNumeric, numeric.width), note: '', limit: false };
+    }
+    if (pureLetters.length) {
+        var letterPrefix = pureLetters[0];
+        var candidate = '';
+        var seq = 1;
+        do {
+            candidate = letterPrefix + seq;
+            seq += 1;
+        } while (seenSegments[candidate.toLowerCase()] && seq <= 999);
+        return {
+            segment: candidate,
+            note: '同级编码均为纯字母（如 ' + letterPrefix + '），已自动生成 ' + candidate + '；如需其它格式请手动修改。',
+            limit: false
+        };
+    }
+    return { segment: fallbackSegment || null, note: '', limit: false };
+}
+/** 旧版默认编码段：根 A001 / 子 B001 / 库存 001（推断不可用或超限时回退；超 999 返回 null） */
+function legacyDefaultRootSegment() {
     var maxNum = 0;
-    Object.keys(products).forEach(function (key) {
+    Object.keys(gistData.products || {}).forEach(function (key) {
         var code = Z.normalizeCode(key);
-        if (!/^A\d{3}$/.test(code)) return;
+        if (!CODE_RE.root.test(code)) return;
         var num = parseInt(code.slice(1), 10);
         if (!isNaN(num) && num > maxNum) maxNum = num;
     });
     var next = maxNum + 1;
-    if (next > 999) { toast('大类编码已达 A999 上限', 'error'); return null; }
-    return 'A' + String(next).padStart(3, '0');
+    if (next > 999) return null;
+    return 'A' + padCodeNumber(next, 3);
+}
+function legacyDefaultChildSegment(parent) {
+    var maxNum = 0;
+    Object.keys((parent && parent.children) || {}).forEach(function (key) {
+        var last = codeSegmentOf(key);
+        if (!/^B\d+$/.test(last)) return;
+        var num = parseInt(last.slice(1), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+    });
+    var next = maxNum + 1;
+    if (next > 999) return null;
+    return 'B' + padCodeNumber(next, 3);
+}
+function legacyDefaultItemSegment(parent) {
+    var maxNum = 0;
+    (Array.isArray(parent && parent.items) ? parent.items : []).forEach(function (item) {
+        if (!item || !item.code) return;
+        var last = codeSegmentOf(item.code);
+        if (!/^\d+$/.test(last)) return;
+        var num = parseInt(last, 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+    });
+    var next = maxNum + 1;
+    if (next > 999) return null;
+    return padCodeNumber(next, 3);
+}
+/** 推断本级段并按需提示；失败/超限返回 null（调用方给出明确错误） */
+function inferContainerSegment(siblingCodes, fallbackSegment, scopeLabel) {
+    var inferred = inferNextCode(siblingCodes, fallbackSegment);
+    if (inferred.note) toast(inferred.note, { type: 'info', duration: 6000 });
+    if (inferred.limit) {
+        toast((scopeLabel || '') + '自动编码数字已超过 999 上限，已回退默认编码', { type: 'warn', duration: 6000 });
+        return fallbackSegment || null;
+    }
+    return inferred.segment || null;
+}
+
+function generateRootCode() {
+    var siblingCodes = Object.keys(gistData.products || {});
+    var segment = inferContainerSegment(siblingCodes, legacyDefaultRootSegment(), '大类');
+    if (!segment) { toast('大类编码已达上限，无法自动生成', 'error'); return null; }
+    return segment;
 }
 
 function generateChildCode(parentCode) {
     var parent = findNodeByCode(parentCode);
     if (!parent) return null;
     var children = (parent.children && typeof parent.children === 'object') ? parent.children : {};
-    var maxNum = 0;
-    Object.keys(children).forEach(function (key) {
-        var last = String(key).split('/').pop();
-        if (!/^B\d+$/.test(last)) return;
-        var num = parseInt(last.slice(1), 10);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
-    });
-    var next = maxNum + 1;
-    if (next > 999) { toast('子类编码已达 B999 上限', 'error'); return null; }
-    return parentCode + '/B' + String(next).padStart(3, '0');
+    var segment = inferContainerSegment(Object.keys(children), legacyDefaultChildSegment(parent), '子类');
+    if (!segment) { toast('子类编码已达上限，无法自动生成', 'error'); return null; }
+    return composeFullCode(parentCode, segment);
 }
 
 function generateItemCode(parentCode) {
     var parent = findNodeByCode(parentCode);
     if (!parent) return null;
-    var items = Array.isArray(parent.items) ? parent.items : [];
-    var maxNum = 0;
-    items.forEach(function (item) {
-        if (!item || !item.code) return;
-        var last = String(item.code).split('/').pop();
-        if (!/^\d+$/.test(last)) return;
-        var num = parseInt(last, 10);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
-    });
-    var next = maxNum + 1;
-    if (next > 999) { toast('库存编码已达 999 上限', 'error'); return null; }
-    return parentCode + '/' + String(next).padStart(3, '0');
+    var siblingCodes = (Array.isArray(parent.items) ? parent.items : []).map(function (item) { return item && item.code; });
+    var segment = inferContainerSegment(siblingCodes, legacyDefaultItemSegment(parent), '库存');
+    if (!segment) { toast('库存编码已达上限，无法自动生成', 'error'); return null; }
+    return composeFullCode(parentCode, segment);
 }
 
 // ============================================================
@@ -3942,6 +4154,11 @@ function nodeMatchesTerm(node, code, term) {
     if (includesTerm(node.orderNumber, term) || includesTerm(node.trackingNumber, term) || includesTerm(node.remark, term)) return true;
     if (includesTerm(Z.normalizeStatus(node.status), term)) return true;
     if (Array.isArray(node.qrLinks) && node.qrLinks.some(function (link) { return includesTerm(link, term); })) return true;
+    // R5：类目条码节点搜索时把“自动汇总状态”也纳入匹配（如搜“部分在售”）
+    if (node.unified !== false && typeof Z.aggregateItemStatus === 'function') {
+        var aggregated = Z.aggregateItemStatus(node);
+        if (includesTerm(aggregated.label, term)) return true;
+    }
     return false;
 }
 
@@ -4040,7 +4257,13 @@ function buildNodeHtml(code, node, depth, term, ctx) {
         if (statsCache) statsCache.set(code, stats);
     }
     var unified = node.unified !== false;
-    var nodeStatus = Z.normalizeStatus(node.status);
+    // R5：类目条码节点的状态由类目下商品自动汇总；单件条码节点仍展示自身状态
+    var aggregatedStatus = unified ? Z.aggregateItemStatus(node) : null;
+    var nodeStatus = aggregatedStatus ? aggregatedStatus.label : Z.normalizeStatus(node.status);
+    var nodeStatusClass = aggregatedStatus ? aggregatedStatus.cls : Z.statusClass(nodeStatus);
+    var nodeStatusTitle = aggregatedStatus
+        ? ('在售 ' + aggregatedStatus.counts['在售'] + ' / 售出 ' + aggregatedStatus.counts['售出'] + ' / 待售 ' + aggregatedStatus.counts['待售'] + '（共 ' + aggregatedStatus.total + ' 件）')
+        : '';
     var hasToggle = childResults.length > 0 || allItems.length > 0;
 
     var toggleIcon = hasToggle
@@ -4084,9 +4307,9 @@ function buildNodeHtml(code, node, depth, term, ctx) {
         + toggleIcon
         + '<span class="name" data-action="toggle" data-code="' + esc(code) + '" role="button" tabindex="0">' + highlightText(node.name || code, term) + '</span>'
         + '<span class="code">' + highlightText(code, term) + '</span>'
-        + '<span class="badge" style="background:' + (unified ? '#dbeafe' : '#fef3c7') + ';">' + (unified ? '统一' : '不统一') + '</span>'
-        + '<span class="status-badge ' + Z.statusClass(nodeStatus) + '">' + esc(nodeStatus) + '</span>'
-        + (node.orderNumber ? '<span class="badge" style="background:#e0e7ff;">📋' + highlightText(node.orderNumber, term) + '</span>' : '')
+        + '<span class="badge" style="background:' + (unified ? '#dbeafe' : '#fef3c7') + ';" title="' + (unified ? '类目条码：整个类目共用一个编码' : '单件条码：每个库存单独编码') + '">' + (unified ? '类目' : '单件') + '</span>'
+        + '<span class="status-badge ' + nodeStatusClass + '"' + (nodeStatusTitle ? ' title="' + esc(nodeStatusTitle) + '"' : '') + '>' + esc(nodeStatus) + '</span>'
+        + ((!unified && node.orderNumber) ? '<span class="badge" style="background:#e0e7ff;">📋' + highlightText(node.orderNumber, term) + '</span>' : '')
         + nodeSummaryHtml
         + '<span class="actions">' + actions + '</span>'
         + '</div>'
@@ -4197,7 +4420,6 @@ function onTreeClick(event) {
     var code = el.getAttribute('data-code');
     var parent = el.getAttribute('data-parent');
     var itemCode = el.getAttribute('data-item');
-    if (isSaving && action !== 'toggle') { toast('正在保存，请稍候…', 'warn'); return; }
     switch (action) {
         case 'toggle': toggleNode(code); break;
         case 'edit-node': openNodeModal('edit', code); break;
@@ -4254,15 +4476,136 @@ function onTreeDblClick(event) {
 }
 
 // ============================================================
-// 保存引擎封装（ops + 三方合并 + 串行锁 + 冲突 UI）
+// 保存引擎封装（R5：乐观更新 + 后台合并保存队列 + 三方合并 + 冲突 UI）
+// 设计要点：
+// - 用户点保存 → 先本地 applyOps 立即生效并关闭弹窗，不再等待远端；
+// - 多次编辑合并排队，后台单批串行写入（保持 ops 顺序）；
+// - 保存返回时若期间又有新编辑，不用返回值覆盖本地乐观数据（只更新 baseDoc/syncMeta）；
+// - 失败 → 顶部保存指示可点击重试 + refreshFromRemote 回滚到远端真值。
 // ============================================================
-function setGlobalBusy(busy) {
-    [addRootBtn, refreshBtn, logoutBtn, modalNodeSave, modalItemSave, batchStatusSave, deleteConfirmOk, dataMenuBtn].forEach(function (btn) {
-        if (!btn) return;
-        if (busy) btn.disabled = true;
-        else btn.disabled = false;
+var saveStateTimer = null;
+
+/** 顶部轻量保存状态指示（非阻塞）：saving / saved / failed / idle */
+function updateSaveState(mode, detail) {
+    if (!saveStateEl) return;
+    if (saveStateTimer) { clearTimeout(saveStateTimer); saveStateTimer = null; }
+    if (mode === 'saving') {
+        saveStateEl.textContent = '⟳ 保存中…';
+        saveStateEl.className = 'sync-meta save-state is-saving';
+        saveStateEl.removeAttribute('title');
+        saveStateEl.onclick = null;
+    } else if (mode === 'saved') {
+        saveStateEl.textContent = '✓ 已保存 ' + Z.formatTime(new Date());
+        saveStateEl.className = 'sync-meta save-state is-saved';
+        saveStateEl.removeAttribute('title');
+        saveStateEl.onclick = null;
+    } else if (mode === 'failed') {
+        saveStateEl.textContent = '⚠ 保存失败，点此重试';
+        saveStateEl.className = 'sync-meta save-state is-error';
+        saveStateEl.title = detail || '点击重试';
+        saveStateEl.onclick = retryFailedSave;
+    } else {
+        saveStateEl.textContent = '';
+        saveStateEl.className = 'sync-meta save-state';
+        saveStateEl.removeAttribute('title');
+        saveStateEl.onclick = null;
+    }
+}
+
+/** 分批把排队中的 ops 写入远端；写入成功后自动排空队列 */
+function flushSaveQueue() {
+    if (saveQueue.inFlight) return;
+    if (!saveQueue.pendingOps.length) return;
+    if (readOnly || isLoading) return;
+    var batchOps = saveQueue.pendingOps;
+    saveQueue.pendingOps = [];
+    var batchSeq = localEditSeq;
+    var batchEpoch = loadEpoch;
+    var batchMessage = saveQueue.lastMessage;
+    var batchOnConflict = saveQueue.onConflict || showConflictDialog;
+    var batchOnRetry = saveQueue.onRetry;
+    saveQueue.lastMessage = '';
+    saveQueue.onConflict = null;
+    saveQueue.onRetry = null;
+    saveQueue.inFlight = true;
+    isSaving = true;
+    // 每批保存前做一次本地快照（失败不影响远端保存）
+    takeSnapshotBeforeSave();
+    updateSaveState('saving');
+    Z.save({
+        token: currentToken,
+        gistId: currentGistId,
+        filename: currentFilename,
+        baseDoc: baseDoc,
+        ops: batchOps,
+        onConflict: batchOnConflict,
+        onRetry: function (err, attempt) {
+            if (typeof batchOnRetry === 'function') batchOnRetry(err, attempt);
+            else toast('网络异常，正在自动重试（第 ' + (attempt + 1) + ' 次）…', 'warn');
+        }
+    }).then(function (result) {
+        saveQueue.inFlight = false;
+        isSaving = false;
+        if (batchEpoch !== loadEpoch) return; // 已退出登录/切换账号：丢弃旧保存结果
+        // 与加载时一致：baseDoc 保留远端原始值（含历史别名），展示态数据做归一
+        var rawDoc = Z.clone(result.data);
+        normalizeDoc(result.data);
+        baseDoc = rawDoc;
+        syncMeta = {
+            updatedAt: result.updatedAt || syncMeta.updatedAt,
+            revision: result.revision || syncMeta.revision,
+            size: result.size || syncMeta.size,
+            lastSyncAt: Date.now()
+        };
+        updateSyncMeta();
+        if (localEditSeq !== batchSeq) {
+            // 竞态保护：保存期间又有新编辑 → 保留本地乐观数据，只更新基准与同步信息
+            updateRecycleCount();
+        } else {
+            gistData = result.data;
+            invalidateViewCaches();
+            populateFilter();
+            renderTree();
+            updateSummaryBar();
+            updateRecycleCount();
+        }
+        if (result.unchanged) {
+            if (result.conflicts && result.conflicts.length) toast('未写入改动：冲突已按你的选择保留远端版本', { type: 'warn', duration: 5000 });
+            else toast('数据没有变化', 'info');
+        } else {
+            toast(batchMessage || '保存成功', 'success');
+        }
+        if (result.conflicts && result.conflicts.length) {
+            toast('已按你的选择解决 ' + result.conflicts.length + ' 处冲突', { type: 'warn', duration: 5000 });
+        }
+        updateSaveState('saved');
+        if (saveQueue.pendingOps.length) setTimeout(function () { flushSaveQueue(); }, 0);
+    }).catch(function (err) {
+        saveQueue.inFlight = false;
+        isSaving = false;
+        if (batchEpoch !== loadEpoch) return; // 已退出登录：不回滚、不提示
+        var tip = Z.friendlyError(err);
+        // 失败批次留作“点此重试”；其余排队改动随回滚一起丢弃
+        saveQueue.failed = { ops: batchOps, message: batchMessage, onConflict: batchOnConflict, onRetry: batchOnRetry };
+        saveQueue.pendingOps = [];
+        updateSaveState('failed', '保存失败：' + tip + '（点击重试）');
+        toast('保存失败：' + tip + '；已回滚到远端最新数据', { type: 'error', duration: 8000 });
+        refreshFromRemote();
     });
-    if (!busy) updateDeleteConfirmState();
+}
+
+/** 顶栏“保存失败，点此重试” */
+function retryFailedSave() {
+    var failed = saveQueue.failed;
+    if (!failed || !failed.ops || !failed.ops.length) return;
+    if (readOnly || isLoading) { toast('当前无法保存，请先等待数据加载完成', 'warn'); return; }
+    saveQueue.failed = null;
+    updateSaveState('idle');
+    saveWithOps(failed.ops, {
+        successMessage: failed.message,
+        onConflict: failed.onConflict,
+        onRetry: failed.onRetry
+    });
 }
 
 function fieldDiff(values, base) {
@@ -4279,63 +4622,33 @@ function saveWithOps(ops, options) {
         toast('当前处于只读保护状态，无法写入数据。请先重试加载成功。', { type: 'error', duration: 7000 });
         return Promise.resolve(null);
     }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return Promise.resolve(null); }
     if (isLoading) { toast('正在加载最新数据，请稍候…', 'warn'); return Promise.resolve(null); }
     if (!ops || !ops.length) { toast('没有需要保存的修改', 'info'); return Promise.resolve(null); }
-    isSaving = true;
-    setGlobalBusy(true);
-    if (treeSavingMask) treeSavingMask.classList.add('active');
-    // 保存前自动做本地快照（失败不影响远端保存）
-    takeSnapshotBeforeSave();
-    return Z.save({
-        token: currentToken,
-        gistId: currentGistId,
-        filename: currentFilename,
-        baseDoc: baseDoc,
-        ops: ops,
-        onConflict: options.onConflict || showConflictDialog,
-        onRetry: function (err, attempt) {
-            if (options.onRetry) options.onRetry(err, attempt);
-            else toast('网络异常，正在自动重试（第 ' + (attempt + 1) + ' 次）…', 'warn');
-        }
-    }).then(function (result) {
-        // 与加载时一致：baseDoc 保留远端原始值（含历史别名），展示态数据做归一
-        var rawDoc = Z.clone(result.data);
-        normalizeDoc(result.data);
-        gistData = result.data;
-        baseDoc = rawDoc;
-        syncMeta = {
-            updatedAt: result.updatedAt || syncMeta.updatedAt,
-            revision: result.revision || syncMeta.revision,
-            size: result.size || syncMeta.size,
-            lastSyncAt: Date.now()
-        };
-        updateSyncMeta();
-        invalidateViewCaches();
-        populateFilter();
-        renderTree();
-        updateSummaryBar();
-        updateRecycleCount();
-        if (result.unchanged) {
-            if (result.conflicts && result.conflicts.length) toast('未写入改动：冲突已按你的选择保留远端版本', { type: 'warn', duration: 5000 });
-            else toast('数据没有变化', 'info');
-        } else {
-            toast(options.successMessage || '保存成功', 'success');
-        }
-        if (result.conflicts && result.conflicts.length) {
-            toast('已按你的选择解决 ' + result.conflicts.length + ' 处冲突', { type: 'warn', duration: 5000 });
-        }
-        return result;
-    }).catch(function (err) {
-        var tip = Z.friendlyError(err);
-        toast('保存失败：' + tip, { type: 'error', duration: 7000 });
-        if (options.onError) options.onError(err, tip);
-        return null;
-    }).finally(function () {
-        isSaving = false;
-        if (treeSavingMask) treeSavingMask.classList.remove('active');
-        setGlobalBusy(false);
-    });
+    // 1) 乐观更新：先在本地应用 ops（失败则不产生任何本地改动）
+    var optimistic = Z.clone(gistData);
+    try {
+        Z.applyOps(optimistic, ops, baseDoc, null, []);
+    } catch (err) {
+        var applyTip = Z.friendlyError(err);
+        toast('保存失败：' + applyTip, { type: 'error', duration: 7000 });
+        if (options.onError) options.onError(err, applyTip);
+        return Promise.resolve(null);
+    }
+    localEditSeq += 1;
+    gistData = optimistic;
+    invalidateViewCaches();
+    populateFilter();
+    renderTree();
+    updateSummaryBar();
+    updateRecycleCount();
+    // 2) 入队，后台合并保存（立即返回，调用方可以马上关闭弹窗）
+    saveQueue.pendingOps = saveQueue.pendingOps.concat(ops);
+    if (options.successMessage) saveQueue.lastMessage = options.successMessage;
+    if (options.onConflict) saveQueue.onConflict = options.onConflict;
+    if (options.onRetry) saveQueue.onRetry = options.onRetry;
+    saveQueue.failed = null;
+    flushSaveQueue();
+    return Promise.resolve({ optimistic: true, queued: true });
 }
 
 // ---------- 冲突处理弹窗 ----------
@@ -4439,19 +4752,26 @@ function collectNodeFormValues() {
     };
 }
 
+/** 编辑节点时推断其父编码前缀（根节点返回 ''） */
+function parentCodeOfNode(code) {
+    var entry = findNodeEntry(code);
+    return entry && entry.parentCode ? entry.parentCode : '';
+}
+
 function openNodeModal(mode, code, parentCode) {
     if (readOnly) { toast('当前为只读保护状态，无法编辑。请先重试加载。', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     modalNodeCodeCustom.checked = false;
     if (mode === 'add') {
         // 新增节点：只有新增时才创建空 children（编辑绝不携带 children/items）
-        var defaultCode = parentCode ? generateChildCode(parentCode) : generateRootCode();
-        if (!defaultCode) return;
-        editContext = { nodeMode: 'add', originalCode: null, parentCode: parentCode || '', baseNode: null, autoCode: defaultCode };
+        var addParent = parentCode || '';
+        var defaultFullCode = addParent ? generateChildCode(addParent) : generateRootCode();
+        if (!defaultFullCode) return;
+        editContext = { nodeMode: 'add', originalCode: null, parentCode: addParent, baseNode: null, autoCode: defaultFullCode };
         modalNodeMode.value = 'add';
-        modalNodeParent.value = parentCode || '';
-        modalNodeTitle.textContent = parentCode ? '添加子类' : '添加大类';
-        modalNodeCode.value = defaultCode;
+        modalNodeParent.value = addParent;
+        modalNodeTitle.textContent = addParent ? '添加子类' : '添加大类';
+        modalNodeCode.value = codeSegmentOf(defaultFullCode);
         modalNodeName.value = '';
         modalNodeUnified.value = 'true';
         modalNodeCost.value = '';
@@ -4464,18 +4784,20 @@ function openNodeModal(mode, code, parentCode) {
     } else {
         var node = findNodeByCode(code);
         if (!node || Z.isDeleted(node)) { toast('节点不存在或已在回收站', 'error'); return; }
+        var editParent = parentCodeOfNode(code);
         editContext = {
             nodeMode: 'edit',
             originalCode: code,
-            parentCode: '',
+            parentCode: editParent,
             baseNode: Z.clone(baseNodeOf(code) || node),
             autoCode: code
         };
         modalNodeMode.value = 'edit';
         modalNodeOriginalCode.value = code;
-        modalNodeParent.value = '';
+        modalNodeParent.value = editParent;
         modalNodeTitle.textContent = '编辑节点';
-        modalNodeCode.value = code;
+        // 输入框只回填本级段（父编码前缀在上方只读展示）
+        modalNodeCode.value = codeSegmentOf(code);
         modalNodeName.value = node.name || '';
         modalNodeUnified.value = node.unified !== false ? 'true' : 'false';
         modalNodeCost.value = node.cost === undefined || node.cost === null ? '' : node.cost;
@@ -4486,6 +4808,7 @@ function openNodeModal(mode, code, parentCode) {
         fillStatusSelect(modalNodeStatus, node.status);
     }
     updateNodeCodeUI();
+    updateUnifiedFieldsUI();
     openOverlay(modalNodeOverlay);
     resetSaveButton(modalNodeSave, nodeSaveStatus);
     setTimeout(function () { modalNodeName.focus(); }, 30);
@@ -4499,44 +4822,76 @@ function closeNodeModal() {
 
 function saveNode() {
     if (readOnly) { toast('当前为只读保护状态，无法保存。请先重试加载。', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
     if (!editContext) return;
     var mode = editContext.nodeMode;
     var custom = !!(modalNodeCodeCustom && modalNodeCodeCustom.checked);
-    var code = Z.normalizeCode(modalNodeCode.value);
-    var nodeForm = collectNodeFormValues();
-    if (!nodeForm.ok) {
-        toast(nodeForm.error, 'error');
-        modalNodeCost.focus();
-        return;
+    var prefix = editContext.parentCode || '';
+    var originalCode = editContext.originalCode;
+    var code = '';
+    var rawSegment = String(modalNodeCode.value === undefined || modalNodeCode.value === null ? '' : modalNodeCode.value).trim();
+    if (custom && !rawSegment) {
+        // 勾选自定义但留空：新增仍自动生成；编辑提示补全
+        if (mode === 'edit') {
+            toast('编码不能为空；如需保留原编码请取消勾选“自定义编码”', { type: 'error', duration: 7000 });
+            modalNodeCode.focus();
+            return;
+        }
+        code = editContext.autoCode || (prefix ? generateChildCode(prefix) : generateRootCode());
+        if (!code) return;
+        modalNodeCode.value = codeSegmentOf(code);
+    } else if (custom) {
+        // 用户若粘贴了完整编码：自动剥离只读父前缀，避免误判
+        if (prefix && rawSegment.indexOf(prefix + '/') === 0) {
+            rawSegment = rawSegment.slice(prefix.length + 1).trim();
+            toast('已自动去掉父编码前缀，只保留本级编码：' + rawSegment, { type: 'info', duration: 5000 });
+        }
+        if (rawSegment.indexOf('/') !== -1) {
+            toast('自定义编码只填本级段，不能包含“/”；父编码前缀不可在此修改', { type: 'error', duration: 7000 });
+            modalNodeCode.focus();
+            return;
+        }
+        var segmentError = validateCodeSegment(rawSegment);
+        if (segmentError) {
+            toast(segmentError, { type: 'error', duration: 7000 });
+            modalNodeCode.focus();
+            return;
+        }
+        if (rawSegment !== rawSegment.toUpperCase()) {
+            rawSegment = rawSegment.toUpperCase();
+            toast('编码已自动转为大写：' + rawSegment, { type: 'info', duration: 5000 });
+        }
+        code = composeFullCode(prefix, rawSegment);
+        modalNodeCode.value = rawSegment;
+        var formatError = validateNodeCodeFormat(code, mode);
+        if (formatError) { toast(formatError, { type: 'error', duration: 7000 }); modalNodeCode.focus(); return; }
+    } else if (mode === 'add') {
+        // 留空/自动模式：沿用打开弹窗时生成的编码
+        code = editContext.autoCode || (prefix ? generateChildCode(prefix) : generateRootCode());
+        if (!code) return;
+        modalNodeCode.value = codeSegmentOf(code);
+    } else {
+        // 未开启“自定义编码”时，编码只读，不允许被脚本/输入意外修改
+        code = originalCode;
+        modalNodeCode.value = codeSegmentOf(code);
     }
+    var nodeForm = collectNodeFormValues();
     var values = nodeForm.values;
     if (!values.name) {
         toast('名称不能为空', 'error');
         modalNodeName.focus();
         return;
     }
-    if (!code) {
-        if (mode === 'add') {
-            code = editContext.autoCode || (editContext.parentCode ? generateChildCode(editContext.parentCode) : generateRootCode());
-            if (!code) return;
-        } else {
-            toast('编码不能为空', 'error');
-            return;
-        }
+    if (values.unified) {
+        // 类目条码：成本/快递单号/订单号/状态由类目下商品承载，从节点数据中清除
+        values.cost = undefined;
+        values.trackingNumber = undefined;
+        values.orderNumber = undefined;
+        values.status = undefined;
+    } else if (!nodeForm.ok) {
+        toast(nodeForm.error, 'error');
+        modalNodeCost.focus();
+        return;
     }
-    if (mode === 'add' && !custom) {
-        code = editContext.autoCode || code;
-    }
-    var originalCode = editContext.originalCode;
-    if (custom) {
-        var formatError = validateNodeCodeFormat(code, mode);
-        if (formatError) { toast(formatError, { type: 'error', duration: 7000 }); modalNodeCode.focus(); return; }
-    } else if (mode === 'edit') {
-        // 未开启“自定义编码”时，编码只读，不允许被脚本/输入意外修改
-        code = originalCode;
-    }
-    modalNodeCode.value = code;
     if (mode === 'add') {
         if (findCodeCollision(code, null)) {
             toast('编码已被占用（节点与库存编码全局唯一）：' + code, { type: 'error', duration: 7000 });
@@ -4557,8 +4912,8 @@ function saveNode() {
     } else {
         var baseNode = editContext.baseNode;
         fields = fieldDiff(values, baseNode);
-        // 历史数据节点可能没有 status 字段：默认“在售”不主动写入，避免制造无意义改动
-        if (fields.status !== undefined && baseNode.status === undefined && fields.status === STATUS.ON_SALE) {
+        // 单件条码节点历史数据可能没有 status：默认“在售”不主动写入，避免制造无意义改动
+        if (!values.unified && fields.status !== undefined && baseNode.status === undefined && fields.status === STATUS.ON_SALE) {
             delete fields.status;
         }
         if (!Object.keys(fields).length && Z.sameCode(code, originalCode)) {
@@ -4577,10 +4932,8 @@ function saveNode() {
         fields: fields
     };
     function proceed() {
-        modalNodeSave.disabled = true;
-        modalNodeSave.textContent = '保存中…';
-        nodeSaveStatus.innerHTML = '<span class="spinner"></span> 保存中…';
         var successMessage = (mode === 'add' ? '已添加节点 ' : '已保存节点 ') + code;
+        // R5：乐观更新后立即关闭弹窗，远端保存交给后台队列（进度见顶部保存指示）
         return saveWithOps([op], {
             successMessage: successMessage,
             onError: function (err, tip) { nodeSaveStatus.textContent = '保存失败：' + tip; }
@@ -4629,7 +4982,7 @@ function collectItemFormValues() {
 
 function openItemModal(mode, parentCode, itemCode) {
     if (readOnly) { toast('当前为只读保护状态，无法编辑。请先重试加载。', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var parent = findNodeByCode(parentCode);
     if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); return; }
     modalItemParentCode.value = parentCode;
@@ -4641,7 +4994,7 @@ function openItemModal(mode, parentCode, itemCode) {
         modalItemTitle.textContent = '添加库存';
         if (itemQtyRow) itemQtyRow.style.display = 'block';
         if (modalItemQty) modalItemQty.value = '1';
-        modalItemCode.value = defaultCode;
+        modalItemCode.value = codeSegmentOf(defaultCode);
         modalItemName.value = '';
         modalItemCost.value = '';
         modalItemTracking.value = '';
@@ -4662,7 +5015,7 @@ function openItemModal(mode, parentCode, itemCode) {
         };
         modalItemTitle.textContent = '编辑库存';
         if (itemQtyRow) itemQtyRow.style.display = 'none';
-        modalItemCode.value = item.code || '';
+        modalItemCode.value = codeSegmentOf(item.code || '');
         modalItemName.value = item.name || '';
         modalItemCost.value = item.cost === undefined || item.cost === null ? '' : item.cost;
         modalItemTracking.value = item.trackingNumber || '';
@@ -4686,33 +5039,49 @@ function closeItemModal() {
 
 function saveItem() {
     if (readOnly) { toast('当前为只读保护状态，无法保存。请先重试加载。', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
     if (!itemContext) return;
     var parentCode = itemContext.parentCode;
     var parent = findNodeByCode(parentCode);
     if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); return; }
     var custom = !!(modalItemCodeCustom && modalItemCodeCustom.checked);
-    var code = Z.normalizeCode(modalItemCode.value);
-    if (!code) {
-        code = itemContext.autoCode || generateItemCode(parentCode);
-        if (!code) return;
-    }
-    if (itemContext.itemMode === 'add' && !custom) {
-        code = itemContext.autoCode || code;
-    }
     var originalCode = itemContext.originalCode;
-    if (custom) {
+    var code = '';
+    var rawSegment = String(modalItemCode.value === undefined || modalItemCode.value === null ? '' : modalItemCode.value).trim();
+    if (custom && rawSegment) {
+        // 用户若粘贴了完整编码：自动剥离只读父前缀，避免误判
+        if (rawSegment.indexOf(parentCode + '/') === 0) {
+            rawSegment = rawSegment.slice(parentCode.length + 1).trim();
+            toast('已自动去掉父节点编码前缀，只保留本级编码：' + rawSegment, { type: 'info', duration: 5000 });
+        }
+        if (rawSegment.indexOf('/') !== -1) {
+            toast('自定义编码只填本级段，不能包含“/”；父节点编码前缀不可在此修改', { type: 'error', duration: 7000 });
+            modalItemCode.focus();
+            return;
+        }
+        var segmentError = validateCodeSegment(rawSegment);
+        if (segmentError) {
+            toast(segmentError, { type: 'error', duration: 7000 });
+            modalItemCode.focus();
+            return;
+        }
+        if (rawSegment !== rawSegment.toUpperCase()) {
+            rawSegment = rawSegment.toUpperCase();
+            toast('编码已自动转为大写：' + rawSegment, { type: 'info', duration: 5000 });
+        }
+        code = composeFullCode(parentCode, rawSegment);
+        modalItemCode.value = rawSegment;
         var formatError = validateItemCodeFormat(code, parentCode);
         if (formatError) { toast(formatError, { type: 'error', duration: 7000 }); modalItemCode.focus(); return; }
         if (findCodeCollision(code, originalCode)) {
             toast('编码已被占用（节点与库存编码全局唯一）：' + code, { type: 'error', duration: 7000 });
             return;
         }
-    } else if (itemContext.itemMode === 'edit') {
-        // 未开启“自定义编码”时，编码只读
-        code = originalCode;
+    } else {
+        // 留空自动生成：新增用自动编码；编辑沿用原编码
+        code = itemContext.autoCode || (itemContext.itemMode === 'add' ? generateItemCode(parentCode) : originalCode);
+        if (!code) return;
+        modalItemCode.value = codeSegmentOf(code);
     }
-    modalItemCode.value = code;
     var itemForm = collectItemFormValues();
     if (!itemForm.ok) {
         toast(itemForm.error, 'error');
@@ -4744,9 +5113,7 @@ function saveItem() {
                     fields: Z.clone(batchFields)
                 };
             });
-            modalItemSave.disabled = true;
-            modalItemSave.textContent = '保存中…';
-            itemSaveStatus.innerHTML = '<span class="spinner"></span> 批量保存 ' + qty + ' 件…';
+            // R5：乐观更新后立即关闭弹窗
             saveWithOps(batchOps, {
                 successMessage: '已批量添加 ' + qty + ' 件库存（' + codes[0] + ' ~ ' + codes[codes.length - 1] + '）',
                 onError: function (err, tip) { itemSaveStatus.textContent = '保存失败：' + tip; }
@@ -4790,9 +5157,6 @@ function saveItem() {
             fields: fields
         };
     }
-    modalItemSave.disabled = true;
-    modalItemSave.textContent = '保存中…';
-    itemSaveStatus.innerHTML = '<span class="spinner"></span> 保存中…';
     var successMessage = (itemContext.itemMode === 'add' ? '已添加库存 ' : '已保存库存 ') + code;
     saveWithOps([op], {
         successMessage: successMessage,
@@ -4817,7 +5181,7 @@ function updateDeleteConfirmState() {
     if (!deleteState) return;
     var typed = deleteConfirmInput.value;
     var ok = Z.sameCode(typed, deleteState.code);
-    deleteConfirmOk.disabled = !ok || isSaving;
+    deleteConfirmOk.disabled = !ok;
 }
 
 function showDeleteConfirm(opts) {
@@ -4840,7 +5204,7 @@ function cancelDelete() {
 }
 
 function confirmDelete() {
-    if (!deleteState || isSaving) return;
+    if (!deleteState) return;
     if (!Z.sameCode(deleteConfirmInput.value, deleteState.code)) return;
     var state = deleteState;
     deleteConfirmOk.disabled = true;
@@ -4867,7 +5231,7 @@ function confirmDelete() {
 
 function deleteNode(code) {
     if (readOnly) { toast('当前为只读保护状态，无法删除。请先重试加载。', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var entry = findNodeEntry(code);
     if (!entry || Z.isDeleted(entry.node)) { toast('节点不存在或已在回收站', 'error'); return; }
     var counts = countNodeContents(entry.node, false);
@@ -4902,7 +5266,7 @@ function deleteNode(code) {
 
 function deleteItem(parentCode, itemCode) {
     if (readOnly) { toast('当前为只读保护状态，无法删除。请先重试加载。', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var parent = findNodeByCode(parentCode);
     if (!parent || Z.isDeleted(parent)) { toast('父节点不存在或已在回收站', 'error'); return; }
     var item = Z.findItem(parent, itemCode);
@@ -4953,7 +5317,7 @@ function toggleSelectAll(checkbox, parentCode) {
 
 function openBatchStatus(parentCode) {
     if (readOnly) { toast('当前为只读保护状态，无法修改。请先重试加载。', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var selected = getSelectedItems(parentCode);
     if (!selected.length) { toast('请先选择要修改的库存项', 'warn'); return; }
     batchContext = { entries: [{ parentCode: parentCode, itemCodes: selected }] };
@@ -4965,7 +5329,7 @@ function openBatchStatus(parentCode) {
 
 function openGlobalBatchStatus() {
     if (readOnly) { toast('当前为只读保护状态，无法修改。请先重试加载。', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var entries = collectCheckedItemEntries();
     var total = entries.reduce(function (sum, entry) { return sum + entry.itemCodes.length; }, 0);
     if (!total) { toast('请先勾选要修改状态的库存项（可用“全选当前筛选结果”）', 'warn'); return; }
@@ -4979,7 +5343,7 @@ function openGlobalBatchStatus() {
 function applyBatchStatus() {
     if (!batchContext) return;
     if (readOnly) { toast('当前为只读保护状态，无法保存。请先重试加载。', 'error'); return; }
-    if (isSaving) { toast('正在保存，请稍候…', 'warn'); return; }
+
     var target = Z.normalizeStatus(batchStatusSelect.value);
     var ops = [];
     (batchContext.entries || []).forEach(function (entry) {
@@ -5002,11 +5366,8 @@ function applyBatchStatus() {
         });
     });
     if (!ops.length) { toast('所选库存状态未变化', 'info'); closeOverlay(batchStatusOverlay); return; }
-    batchStatusSave.disabled = true;
-    batchStatusSave.textContent = '保存中…';
+    // R5：乐观更新后立即关闭弹窗，远端写入交给后台队列
     saveWithOps(ops, { successMessage: '已修改 ' + ops.length + ' 项库存状态为「' + target + '」' }).then(function (result) {
-        batchStatusSave.disabled = false;
-        batchStatusSave.textContent = '确定修改';
         if (result) {
             closeOverlay(batchStatusOverlay);
             updateGlobalSelection();
@@ -5153,23 +5514,27 @@ importFile.addEventListener('change', function () {
     if (file) handleImportFile(file);
 });
 
-// 自定义编码开关（默认关闭 = 自动编码且只读）
+// 自定义编码开关（默认关闭 = 自动编码且只读；输入框始终只显示本级段）
 modalNodeCodeCustom.addEventListener('change', function () {
     updateNodeCodeUI();
     if (!modalNodeCodeCustom.checked && editContext) {
-        modalNodeCode.value = editContext.autoCode || editContext.originalCode || '';
+        modalNodeCode.value = codeSegmentOf(editContext.autoCode || editContext.originalCode || '');
     } else if (modalNodeCodeCustom.checked) {
         modalNodeCode.focus();
+        modalNodeCode.select();
     }
 });
 modalItemCodeCustom.addEventListener('change', function () {
     updateItemCodeUI();
     if (!modalItemCodeCustom.checked && itemContext) {
-        modalItemCode.value = itemContext.autoCode || itemContext.originalCode || '';
+        modalItemCode.value = codeSegmentOf(itemContext.autoCode || itemContext.originalCode || '');
     } else if (modalItemCodeCustom.checked) {
         modalItemCode.focus();
+        modalItemCode.select();
     }
 });
+// 类目条码开关：切换时隐藏/显示成本、快递单号、订单号与状态下拉
+if (modalNodeUnified) modalNodeUnified.addEventListener('change', updateUnifiedFieldsUI);
 
 // 通用确认弹窗
 confirmCancel.addEventListener('click', cancelConfirm);
@@ -5856,25 +6221,32 @@ window.openBatchStatus = openBatchStatus;
         });
     }
 
+    // R5：虚拟打印机关键字（覆盖常见 PDF/虚拟打印驱动）；默认优先实体打印机
+    var VIRTUAL_PRINTER_KEYWORDS = ['pdf', 'wps', 'fax', 'virtual', 'onenote', 'one note', 'xps', 'print to pdf',
+        'microsoft print to pdf', 'adobe pdf', 'cutepdf', 'foxit', 'dopdf', '导出为', '发送到wps', 'microsoft xps'];
+    function isVirtualPrinterName(name) {
+        var lower = String(name === undefined || name === null ? '' : name).toLowerCase();
+        if (!lower) return true;
+        return VIRTUAL_PRINTER_KEYWORDS.some(function (keyword) { return lower.indexOf(keyword) !== -1; });
+    }
+
     function populatePrinters() {
-        const printers = getPrinterList();        printerSelect.innerHTML = '';
+        const printers = getPrinterList();
+        printerSelect.innerHTML = '';
         printersAvailable = printers.length > 0;
         if (!printersAvailable) {
             const option = document.createElement('option');
-            option.textContent = (lodopLoaderState && lodopLoaderState.loading) ? '正在连接本机 C-Lodop…' : '未检测到打印机（点打印会自动连接 C-Lodop）';
+            option.textContent = (lodopLoaderState && lodopLoaderState.loading) ? '正在连接本机 C-Lodop…' : '未检测到打印机（正在连接打印服务…）';
             option.disabled = true;
             printerSelect.appendChild(option);
-            return { printers: printers, fallback: false };
+            return { printers: printers, fallback: false, allVirtual: false, virtualRemembered: '' };
         }
-        const virtualKeywords = ['pdf', 'wps', 'fax', 'virtual', 'one note', 'onenote', 'microsoft print to pdf', 'print to pdf'];
-        let defaultIndex = 0;
+        // 默认选中第一个非虚拟（实体）打印机；全部为虚拟时选第一个并提示
+        let firstRealIndex = -1;
         for (let i = 0; i < printers.length; i++) {
-            const name = printers[i].toLowerCase();
-            if (!virtualKeywords.some(k => name.includes(k))) {
-                defaultIndex = i;
-                break;
-            }
+            if (!isVirtualPrinterName(printers[i])) { firstRealIndex = i; break; }
         }
+        let defaultIndex = firstRealIndex !== -1 ? firstRealIndex : 0;
         printers.forEach((name, index) => {
             const option = document.createElement('option');
             option.value = index;
@@ -5882,23 +6254,57 @@ window.openBatchStatus = openBatchStatus;
             printerSelect.appendChild(option);
         });
         let fallback = false;
+        let virtualRemembered = '';
         if (printSettings.printerName) {
             const savedIndex = printers.indexOf(printSettings.printerName);
-            if (savedIndex !== -1) defaultIndex = savedIndex;
-            else fallback = true; // H-2：保存的打印机不在当前列表 → 回退第一个非虚拟打印机
+            if (savedIndex === -1) {
+                fallback = true; // H-2：保存的打印机不在当前列表 → 回退第一个非虚拟打印机
+            } else if (isVirtualPrinterName(printers[savedIndex])) {
+                // R5：记忆的是虚拟打印机 → 仍优先实体打印机并提示
+                virtualRemembered = printers[savedIndex];
+            } else {
+                defaultIndex = savedIndex;
+            }
         }
         printerSelect.value = String(defaultIndex);
-        return { printers: printers, fallback: fallback };
+        return { printers: printers, fallback: fallback, allVirtual: firstRealIndex === -1, virtualRemembered: virtualRemembered };
     }
 
-    // v2.2.1：C-Lodop 的 WebSocket 是异步建立的，连上后刷新打印机列表（打印弹窗可能已经打开）
-    window.addEventListener('zcfi:lodop-ready', function () {
-        if (!printPreviewOverlay || !printPreviewOverlay.classList.contains('active')) return;
-        if (printBusy) return;
-        populatePrinters();
+    /** 用一次 populatePrinters 的结果刷新按钮与状态（连接完成/就绪事件共用） */
+    function updatePrinterReadyUI(result, showNotice) {
+        result = result || { printers: [], fallback: false, allVirtual: false, virtualRemembered: '' };
         if (printersAvailable) {
-            printExecute.disabled = false;
-            setPrintStatus('', false);
+            if (printExecute) printExecute.disabled = false;
+            setPrintStatus('已就绪（' + result.printers.length + ' 台打印机）', false);
+        } else {
+            if (printExecute) printExecute.disabled = true;
+            var lastError = window.lodopLoaderState && window.lodopLoaderState.lastError;
+            setPrintStatus(lastError
+                ? '打印服务未连接：确认 C-Lodop 已启动；浏览器提示"访问本地网络"时选允许；若提示 8443 证书过期请升级 C-Lodop。内置示意图仍可查看版式。'
+                : '打印服务尚未就绪：请在本机启动 C-Lodop 后重新打开打印窗口；内置示意图仍可查看版式。', true);
+        }
+        refreshPrintInfo();
+        if (!showNotice || !result.printers.length) return result;
+        if (result.allVirtual) {
+            toast('未检测到实体打印机，已默认选择虚拟打印机「' + result.printers[0] + '」；如需真实打印请连接实体打印机', { type: 'warn', duration: 7000 });
+        } else if (result.virtualRemembered) {
+            toast('上次使用的打印机「' + result.virtualRemembered + '」是虚拟打印机，已改为优先实体打印机「' + (getSelectedPrinterName() || '第一个非虚拟打印机') + '」', { type: 'warn', duration: 7000 });
+        } else if (result.fallback) {
+            toast('上次使用的打印机「' + printSettings.printerName + '」不在当前打印机列表中，已回退到「' + (getSelectedPrinterName() || '第一个非虚拟打印机') + '」', { type: 'warn', duration: 6000 });
+        }
+        return result;
+    }
+    /** 重新读取打印机并刷新按钮/状态 */
+    function applyPrinterState(showNotice) {
+        return updatePrinterReadyUI(populatePrinters(), showNotice);
+    }
+
+    // v2.2.1/R5：C-Lodop 的 WebSocket 是异步建立的，连上后刷新打印机列表。
+    // 无论打印弹窗是否已打开都要刷新（之前因 active 判断提前 return，导致弹窗内状态不更新）。
+    window.addEventListener('zcfi:lodop-ready', function () {
+        var result = populatePrinters();
+        if (printPreviewOverlay && printPreviewOverlay.classList.contains('active') && !printBusy) {
+            updatePrinterReadyUI(result, false);
         }
     });
 
@@ -5918,16 +6324,11 @@ window.openBatchStatus = openBatchStatus;
         window.currentPrintDataList = resolved.dataList;
 
         selectedTemplateIndex = clampInt(printSettings.templateIndex, 0, printTemplates.length - 1, 0);
-        var printerResult = populatePrinters();
-        if (!printersAvailable) {
-            setPrintStatus('正在连接本机 C-Lodop…（首次使用请在浏览器提示"访问本地网络/设备"时选择允许）', false);
-            if (typeof window.ensureLodopLoaded === 'function') {
-                window.ensureLodopLoaded().then(function (ok) {
-                    if (ok) return; // 连上后由 zcfi:lodop-ready 刷新打印机与状态
-                    setPrintStatus('打印服务未连接：确认 C-Lodop 已启动；浏览器提示"访问本地网络"时选允许；若提示 8443 证书过期请升级 C-Lodop。', true);
-                });
-            }
-        }
+        // R5：打开弹窗先展示“正在连接打印服务…”并禁用打印；等 ensureLodopLoaded resolve 后再判定，
+        // 不再同步误报“未连接打印机，已禁用打印”。
+        populatePrinters();
+        if (printExecute) printExecute.disabled = true;
+        setPrintStatus('正在连接打印服务…（首次使用请在浏览器提示"访问本地网络/设备"时选择允许）', false);
         printCopiesInput.value = clampInt(printSettings.copies, 1, 100, 1);
         if (printPreviewMode) printPreviewMode.checked = !!printSettings.previewBeforePrint;
 
@@ -5941,19 +6342,19 @@ window.openBatchStatus = openBatchStatus;
             setPrintStatus('预览渲染失败：' + previewError, true);
             toast('预览渲染失败：' + previewError, { type: 'error', duration: 8000 });
         }
-        if (!printersAvailable) {
-            printExecute.disabled = true; // H-2：GET_PRINTER_COUNT() 为 0 → 禁用打印
-            setPrintStatus('未连接打印机（GET_PRINTER_COUNT() 为 0），已禁用打印；请检查 C-Lodop 与打印机后刷新。', true);
-            toast('未连接打印机，已禁用打印', 'warn');
-        } else {
-            printExecute.disabled = false;
-            setPrintStatus(getLodopInstance(false) ? '' : '未连接 C-Lodop：系统预览/打印不可用，可用内置示意图查看版式。', false);
-        }
-        if (printerResult.fallback) {
-            toast('上次使用的打印机「' + printSettings.printerName + '」不在当前打印机列表中，已回退到「' + (getSelectedPrinterName() || '第一个非虚拟打印机') + '」', { type: 'warn', duration: 6000 });
-        }
         openOverlay(printPreviewOverlay);
         setTimeout(function () { printExecute.focus(); }, 40);
+        // 异步连接完成后再 populate 一次并设置按钮/状态（成功：启用 + 已就绪；失败：禁用 + 可操作提示）
+        var ensurePromise = (typeof window.ensureLodopLoaded === 'function')
+            ? Promise.resolve(window.ensureLodopLoaded())
+            : Promise.resolve(false);
+        ensurePromise.then(function () {
+            if (!printPreviewOverlay || !printPreviewOverlay.classList.contains('active')) return;
+            applyPrinterState(true);
+        }).catch(function () {
+            if (!printPreviewOverlay || !printPreviewOverlay.classList.contains('active')) return;
+            applyPrinterState(true);
+        });
         return true;
     }
 
@@ -6257,8 +6658,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R4 · v2.2.2
-        setText(appVersionEl, 'R4 · v2.2.2 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.0
+        setText(appVersionEl, 'R5 · v2.3.0 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         document.querySelectorAll('.modal-overlay .modal, #print-preview-overlay .print-preview-box').forEach(function (el) {
             el.setAttribute('role', 'dialog');
             el.setAttribute('aria-modal', 'true');
@@ -6295,7 +6696,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R4 · v2.2.1：打印链路修复/快照按 Gist 隔离/恢复前远端备份）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.0：编码本级段/类目条码/乐观保存队列/打印连接修复/实体打印机优先）');
 </script>
 </body>
 </html>

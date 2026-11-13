@@ -760,7 +760,7 @@
 <div id="app-container" style="display:none;">
     <div class="container">
         <header class="app-header">
-            <h1>智能扫码 <span class="app-version" id="header-version">R3 · v2.2.2</span></h1>
+            <h1>智能扫码 <span class="app-version" id="header-version">R3 · v2.3.0</span></h1>
             <div class="app-header-actions">
                 <button class="icon-btn" id="more-btn" type="button" aria-label="更多" aria-haspopup="menu" aria-expanded="false">更多</button>
             </div>
@@ -1319,10 +1319,29 @@
         return MATCH_FIELD_LABELS[field] || field || '';
     }
 
-    function statusBadgeHtml(status) {
-        const normalized = Z ? Z.normalizeStatus(status) : (status || '在售');
+    function statusBadgeHtml(info) {
+        // 兼容字符串与 { label, cls }（类目条码用聚合状态）
+        if (info && typeof info === 'object' && info.label) {
+            return '<span class="status-badge ' + esc(info.cls || 'status-unknown') + '">' + esc(info.label) + '</span>';
+        }
+        const normalized = Z ? Z.normalizeStatus(info) : (info || '在售');
         const cls = Z ? Z.statusClass(normalized) : 'status-unknown';
         return '<span class="status-badge ' + esc(cls) + '">' + esc(normalized) + '</span>';
+    }
+
+    /** 展示状态：类目条码节点用「全部在售/部分在售…」汇总，其余用自身状态 */
+    function displayStatus(entity, isNode) {
+        if (isNode && entity && entity.unified !== false && Z && typeof Z.aggregateItemStatus === 'function') {
+            const agg = Z.aggregateItemStatus(entity);
+            const detail = '在售 ' + agg.counts['在售'] + ' / 售出 ' + agg.counts['售出'] + ' / 待售 ' + agg.counts['待售'];
+            return { label: agg.label, cls: agg.cls, detail: detail, total: agg.total };
+        }
+        const s = Z ? Z.normalizeStatus(entity && entity.status) : ((entity && entity.status) || '在售');
+        return { label: s, cls: (Z ? Z.statusClass(s) : 'status-unknown'), detail: '', total: null };
+    }
+
+    function isUnifiedNode(entity, isNode) {
+        return !!(isNode && entity && entity.unified !== false);
     }
 
     // ============================================================
@@ -2755,17 +2774,20 @@
         if (matchListTitle) matchListTitle.textContent = '找到 ' + matches.length + ' 个匹配';
         let html = '';
         matches.forEach(function (match, index) {
-            const typeLabel = match.type === 'node' ? '商品' : '库存';
-            const entity = match.type === 'node' ? match.node : match.item;
+            const isNode = match.type === 'node';
+            const typeLabel = isNode ? '商品' : '库存';
+            const entity = isNode ? match.node : match.item;
             const name = matchEntityName(match);
-            const status = Z.normalizeStatus(entity.status);
+            const status = displayStatus(entity, isNode);
             const meta = [
-                '<span class="type-badge">' + esc(typeLabel) + '</span>',
+                '<span class="type-badge">' + esc(isUnifiedNode(entity, isNode) ? '类目条码' : typeLabel) + '</span>',
                 '<span>' + esc(match.code) + '</span>',
                 '<span>命中：' + esc(formatMatchField(match.matchField)) + '</span>',
                 statusBadgeHtml(status)
             ];
-            if (entity.trackingNumber) {
+            if (isUnifiedNode(entity, isNode)) {
+                meta.push('<span>状态由类目下商品汇总（' + esc(status.detail) + '）</span>');
+            } else if (entity.trackingNumber) {
                 meta.push('<span>快递：' + esc(entity.trackingNumber) + '</span>');
             }
             html += '<button type="button" class="match-item" data-match-index="' + index + '">' +
@@ -2855,7 +2877,8 @@
         const isNode = resolved.kind === 'node';
         const parentName = isNode ? '' : (resolved.parent.name || resolved.parentCode);
         const name = info.name || (isNode ? resolved.code : parentName);
-        const status = Z.normalizeStatus(info.status);
+        const status = displayStatus(info, isNode);
+        const unified = isUnifiedNode(info, isNode);
         const remark = (info.remark === undefined || info.remark === null || info.remark === '')
             ? '无'
             : String(info.remark);
@@ -2868,8 +2891,12 @@
             html += '<div class="detail-item"><strong>父级:</strong> ' + esc(parentName) + '</div>';
         }
         html += '<div class="detail-item"><strong>状态:</strong> ' + statusBadgeHtml(status) + '</div>';
+        if (unified) {
+            html += '<div class="detail-item"><strong>类目条码:</strong> 整个类目共用一个编码；状态由类目下商品自动汇总（' +
+                esc(status.detail) + '），不单独记录成本/快递单号/订单号</div>';
+        }
 
-        if (info.cost !== undefined && info.cost !== null && info.cost !== '') {
+        if (!unified && info.cost !== undefined && info.cost !== null && info.cost !== '') {
             const costNumber = Number(info.cost);
             const costText = isFinite(costNumber) ? costNumber.toFixed(2) : String(info.cost);
             // L-5：成本隐藏时不在 DOM/属性里保留明文，点“显示”时再按当前实体取值渲染
@@ -2878,11 +2905,11 @@
                 (costVisible ? esc(costText) : '***') + '</span>' +
                 '<button class="cost-toggle" type="button">' + (costVisible ? '隐藏' : '显示') + '</button></div>';
         }
-        if (info.trackingNumber) {
+        if (!unified && info.trackingNumber) {
             html += '<div class="detail-item"><strong>快递:</strong> ' +
                 esc(info.trackingNumber) + ' ' + getCourierTagHtml(info.trackingNumber) + '</div>';
         }
-        if (info.orderNumber) {
+        if (!unified && info.orderNumber) {
             html += '<div class="detail-item"><strong>订单:</strong> ' + esc(info.orderNumber) + '</div>';
         }
         const linkCount = Array.isArray(info.qrLinks) ? info.qrLinks.length : 0;

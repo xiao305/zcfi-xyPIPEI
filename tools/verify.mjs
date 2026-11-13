@@ -111,7 +111,7 @@ const requirements = [
     ['scan.html', /Content-Security-Policy/, 'scan 缺少 CSP meta'],
     ['scan.html', /js\/vendor\/html5-qrcode\.min\.js/, 'scan 未使用本地扫码库'],
     ['index.html', /Content-Security-Policy/, 'index 缺少 CSP meta'],
-    ['js/core.js', /VERSION = '2\.2\.0'/, 'core 版本不是 2.2.0'],
+    ['js/core.js', /VERSION = '2\.3\.0'/, 'core 版本不是 2.3.0'],
     ['js/core.js', /cache = 'no-store'/, 'core 未禁用 HTTP 缓存'],
     ['js/core.js', /credentials/, 'core 缺少 credentials 统一凭据'],
     ['js/core.js', /SCHEMA_VERSION/, 'core 缺少 schemaVersion'],
@@ -124,6 +124,10 @@ const requirements = [
     ['admin.html', /__zcfiLodopShim/, 'admin 缺少 C-Lodop 字符串定时器兼容垫片'],
     ['admin.html', /var urls = \[LODOP_HTTP_URL, LODOP_HTTPS_URL\]/, 'admin 未采用 http 优先加载 C-Lodop'],
     ['admin.html', /未检测（点打印/, 'admin 状态栏未改为按需连接'],
+    ['admin.html', /aggregateItemStatus/, 'admin 未使用类目状态汇总'],
+    ['admin.html', /类目条码/, 'admin 未改名类目条码'],
+    ['admin.html', /inferNextCode/, 'admin 未实现同级编码推断'],
+    ['scan.html', /aggregateItemStatus/, 'scan 未展示类目聚合状态'],
     ['admin.html', /ws:\/\/127\.0\.0\.1:8000/, 'admin CSP 未放行 ws://127.0.0.1:8000'],
     ['admin.html', /zcfi:lodop-ready/, 'admin 缺少 C-Lodop 就绪事件'],
     ['admin.html', /localhost\.lodop\.net:8443/, 'admin 未运行时加载本机 C-Lodop'],
@@ -141,16 +145,16 @@ console.log('== 4. 版本一致性 ==');
 const versionFiles = ['README.md', 'CHANGELOG.md', 'docs/ARCHITECTURE.md', 'docs/RELEASE-CHECKLIST.md'];
 for (const rel of versionFiles) {
     if (!exists(rel)) { bad(`${rel} 不存在`); continue; }
-    check(/2\.2\.0/.test(read(rel)), `${rel} 未提及 v2.2.0`);
+    check(/2\.3\.0/.test(read(rel)), `${rel} 未提及 v2.3.0`);
 }
-check(/2\.2\.0/.test(read('js/core.js')), 'core 未标记 v2.2.0');
+check(/2\.2\.0/.test(read('js/core.js')) || /2\.3\.0/.test(read('js/core.js')), 'core 未标记 2.3.0');
 {
     const cspMeta = (read('admin.html').match(/Content-Security-Policy" content="([^"]*)"/) || [null, ''])[1];
     check(!/unsafe-eval/.test(cspMeta), 'admin CSP 不应放开 unsafe-eval');
 }
-check(/R4 · v2\.2\.2/.test(read('admin.html')), 'admin 未标记 R4 · v2.2.2');
-check(/R3 · v2\.2\.2/.test(read('scan.html')), 'scan 未标记 R3 · v2.2.2');
-check(/\[2\.2\.2\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.2.2] 条目');
+check(/R5 · v2\.3\.0/.test(read('admin.html')), 'admin 未标记 R5 · v2.3.0');
+check(/R3 · v2\.3\.0/.test(read('scan.html')), 'scan 未标记 R3 · v2.3.0');
+check(/\[2\.3\.0\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.3.0] 条目');
 
 console.log('== 5. 文件结构与存在性 ==');
 check(!exists('CLodopFuncs.js'), 'CLodopFuncs.js 仍被提交（应删除，运行时加载）');
