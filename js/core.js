@@ -1,6 +1,6 @@
 /*!
- * zcfi-core.js v2.0.0
- * 共享核心：状态词表 / 转义 / 编码规范化 / GitHub Gist 严格读写 / 并发安全三方合并保存引擎 / 通用工具
+ * zcfi-core.js v2.2.0
+ * 共享核心：状态词表 / 转义 / 编码规范化 / 凭据读写 / GitHub Gist 严格读写 / 并发安全三方合并保存引擎 / 通用工具
  *
  * 用法：在页面业务脚本之前引入
  *   <script src="js/core.js"></script>
@@ -30,8 +30,15 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '2.1.0';
+    var VERSION = '2.2.0';
+    /** 数据文件结构版本；根级 schemaVersion 缺失视为 0/未标记，保存时补写当前版本 */
+    var SCHEMA_VERSION = 1;
     var API_ROOT = 'https://api.github.com';
+    /** 统一请求头：固定 API 版本，避免 GitHub 变更默认行为 */
+    var API_HEADERS = {
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+    };
     var INVISIBLE_RE = /[\u200B-\u200D\u2060\uFEFF]/g;
     var DEFAULT_TIMEOUT = 15000;
     var DEFAULT_SAVE_TIMEOUT = 25000;
@@ -133,12 +140,50 @@
         return JSON.parse(JSON.stringify(value));
     }
 
+    /** 深比较：对象键顺序无关；undefined 与缺失视为不等（调用方先归一） */
+    function deepEqual(a, b) {
+        if (a === b) return true;
+        if (typeof a !== typeof b) return false;
+        if (a === null || b === null || typeof a !== 'object') return false;
+        if (Array.isArray(a) !== Array.isArray(b)) return false;
+        var i;
+        if (Array.isArray(a)) {
+            if (a.length !== b.length) return false;
+            for (i = 0; i < a.length; i++) {
+                if (!deepEqual(a[i], b[i])) return false;
+            }
+            return true;
+        }
+        var ka = Object.keys(a);
+        var kb = Object.keys(b);
+        if (ka.length !== kb.length) return false;
+        for (i = 0; i < ka.length; i++) {
+            var key = ka[i];
+            if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+            if (!deepEqual(a[key], b[key])) return false;
+        }
+        return true;
+    }
+
+    /** UTF-8 字节数（中文不能按字符数估算 1MB 限制） */
+    function sizeBytes(value) {
+        var text = value === null || value === undefined ? '' : String(value);
+        try {
+            if (typeof TextEncoder === 'function') return new TextEncoder().encode(text).length;
+        } catch (e) { /* 回退 */ }
+        try {
+            return unescape(encodeURIComponent(text)).length;
+        } catch (e2) {
+            return text.length;
+        }
+    }
+
     function valuesEqual(a, b) {
         var x = a === undefined ? null : a;
         var y = b === undefined ? null : b;
         if (x === y) return true;
         if (typeof x !== 'object' || typeof y !== 'object' || x === null || y === null) return false;
-        try { return JSON.stringify(x) === JSON.stringify(y); } catch (e) { return false; }
+        return deepEqual(x, y);
     }
 
     /* ============================================================
@@ -161,18 +206,26 @@
 
     function friendlyError(err) {
         if (!err) return '未知错误';
-        if (err.code === 'FILE_MISSING') return 'Gist 中找不到数据文件，请检查“文件名”是否正确（默认 data.json）。';
+        if (err.code === 'FILE_MISSING') return 'Gist 中找不到数据文件，请检查“文件名”是否正确（默认 data.json），或确认该 Gist 是否存在。';
         if (err.code === 'TRUNCATED') return '数据文件过大，GitHub 只返回了部分内容。已停止加载以避免数据损坏，请先备份并拆分/压缩数据。';
         if (err.code === 'PARSE') return '数据文件不是合法 JSON，可能已损坏。已停止进入编辑状态，请先用备份恢复。';
         if (err.code === 'SCHEMA') return '数据结构异常（缺少 products 对象）。已停止进入编辑状态，避免误写。';
         if (err.code === 'EMPTY') return '数据文件内容为空。已停止加载，避免用空数据覆盖。';
-        if (err.code === 'AUTH') return err.message || '登录凭证无效或权限不足，请重新登录。';
+        if (err.code === 'AUTH') return err.message || '登录凭证无效或已过期（401），请重新登录。';
+        if (err.code === 'PERMISSION') return err.message || '没有访问该 Gist 的权限（403）。请确认 Token 具备 gist 权限、且该 Gist 属于该账号。';
         if (err.code === 'NETWORK') return '网络请求超时或失败，请检查网络后重试。';
-        if (err.code === 'RATE_LIMIT') return 'GitHub API 频率超限，请稍后再试。';
+        if (err.code === 'RATE_LIMIT') {
+            var hint = '';
+            if (err.retryAfter) hint = '，请 ' + err.retryAfter + ' 秒后重试';
+            else if (err.resetAt) hint = '，额度重置于 ' + err.resetAt;
+            return 'GitHub API 频率超限' + hint + '。';
+        }
         if (err.code === 'CONFLICT_ABORTED') return '检测到他人同时修改，已取消本次保存。可刷新后重试。';
         if (err.code === 'CONFLICT_UNRESOLVED') return '冲突未能解决，已取消保存。';
         if (err.code === 'CODE_EXISTS') return err.message || '编码已存在。';
         if (err.code === 'PARENT_MISSING') return err.message || '父节点不存在，请刷新后重试。';
+        if (err.code === 'SAVE_FAILED') return err.message || '保存失败，请稍后重试。';
+        if (err.code === 'BAD_OP') return err.message || '保存操作无效，请刷新后重试。';
         return err.message || String(err);
     }
 
@@ -199,6 +252,82 @@
         },
         setJson: function (key, value) {
             try { return storage.set(key, JSON.stringify(value)); } catch (e) { return false; }
+        }
+    };
+
+    /* ============================================================
+     * 四、凭据（登录态）统一读写
+     * 规则：sessionStorage 优先、localStorage 兜底；
+     *       remember=true 只写 localStorage，false 只写 sessionStorage；
+     *       退出登录两处同时清理，绝不把“仅本次会话”写成持久化。
+     * ============================================================ */
+    var CRED_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
+
+    function readCredential(key) {
+        try {
+            var s = global.sessionStorage.getItem(key);
+            if (s !== null) return { value: s, store: 'session' };
+        } catch (e) { /* 隐私模式 */ }
+        try {
+            var l = global.localStorage.getItem(key);
+            if (l !== null) return { value: l, store: 'local' };
+        } catch (e2) { /* 隐私模式 */ }
+        return { value: null, store: null };
+    }
+
+    function writeCredential(key, value, remember) {
+        var ok = false;
+        try {
+            if (remember) {
+                global.localStorage.setItem(key, String(value));
+                global.sessionStorage.removeItem(key);
+                ok = true;
+            } else {
+                global.sessionStorage.setItem(key, String(value));
+                global.localStorage.removeItem(key);
+                ok = true;
+            }
+        } catch (e) {
+            ok = false;
+        }
+        return ok;
+    }
+
+    function clearCredentialKey(key) {
+        try { global.localStorage.removeItem(key); } catch (e) { /* ignore */ }
+        try { global.sessionStorage.removeItem(key); } catch (e2) { /* ignore */ }
+    }
+
+    var credentials = {
+        keys: CRED_KEYS,
+        /** @returns {{token:string, gistId:string, filename:string, remember:boolean}} */
+        read: function () {
+            var token = readCredential(CRED_KEYS.TOKEN);
+            var gistId = readCredential(CRED_KEYS.GIST_ID);
+            var filename = readCredential(CRED_KEYS.FILENAME);
+            return {
+                token: token.value || '',
+                gistId: gistId.value || '',
+                filename: filename.value || '',
+                remember: token.store === 'local' || gistId.store === 'local' || filename.store === 'local'
+            };
+        },
+        /** 写入三项；remember=false 时只写 sessionStorage。返回实际生效的 remember 值 */
+        write: function (token, gistId, filename, remember) {
+            var test = writeCredential(CRED_KEYS.TOKEN, token, !!remember);
+            writeCredential(CRED_KEYS.GIST_ID, gistId, !!remember);
+            writeCredential(CRED_KEYS.FILENAME, filename, !!remember);
+            return !!remember && test;
+        },
+        /** 只清 Token（保留 Gist ID/文件名，便于重新登录） */
+        clearToken: function () {
+            clearCredentialKey(CRED_KEYS.TOKEN);
+        },
+        /** 清除全部登录信息 */
+        clear: function () {
+            clearCredentialKey(CRED_KEYS.TOKEN);
+            clearCredentialKey(CRED_KEYS.GIST_ID);
+            clearCredentialKey(CRED_KEYS.FILENAME);
         }
     };
 
@@ -301,18 +430,18 @@
         return null;
     }
 
-    /** 返回 { container, key, node, parentCode } */
-    function findNodeEntry(docOrProducts, code) {
+    /** 返回 { container, key, node, parentCode }；parentCode 为真实父编码（根级为 null） */
+    function findNodeEntry(docOrProducts, code, parentCode) {
         var products = getProducts(docOrProducts);
         if (!code) return null;
         if (Object.prototype.hasOwnProperty.call(products, code)) {
-            return { container: products, key: code, node: products[code], parentCode: null };
+            return { container: products, key: code, node: products[code], parentCode: parentCode || null };
         }
         for (var key in products) {
             if (!Object.prototype.hasOwnProperty.call(products, key)) continue;
             var node = products[key];
             if (node && isPlainObject(node.children)) {
-                var found = findNodeEntry(node.children, code);
+                var found = findNodeEntry(node.children, code, key);
                 if (found) return found;
             }
         }
@@ -325,10 +454,17 @@
         return findNodeByCode(docOrProducts, entry.parentCode);
     }
 
+    /** 库存编码归一：与节点编码一致，去空白/零宽，忽略大小写 */
+    function normItemCode(value) {
+        return normalizeCode(value).toLowerCase();
+    }
+
     function findItem(node, itemCode) {
         if (!node || !Array.isArray(node.items)) return null;
+        var target = normItemCode(itemCode);
+        if (!target) return null;
         for (var i = 0; i < node.items.length; i++) {
-            if (node.items[i] && node.items[i].code === itemCode) return node.items[i];
+            if (node.items[i] && normItemCode(node.items[i].code) === target) return node.items[i];
         }
         return null;
     }
@@ -398,6 +534,9 @@
                 if (seenNode[key]) errors.push('节点编码重复：' + key);
                 seenNode[key] = true;
                 if (!node.name && !isDeleted(node)) warnings.push('节点「' + key + '」缺少名称');
+                if (node.status !== undefined && node.status !== null && STATUS_LIST.indexOf(normalizeStatus(node.status)) === -1) {
+                    warnings.push('节点「' + key + '」的状态不在词表内（' + node.status + '），将按原值显示');
+                }
                 if (node.children !== undefined && !isPlainObject(node.children)) {
                     errors.push('节点「' + key + '」的 children 不是对象');
                 }
@@ -421,6 +560,12 @@
                             if (item.code.indexOf(key + '/') !== 0) {
                                 warnings.push('库存编码前缀与父节点不一致：' + item.code + '（父节点 ' + key + '）');
                             }
+                        }
+                        if (item.trackingNumber !== undefined && item.trackingNumber !== null && typeof item.trackingNumber !== 'string') {
+                            warnings.push('节点「' + key + '」的库存「' + item.code + '」快递单号不是字符串，打印时按空值处理');
+                        }
+                        if (item.orderNumber !== undefined && item.orderNumber !== null && typeof item.orderNumber !== 'string') {
+                            warnings.push('节点「' + key + '」的库存「' + item.code + '」订单号不是字符串，打印时按空值处理');
                         }
                         if (item.trackingNumber) {
                             if (seenTracking[item.trackingNumber]) warnings.push('快递单号重复：' + item.trackingNumber);
@@ -457,20 +602,27 @@
      * ============================================================ */
     function fetchWithTimeout(url, options, timeoutMs) {
         options = options || {};
+        var opts = {};
+        for (var p in options) {
+            if (Object.prototype.hasOwnProperty.call(options, p)) opts[p] = options[p];
+        }
+        // 必须绕开浏览器私有缓存：写前 GET 若命中 GitHub 的 60s 缓存，三方合并会看不到他人改动
+        if (opts.cache === undefined) opts.cache = 'no-store';
         var controller = null;
         if (typeof AbortController === 'function') {
             controller = new AbortController();
-            options.signal = controller.signal;
+            opts.signal = controller.signal;
         }
+        var limit = timeoutMs || DEFAULT_TIMEOUT;
         var timer = null;
         if (controller) {
-            timer = setTimeout(function () { try { controller.abort(); } catch (e) { /* ignore */ } }, timeoutMs || DEFAULT_TIMEOUT);
+            timer = setTimeout(function () { try { controller.abort(); } catch (e) { /* ignore */ } }, limit);
         }
         return Promise.resolve()
-            .then(function () { return fetch(url, options); })
+            .then(function () { return fetch(url, opts); })
             .catch(function (err) {
                 if (err && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
-                    throw makeError('NETWORK', '请求超时（' + Math.round((timeoutMs || DEFAULT_TIMEOUT) / 1000) + 's），请检查网络后重试');
+                    throw makeError('NETWORK', '请求超时（' + Math.round(limit / 1000) + 's），请检查网络后重试');
                 }
                 throw makeError('NETWORK', '网络请求失败：' + (err && err.message ? err.message : err));
             })
@@ -483,16 +635,91 @@
             });
     }
 
+    /** 读取响应体并保证超时：仅有响应头返回时，body 卡住也要能失败 */
+    function readBodyText(resp, timeoutMs) {
+        var limit = timeoutMs || DEFAULT_TIMEOUT;
+        return new Promise(function (resolve, reject) {
+            var done = false;
+            var timer = setTimeout(function () {
+                if (done) return;
+                done = true;
+                reject(makeError('NETWORK', '读取响应超时（' + Math.round(limit / 1000) + 's），请检查网络后重试'));
+            }, limit);
+            resp.text().then(function (text) {
+                if (done) return;
+                done = true;
+                clearTimeout(timer);
+                resolve(text);
+            }, function (err) {
+                if (done) return;
+                done = true;
+                clearTimeout(timer);
+                reject(makeError('NETWORK', '读取响应失败：' + (err && err.message ? err.message : err)));
+            });
+        });
+    }
+
+    async function readJsonBody(resp, timeoutMs) {
+        var text = await readBodyText(resp, timeoutMs);
+        if (!text) return null;
+        try { return JSON.parse(text); } catch (e) { return null; }
+    }
+
+    function responseHeader(resp, name) {
+        try {
+            return resp.headers && typeof resp.headers.get === 'function' ? resp.headers.get(name) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
     function httpError(resp, body, action) {
         var detail = body && body.message ? body.message : (resp.statusText || '');
+        var suffix = detail ? '（' + detail + '）' : '';
+        var remaining = responseHeader(resp, 'x-ratelimit-remaining');
+        var retryAfterRaw = responseHeader(resp, 'retry-after');
+        var resetRaw = responseHeader(resp, 'x-ratelimit-reset');
+        var retryAfter = retryAfterRaw ? parseInt(retryAfterRaw, 10) : NaN;
+        var resetAt = null;
+        if (resetRaw) {
+            var resetEpoch = parseInt(resetRaw, 10);
+            if (!isNaN(resetEpoch)) {
+                try { resetAt = formatDateTime(new Date(resetEpoch * 1000)); } catch (e) { resetAt = null; }
+            }
+        }
+        function rateLimited() {
+            return makeError('RATE_LIMIT', 'GitHub API 频率超限，请稍后再试。' + suffix, {
+                status: resp.status,
+                detail: detail,
+                retryAfter: isNaN(retryAfter) ? null : retryAfter,
+                resetAt: resetAt
+            });
+        }
+        // 403 有两种含义：主限流（remaining=0 或带 retry-after）与真的没权限
         if (resp.status === 401) return makeError('AUTH', 'GitHub Token 无效或已过期（401），请重新登录', { status: 401, detail: detail });
-        if (resp.status === 403) return makeError('AUTH', '没有访问该 Gist 的权限，或 API 频率已超限（403）：' + detail, { status: 403, detail: detail });
-        if (resp.status === 404) return makeError('FILE_MISSING', '找不到该 Gist（404），请检查 Gist ID 是否正确', { status: 404, detail: detail });
+        if (resp.status === 403) {
+            if (remaining === '0' || !isNaN(retryAfter)) return rateLimited();
+            return makeError('PERMISSION', '没有访问该 Gist 的权限（403）' + suffix + '。请确认 Token 具备 gist 权限、且该 Gist 属于该账号', { status: 403, detail: detail });
+        }
+        if (resp.status === 404) return makeError('FILE_MISSING', '找不到该 Gist（404），请检查 Gist ID 是否正确、或该 Token 是否可访问它', { status: 404, detail: detail });
         if (resp.status === 409) return makeError('SERVER', 'GitHub 报告版本冲突（409），请稍后重试', { status: 409, detail: detail });
         if (resp.status === 422) return makeError('SAVE_FAILED', 'GitHub 拒绝写入（422）：' + detail, { status: 422, detail: detail });
-        if (resp.status === 429) return makeError('RATE_LIMIT', 'GitHub API 频率超限（429），请稍后再试', { status: 429, detail: detail });
+        if (resp.status === 429) return rateLimited();
         if (resp.status >= 500) return makeError('SERVER', 'GitHub 服务异常（' + resp.status + '），请稍后重试', { status: resp.status, detail: detail });
         return makeError('SAVE_FAILED', (action || '操作') + '失败（' + resp.status + '）：' + detail, { status: resp.status, detail: detail });
+    }
+
+    function authHeaders(token, extra) {
+        var headers = { 'Authorization': 'token ' + token };
+        for (var k in API_HEADERS) {
+            if (Object.prototype.hasOwnProperty.call(API_HEADERS, k)) headers[k] = API_HEADERS[k];
+        }
+        if (extra) {
+            for (var e in extra) {
+                if (Object.prototype.hasOwnProperty.call(extra, e)) headers[e] = extra[e];
+            }
+        }
+        return headers;
     }
 
     async function parseGistFileContent(file, filename) {
@@ -524,7 +751,7 @@
             throw makeError('PARSE', '数据文件不是合法 JSON：' + e.message);
         }
         validateDoc(data);
-        return { data: data, size: text.length };
+        return { data: data, size: sizeBytes(text) };
     }
 
     async function get(token, gistId, filename, options) {
@@ -533,10 +760,9 @@
         if (!filename) filename = 'data.json';
         var url = API_ROOT + '/gists/' + encodeURIComponent(gistId);
         var resp = await fetchWithTimeout(url, {
-            headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
+            headers: authHeaders(token)
         }, options.timeoutMs || DEFAULT_TIMEOUT);
-        var body = null;
-        try { body = await resp.json(); } catch (e) { body = null; }
+        var body = await readJsonBody(resp, options.timeoutMs || DEFAULT_TIMEOUT);
         if (!resp.ok) throw httpError(resp, body, '读取数据');
         var files = body && body.files;
         if (!files || !Object.prototype.hasOwnProperty.call(files, filename)) {
@@ -570,15 +796,10 @@
         var url = API_ROOT + '/gists/' + encodeURIComponent(gistId);
         var resp = await fetchWithTimeout(url, {
             method: 'PATCH',
-            headers: {
-                'Authorization': 'token ' + token,
-                'Accept': 'application/vnd.github.v3+json',
-                'Content-Type': 'application/json'
-            },
+            headers: authHeaders(token, { 'Content-Type': 'application/json' }),
             body: JSON.stringify({ files: (function () { var f = {}; f[filename] = { content: text }; return f; })() })
         }, options.timeoutMs || DEFAULT_SAVE_TIMEOUT);
-        var body = null;
-        try { body = await resp.json(); } catch (e) { body = null; }
+        var body = await readJsonBody(resp, options.timeoutMs || DEFAULT_SAVE_TIMEOUT);
         if (!resp.ok) throw httpError(resp, body, '保存数据');
         var revision = null;
         if (body && body.history && body.history.length && body.history[0] && body.history[0].version) {
@@ -592,10 +813,9 @@
         if (!token || !gistId) throw makeError('AUTH', '缺少 Token 或 Gist ID');
         var url = API_ROOT + '/gists/' + encodeURIComponent(gistId);
         var resp = await fetchWithTimeout(url, {
-            headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
+            headers: authHeaders(token)
         }, DEFAULT_TIMEOUT);
-        var body = null;
-        try { body = await resp.json(); } catch (e) { body = null; }
+        var body = await readJsonBody(resp, DEFAULT_TIMEOUT);
         if (!resp.ok) throw httpError(resp, body, '读取历史版本');
         return (body && body.history ? body.history : []).map(function (h) {
             return {
@@ -613,10 +833,9 @@
         if (!filename) filename = 'data.json';
         var url = API_ROOT + '/gists/' + encodeURIComponent(gistId) + '/' + encodeURIComponent(sha);
         var resp = await fetchWithTimeout(url, {
-            headers: { 'Authorization': 'token ' + token, 'Accept': 'application/vnd.github.v3+json' }
+            headers: authHeaders(token)
         }, DEFAULT_TIMEOUT);
-        var body = null;
-        try { body = await resp.json(); } catch (e) { body = null; }
+        var body = await readJsonBody(resp, DEFAULT_TIMEOUT);
         if (!resp.ok) throw httpError(resp, body, '读取历史版本');
         var files = body && body.files;
         if (!files || !Object.prototype.hasOwnProperty.call(files, filename)) {
@@ -774,6 +993,9 @@
         }
 
         var node = entry.node;
+        if (op.createOnly && !baseNode) {
+            throw makeError('CODE_EXISTS', '编码「' + originalCode + '」已被其它设备占用，请刷新后重试');
+        }
         applyFieldMerge(node, fields, baseNode, 'node', originalCode, opIndex, decisions, conflicts);
 
         if (originalCode !== newCode) {
@@ -812,9 +1034,10 @@
         var originalCode = op.originalCode || op.code;
         var baseParent = baseDoc ? findNodeByCode(baseDoc.products, op.parentCode) : null;
         var baseItem = op.baseItem || (baseParent ? findItem(baseParent, originalCode) : null);
+        var targetNorm = normItemCode(originalCode);
         var idx = -1;
         for (var i = 0; i < parent.items.length; i++) {
-            if (parent.items[i] && parent.items[i].code === originalCode) { idx = i; break; }
+            if (parent.items[i] && normItemCode(parent.items[i].code) === targetNorm) { idx = i; break; }
         }
         var fields = op.fields || {};
 
@@ -838,10 +1061,14 @@
         }
 
         var item = parent.items[idx];
+        if (op.createOnly && !baseItem) {
+            throw makeError('CODE_EXISTS', '库存编码「' + originalCode + '」已被其它设备占用，请刷新后重试');
+        }
         applyFieldMerge(item, fields, baseItem, 'item', originalCode, opIndex, decisions, conflicts);
         if (op.code && op.code !== originalCode) {
+            var newNorm = normItemCode(op.code);
             for (var j = 0; j < parent.items.length; j++) {
-                if (j !== idx && parent.items[j] && parent.items[j].code === op.code) {
+                if (j !== idx && parent.items[j] && normItemCode(parent.items[j].code) === newNorm) {
                     throw makeError('CODE_EXISTS', '库存编码已存在：' + op.code);
                 }
             }
@@ -852,9 +1079,10 @@
     function applyItemDelete(doc, op, baseDoc, decisions, conflicts, opIndex) {
         var parent = findNodeByCode(doc.products, op.parentCode);
         if (!parent || !Array.isArray(parent.items)) return;
+        var targetNorm = normItemCode(op.code);
         var idx = -1;
         for (var i = 0; i < parent.items.length; i++) {
-            if (parent.items[i] && parent.items[i].code === op.code) { idx = i; break; }
+            if (parent.items[i] && normItemCode(parent.items[i].code) === targetNorm) { idx = i; break; }
         }
         if (idx === -1) return;
         var baseParent = baseDoc ? findNodeByCode(baseDoc.products, op.parentCode) : null;
@@ -882,19 +1110,36 @@
             else if (op.type === 'node.delete') applyNodeDelete(doc, op, baseDoc, decisions, conflicts, i);
             else if (op.type === 'item.upsert') applyItemUpsert(doc, op, baseDoc, decisions, conflicts, i);
             else if (op.type === 'item.delete') applyItemDelete(doc, op, baseDoc, decisions, conflicts, i);
-            else if (op.type === 'doc.replace') applyDocReplace(doc, op);
+            else if (op.type === 'doc.replace') applyDocReplace(doc, op, baseDoc, decisions, conflicts, i);
             else throw makeError('BAD_OP', '未知保存操作：' + op.type);
         }
         return doc;
     }
 
-    /** 整库替换（仅用于“从备份/历史版本恢复”，需页面二次确认） */
-    function applyDocReplace(doc, op) {
+    /**
+     * 整库替换（仅用于“从备份/历史版本恢复”）。
+     * 传了 baseDoc 时做冲突检测：远端 products 与 baseDoc 不一致说明期间有他人改动，
+     * 推入 kind='doc-replace' 冲突交给页面确认（'theirs' 表示放弃替换）。
+     */
+    function applyDocReplace(doc, op, baseDoc, decisions, conflicts, opIndex) {
         if (!op.doc) throw makeError('BAD_OP', '要恢复的数据为空');
         validateDoc(op.doc);
+        if (baseDoc && isPlainObject(baseDoc.products) && isPlainObject(doc.products)) {
+            if (!deepEqual(baseDoc.products, doc.products)) {
+                var key = opIndex + ':__replace__';
+                var decision = decisions ? decisions[key] : null;
+                if (!decision && conflicts) {
+                    conflicts.push(makeConflict(opIndex, key, 'doc', null, '__replace__',
+                        '远端数据已被其它设备修改，继续恢复会覆盖这些修改', { kind: 'doc-replace', label: '整库恢复', base: baseDoc.products, remote: doc.products }));
+                    decision = 'mine';
+                }
+                if (decision === 'theirs') return;
+            }
+        }
         var next = clone(op.doc);
-        // 只替换 products，保留远端根级未知字段
+        // 只替换 products，保留远端根级未知字段；schemaVersion 跟随恢复内容
         doc.products = next.products;
+        if (next.schemaVersion !== undefined) doc.schemaVersion = next.schemaVersion;
     }
 
     var writeQueues = Object.create(null);
@@ -904,6 +1149,19 @@
         var next = previous.then(run, run);
         writeQueues[key] = next.then(function () { }, function () { });
         return next;
+    }
+
+    function sleep(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    /** 补写结构版本号（迁移入口）。不擅自改写业务字段，状态别名在读取/渲染时归一 */
+    function migrateDoc(doc) {
+        if (!isPlainObject(doc)) return doc;
+        if (doc.schemaVersion === undefined || doc.schemaVersion === null || typeof doc.schemaVersion !== 'number') {
+            doc.schemaVersion = SCHEMA_VERSION;
+        }
+        return doc;
     }
 
     async function save(options) {
@@ -923,42 +1181,55 @@
             var lastError = null;
             while (attempt < maxAttempts) {
                 attempt += 1;
-                // 1) 每次保存都重新读取远端最新文档
-                var remote = await get(token, gistId, filename, { timeoutMs: options.timeoutMs });
-                // 2) 在远端副本上应用本次 ops
-                var work = clone(remote.data);
-                var conflicts = [];
-                applyOps(work, ops, baseDoc, null, conflicts);
-                var resolvedConflicts = [];
-                if (conflicts.length) {
-                    var choices = null;
-                    if (typeof options.onConflict === 'function') {
-                        choices = await options.onConflict(conflicts, { attempt: attempt, remoteUpdatedAt: remote.updatedAt });
-                    }
-                    if (!choices) throw makeError('CONFLICT_ABORTED', '检测到数据冲突，已取消保存', { conflicts: conflicts });
-                    var decisions = Object.create(null);
-                    for (var c = 0; c < conflicts.length; c++) {
-                        decisions[conflicts[c].key] = choices[c] === 'theirs' ? 'theirs' : 'mine';
-                    }
-                    work = clone(remote.data);
-                    var still = [];
-                    applyOps(work, ops, baseDoc, decisions, still);
-                    if (still.length) throw makeError('CONFLICT_UNRESOLVED', '仍有冲突未解决，已取消保存', { conflicts: still });
-                    resolvedConflicts = conflicts;
-                }
-                // 3) 数据没有实际变化就不产生新版本
-                if (JSON.stringify(work) === JSON.stringify(remote.data)) {
-                    return {
-                        data: remote.data,
-                        updatedAt: remote.updatedAt,
-                        revision: remote.revision,
-                        conflicts: resolvedConflicts,
-                        unchanged: true,
-                        attempts: attempt
-                    };
-                }
-                // 4) 写入；网络/5xx 自动重试（重试会重新 GET 并重放 ops）
                 try {
+                    // 1) 每次保存都重新读取远端最新文档（GET 也纳入重试，弱网下与写入同等对待）
+                    var remote = await get(token, gistId, filename, { timeoutMs: options.timeoutMs });
+                    // 2) 在远端副本上应用本次 ops
+                    var work = clone(remote.data);
+                    migrateDoc(work);
+                    var conflicts = [];
+                    applyOps(work, ops, baseDoc, null, conflicts);
+                    var resolvedConflicts = [];
+                    if (conflicts.length) {
+                        var choices = null;
+                        if (typeof options.onConflict === 'function') {
+                            choices = await options.onConflict(conflicts, { attempt: attempt, remoteUpdatedAt: remote.updatedAt });
+                        }
+                        if (!choices) throw makeError('CONFLICT_ABORTED', '检测到数据冲突，已取消保存', { conflicts: conflicts });
+                        var decisions = Object.create(null);
+                        for (var c = 0; c < conflicts.length; c++) {
+                            decisions[conflicts[c].key] = choices[c] === 'theirs' ? 'theirs' : 'mine';
+                        }
+                        work = clone(remote.data);
+                        migrateDoc(work);
+                        var still = [];
+                        applyOps(work, ops, baseDoc, decisions, still);
+                        if (still.length) throw makeError('CONFLICT_UNRESOLVED', '仍有冲突未解决，已取消保存', { conflicts: still });
+                        resolvedConflicts = conflicts;
+                        // 冲突决策可能选择“用远端”——重新判定是否有实际变化
+                        if (deepEqual(work, remote.data)) {
+                            return {
+                                data: remote.data,
+                                updatedAt: remote.updatedAt,
+                                revision: remote.revision,
+                                conflicts: resolvedConflicts,
+                                unchanged: true,
+                                attempts: attempt
+                            };
+                        }
+                    }
+                    // 3) 数据没有实际变化就不产生新版本（深比较，键顺序无关）
+                    if (deepEqual(work, remote.data)) {
+                        return {
+                            data: remote.data,
+                            updatedAt: remote.updatedAt,
+                            revision: remote.revision,
+                            conflicts: resolvedConflicts,
+                            unchanged: true,
+                            attempts: attempt
+                        };
+                    }
+                    // 4) 写入；网络/5xx 自动重试（重试会重新 GET 并重放 ops）
                     var patched = await patch(token, gistId, filename, work, { timeoutMs: options.timeoutMs });
                     return {
                         data: work,
@@ -975,6 +1246,7 @@
                         if (typeof options.onRetry === 'function') {
                             try { await options.onRetry(err, attempt); } catch (ignore) { /* ignore */ }
                         }
+                        await sleep(300 * attempt);
                         continue;
                     }
                     throw err;
@@ -989,6 +1261,7 @@
      * ============================================================ */
     global.ZCFI = {
         VERSION: VERSION,
+        SCHEMA_VERSION: SCHEMA_VERSION,
         STATUS: STATUS,
         STATUS_LIST: STATUS_LIST,
         FIELD_LABELS: FIELD_LABELS,
@@ -1006,11 +1279,14 @@
         isPlainObject: isPlainObject,
         clone: clone,
         valuesEqual: valuesEqual,
+        deepEqual: deepEqual,
+        sizeBytes: sizeBytes,
 
         friendlyError: friendlyError,
         isRetryableError: isRetryableError,
 
         storage: storage,
+        credentials: credentials,
         formatDateTime: formatDateTime,
         formatTime: formatTime,
         downloadJson: downloadJson,
@@ -1025,6 +1301,7 @@
         countDescendants: countDescendants,
         validateDoc: validateDoc,
         validateDocDeep: validateDocDeep,
+        migrateDoc: migrateDoc,
         isDeleted: isDeleted,
 
         get: get,
@@ -1039,6 +1316,7 @@
             return result.data;
         },
         updateGistContent: function (token, gistId, filename, content) {
+            try { console.warn('[ZCFI] updateGistContent 是整库覆盖入口，已不推荐使用；请改用 ZCFI.save() 的 ops 合并'); } catch (e) { /* ignore */ }
             return patch(token, gistId, filename, content);
         }
     };

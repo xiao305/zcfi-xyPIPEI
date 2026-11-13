@@ -1,10 +1,10 @@
 # 发布检查清单
 
 适用对象：维护者。每次把页面改动发布到 GitHub Pages 前，按本清单执行。
-当前基线：`core v2.1.0` + `admin R2a` + `scan R2`；R2b（admin 体验）与 R3（打印 v2）仍在开发。
+当前基线：**`core v2.2.0` + `admin R4` + `scan R3`**（统一版本号 **v2.2.0**，文档更新日期 2026-11-13）。
 
 > ⚠️ 未经用户明确授权，**不要 push 到 GitHub、不要动 `main`、不要删除远端标签**。
-> 本仓库当前为本地 `overhaul` 分支开发；发布由用户确认后单独操作。
+> 发布由用户确认后按第 6 节流程执行；tag 与 commit 在授权后推送。
 
 ---
 
@@ -12,8 +12,8 @@
 
 | 项 | 填 |
 | --- | --- |
-| 发布版本/轮次 | 例：R2 scan / R2a admin / R2b admin / R3 |
-| 计划 tag | 例：`backup-r2b-admin` |
+| 发布版本 | `v2.2.0`（core 2.2.0 / admin R4 / scan R3） |
+| 计划 tag | 例：`backup-r4` / `backup-v2.2.0` |
 | 基线 commit | `git rev-parse --short HEAD` |
 | 变更文件 | `git status --short` |
 | 测试执行人/时间 | |
@@ -23,14 +23,15 @@
 
 ## 1. 备份现场
 
+**在仓库根目录执行**：
+
 ```powershell
-cd "E:\脚本存放\自动扫码系统"
 git status --short
 git log --oneline -8
 git tag --list
 ```
 
-- [ ] 确认没有未提交的意外改动（特别是不属于本轮的文件）。
+- [ ] 确认没有未提交的意外改动（特别是不属于本轮的文件）：目标改动只应包含 `index.html`、`tools/`、`README.md`、`CHANGELOG.md`、`docs/*.md`、`js/core.js`、`js/vendor/`、删除的废弃目录等本轮文件。
 - [ ] 把本轮会改的文件复制到 `local_dev/backups/`：
 
   ```powershell
@@ -52,7 +53,7 @@ git tag --list
   node --check js\core.js
   ```
 
-- [ ] `admin.html` / `scan.html` 提取内联脚本做 `node --check`（测试台/harness 已覆盖一部分；至少保证浏览器无 `pageerror`）。
+- [ ] `admin.html` / `scan.html` 提取内联脚本做语法检查（`tools/verify.mjs` 已覆盖一部分）；至少保证浏览器无 `pageerror`。
 - [ ] 无真实 Token/Gist 私密内容进入仓库：
 
   ```powershell
@@ -60,34 +61,34 @@ git tag --list
   git grep -n "github_pat_" -- .
   ```
 
-  已知登录框有默认 Gist ID（`f13d97...`），可保留但 README 已注明为默认示例/可改。
+  仓库中**不应再有**任何示例 Gist ID 或硬编码的默认 Gist ID 常量。
 - [ ] 无 `local_dev/`、截图、日志、临时文件被 `git add`。
 
 ---
 
-## 3. 自动化回归
+## 3. 自动化校验（仓库门禁）
 
-在项目根目录：
+在**仓库根目录**执行：
 
 ```powershell
-cd "E:\脚本存放\自动扫码系统"
-
-# 1) 页面可加载 + 截图（admin / scan，移动端）
-node local_dev\harness.mjs --page scan --mobile --out local_dev\shots\release-scan-mobile.png
-node local_dev\harness.mjs --page admin --mobile --out local_dev\shots\release-admin-mobile.png
-node local_dev\harness.mjs --page admin --out local_dev\shots\release-admin-desktop.png
-
-# 2) 全量回归（14 条 scan + admin 用例）
-node local_dev\tests\run-all.mjs --page scan
-node local_dev\tests\run-all.mjs --page admin
-# 或一次跑全部
-node local_dev\tests\run-all.mjs
+node tools/verify.mjs
 ```
 
-- [ ] harness 输出 `errors: []`，无 pageerror。
-- [ ] scan 用例全绿（当前基线 14/14）。
-- [ ] admin 用例全绿（当前基线见 `local_dev/tests/report.json`）。
-- [ ] 失败时：先看 `local_dev/tests/report.json` 的断言/堆栈，**不要带失败发布**。
+`tools/verify.mjs` 做静态/语法/文档一致性校验，包括但不限于：
+
+- `js/core.js` 的 `node --check` 语法检查；
+- `index.html` / `tools/scanner-test.html` 的 HTML 结构（标签闭合）检查；
+- `index.html` 无内联 `<script>`、无 CDN 引用，CSP/referrer meta 存在；
+- `admin.html` / `scan.html` / 站点中无第三方 CDN 引用，扫码库引用本地 `js/vendor/`；
+- 登录页/仓库中无示例 Gist ID、无硬编码默认 Gist ID；
+- README / ARCHITECTURE / CHANGELOG / RELEASE-CHECKLIST 的版本一致性（v2.2.0 / R4 / R3）；
+- 文档中无硬编码的本机绝对路径（旧版本地路径写法）与过期状态表述。
+
+CI：`.github/workflows/ci.yml` 在 push/PR 时自动执行 `node --check` 与 `node tools/verify.mjs`，并校验 `js/vendor/html5-qrcode.min.js` 的 SHA-256、拒绝跟踪 `local_dev/` 与超过 2 MB 的文件。**CI 不绿不得发布**。
+
+- [ ] `node tools/verify.mjs` 全部通过（退出码 0）。
+- [ ] `.github/workflows/ci.yml` 在最近一次 push/PR 上为绿。
+- [ ] 失败时先修校验/修复代码，**不要带失败发布**（不要为了变绿去删校验项）。
 
 ---
 
@@ -96,90 +97,107 @@ node local_dev\tests\run-all.mjs
 ### 4.1 通用/数据安全
 
 - [ ] admin/scan 都能用 Token + Gist 登录；错误 Token 有 401 中文提示。
+- [ ] 登录页 Gist ID **默认为空**，留空不能登录；填写自己的 Gist 后可登录。
 - [ ] admin 新增/编辑 node/item，字段正确保存；刷新后仍在。
 - [ ] 保存失败（断网/错误 Token）后本地数据未被污染；重试可成功。
 - [ ] 两台设备/两个标签页同时改同一字段，出现冲突提示，选择后数据正确。
 - [ ] 回收站：删除→隐藏→恢复→可见；彻底删除后编码可复用；父子删除/恢复顺序正确。
-- [ ] 导出 JSON → 删除/改乱 → 导入恢复；导入前自动下载当前备份。
+- [ ] 导出 JSON → 删除/改乱 → 导入恢复；导入前自动下载 `backup-before-*.json`。
+- [ ] 恢复历史版本/快照前，先自动拉远端并下载真实备份；远端有并发修改时有二次确认。
 - [ ] 数据体检能显示节点/库存/回收站统计与错误项。
-- [ ] Gist 历史版本可查看/恢复，恢复前自动备份。
 - [ ] 大文件/坏 JSON：只读保护 + 重试入口（可用测试台 fixture 或本地 Gist 小文件模拟）。
 
-### 4.2 admin R2a/R2b
+### 4.2 admin R2a/R2b/R4
 
-- [ ] 「记住登录」勾选/取消行为符合说明；退出清理凭据。
-- [ ] 搜索/筛选/排序/折叠展开（R2b 含）可用；搜索不到已删除项。
+- [ ] 「记住登录」默认不勾选；勾选/取消行为符合说明；退出清理凭据。
+- [ ] 搜索/筛选/排序/折叠展开可用；搜索不到已删除项；**中文输入法组合期间不闪烁/不重渲染**。
+- [ ] 按大类筛选能看到子类与库存；软删除父节点后汇总不含其子库存。
 - [ ] 批量状态/批量打印只作用于选中且未删除的库存。
-- [ ] 节点/库存编辑弹窗字段完整；scan 写入的 remark/tracking/order/qrLinks/status 能看到/改到（当前部分字段需打开弹窗）。
-- [ ] 编码自定义规则/全局唯一/改名级联提示正确。
+- [ ] 本地快照按 Gist ID 隔离；换账号/退出后不显示其他 Gist 快照。
+- [ ] 节点/库存编辑弹窗字段完整；scan 写入的 remark/tracking/order/qrLinks/status 能看到/改到。
+- [ ] 编码自定义规则/全局唯一/改名级联提示正确；复制嵌套节点落在正确父节点下。
+- [ ] 确认弹窗防重入、Esc/遮罩/焦点行为正常；a11y（label/for、对比度、可聚焦）。
 
-### 4.3 scan R2
+### 4.3 scan R2/R3
 
 - [ ] 连续模式：开始扫码→命中→详情→关闭→继续扫；`start` 次数不增加、摄像头常开。
 - [ ] 同一码 2 秒内重复回调只 1 条历史。
 - [ ] 多匹配候选列表显示；黄条提示；点选正确商品。
 - [ ] 关联快递/订单/链接；已有值替换提示；标记售出；失败可重试。
+- [ ] 冲突弹窗为**逐字段**选择（基准/远端/我的），不会一键整体覆盖。
 - [ ] 未找到「继续扫描」、关联成功「继续扫下一件」。
 - [ ] 图片识别能调用 scanFile 并进入详情；失败有提示。
 - [ ] 手电筒：不支持隐藏、支持可点击；震动/提示音设置生效并持久化。
-- [ ] 软删除商品扫不到/提示回收站；历史回看被拦截。
+- [ ] 软删除商品扫不到/提示回收站；历史回看被拦截且显示「已删除」徽章。
 - [ ] 历史按日期分组、点击回看、清空 12 秒内撤销。
-- [ ] 页面隐藏/恢复：摄像头暂停/重启；断网离线提示但匹配可用。
+- [ ] 多标签页：登录/退出/历史同步；退出可同时清本机历史。
+- [ ] 错误分类：断网显示离线；401 要求重登；坏数据明确报错且禁止写。
 - [ ] 手机横竖屏/安全区/44px 按钮/键盘遮挡（登录、备注）检查。
 
-### 4.4 打印（R3 前）
+### 4.4 打印（真机验收必须现场做）
 
 - [ ] C-Lodop 已安装启动，`/admin` 顶部状态「已就绪」。
 - [ ] HTTPS 下首次信任 `https://localhost.lodop.net:8443` 证书。
+- [ ] 页面从本机服务加载 `CLodopFuncs.js`（仓库无本地快照）；打印机下拉为**当前机器**的真实打印机。
 - [ ] 单标签预览/直接打印；批量打印；回收站项被阻止。
 - [ ] 份数/模板/字体/纸张在**真实打印机**上验证（现场）。
-- [ ] 失败场景：C-Lodop 未启动、证书未信任、无打印机，均有提示。
+- [ ] 失败场景：C-Lodop 未启动、证书未信任、无打印机、`On_Return` 返回失败，均有明确提示，不会假成功。
+- [ ] 批量打印 strict：复核失效时取消整批并列出被跳过条目。
 
 ---
 
 ## 5. 文档检查
 
 - [ ] `README.md`：登录、数据模型、日常操作、备份、打印、安全、部署、FAQ 与实际一致。
-- [ ] `CHANGELOG.md`：本轮版本、日期、提交/标签、未完成 TODO。
-- [ ] `docs/USER-GUIDE.md`、`docs/FAQ.md`、`docs/BACKUP-AND-RECOVERY.md`、`docs/ARCHITECTURE.md`、`docs/CONSISTENCY-REVIEW.md` 已同步。
-- [ ] 文档没有真实 Token/Gist 私密数据；默认 Gist ID 已注明「示例/可改」。
-- [ ] `docs/CONSISTENCY-REVIEW.md` 中 P1/P2 修复状态更新（或标记“本轮未处理”）。
+- [ ] `CHANGELOG.md`：`[2.2.0] - 2026-11-13` 已记录安全/打印/数据层/admin/scan/站点/文档变更，历史条目保留。
+- [ ] `docs/USER-GUIDE.md`、`docs/FAQ.md`、`docs/BACKUP-AND-RECOVERY.md`、`docs/ARCHITECTURE.md`、`docs/CONSISTENCY-REVIEW.md`（历史快照 + 当前状态表）已同步。
+- [ ] 文档没有真实 Token/Gist 私密数据；**登录页/文档中没有示例 Gist ID**。
+- [ ] 文档与代码版本一致：`v2.2.0` / `admin R4` / `scan R3`，日期 2026-11-13。
+- [ ] 文档中没有过期状态（例如 R2b/R3 仍在开发、未完成）与硬编码本机绝对路径。
 
 ---
 
 ## 6. 提交与标签（需用户授权）
 
-> 当前开发约定：本地 `overhaul` 分支，**不 push**，等用户确认。
+> 发布由用户确认后执行；tag 与 commit 在授权后推送。
 
-建议流程：
+建议流程（**在仓库根目录执行**）：
 
 ```powershell
-cd "E:\脚本存放\自动扫码系统"
 git status --short
 git diff --check
-git add README.md CHANGELOG.md docs/ admin.html scan.html js/core.js   # 按本轮实际文件
-git commit -m "feat: <轮次/模块> <简述>"
+git add index.html tools README.md CHANGELOG.md docs/ js/core.js js/vendor   # 按本轮实际文件
+git commit -m "feat: v2.2.0 <本轮简述>"
 git tag backup-rX-<模块>
 git log --oneline -3
 git tag --list
 ```
 
 - [ ] 只 `add` 本轮预期文件（不要带 `local_dev/`、临时文件）。
-- [ ] commit 信息写清轮次/模块。
-- [ ] tag 命名与历史一致（`backup-r0`、`backup-r1`、`backup-r1-admin`、`backup-r1-core21`、`backup-r2a`、`backup-r2-scan`、`backup-rX-...`）。
+- [ ] commit 信息写清版本/轮次（例：`feat: v2.2.0 安全/打印/数据层/站点入口与文档终稿`）。
+- [ ] tag 命名与历史一致（`backup-r0`、`backup-r1`、`backup-r1-admin`、`backup-r1-core21`、`backup-r2a`、`backup-r2-scan`、`backup-r2b`、`backup-scan-fix`、`backup-r3`、`backup-docs`、`backup-rX-...`）。
 - [ ] **push/tag push 必须等用户明确授权**；推送到 `main` 后 GitHub Pages 自动发布。
 - [ ] 发布后核对：
-  - `https://xypipei.zcfi.cn/`、`/admin`、`/scan` 可访问；
+  - `https://xypipei.zcfi.cn/` 为**导航页**（无内联脚本、可跳转 `/admin`、`/scan`）；
+  - `https://xypipei.zcfi.cn/admin`、`/scan` 可访问；
   - `CNAME` 仍为 `xypipei.zcfi.cn`；
   - 浏览器强刷后版本/页脚/功能正确；
   - 手机网络（非本地）扫码可用。
+
+### 发布前最后确认（安全项）
+
+- [ ] **登录页无示例 Gist ID / 无硬编码默认 Gist ID**（查看 admin.html、scan.html 源码或 `node tools/verify.mjs`）。
+- [ ] **无 CDN 引用**：仓库中不存在第三方脚本 CDN 地址，扫码库为 `js/vendor/html5-qrcode.min.js`。
+- [ ] **CSP 存在**：`index.html`、`tools/scanner-test.html` 含 `<meta http-equiv="Content-Security-Policy">`；admin/scan 的 CSP 现状已在文档注明（仍含 `'unsafe-inline'`）。
+- [ ] 仓库中没有 `CLodopFuncs.js` 快照；打印脚本运行时从本机加载。
+- [ ] **备份 tag 已推送**：本次发布 tag 已创建并已推送到远端（`git ls-remote --tags origin` 可见），远端有可回滚点。
 
 ---
 
 ## 7. 发布后
 
 - [ ] 记录发布 commit/tag、时间、验证人。
-- [ ] 通知用户新功能/注意事项（尤其打印、Token）。
+- [ ] 通知用户新功能/注意事项（尤其打印、Token、Secret Gist 非私有）。
 - [ ] 如出现问题，立即按 `docs/BACKUP-AND-RECOVERY.md` 回滚代码/数据，先保数据。
 - [ ] 回归发现的问题回流到任务板，不带着问题继续加功能。
 
@@ -187,8 +205,9 @@ git tag --list
 
 ## 8. 当前已知事项（发布时注意）
 
-- [ ] `docs/CONSISTENCY-REVIEW.md` 的 P1（凭据 session/local 不一致）是否要在本轮修复；未修则 README/FAQ 已说明 workaround。
-- [ ] P2 打印导出函数守卫、扫码历史删除标记、编码大小写、字段可见性是否纳入 R2b/R3。
-- [ ] R2b/R3 TODO 未完成前，README/CHANGELOG 不要宣称已完成。
 - [ ] 真实打印未现场验证前，不要对外承诺打印份数/模板效果。
-- [ ] `local_dev/tests` 由 QA 维护；实现者不要随手改测试来“变绿”。
+- [ ] **Secret Gist 不是私有**：宣传/文档不要暗示“Secret 就安全”；敏感数据不入 Gist。
+- [ ] admin/scan 仍是内联脚本，CSP 含 `'unsafe-inline'`；严格 CSP 属后续项，不要宣称已严格化。
+- [ ] 后台列表字段可见性（P2-4）仍有提升空间，属后续体验项。
+- [ ] `local_dev/` 是本地目录，**不得**作为发布门禁；门禁以 `node tools/verify.mjs` + CI 为准。
+- [ ] `.github/workflows/ci.yml` 与 `tools/verify.mjs` 的校验项如调整，必须在本清单与 README 同步更新。

@@ -1,0 +1,49 @@
+name: verify
+
+on:
+  push:
+    branches: [main, "backup/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 静态校验 / 语法 / 文档一致性
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run verify.mjs
+        run: node tools/verify.mjs
+
+      - name: Check vendored dependency hash
+        run: |
+          actual="$(sha256sum js/vendor/html5-qrcode.min.js | cut -d' ' -f1)"
+          expected="660b12437b1d747e3e68b8be0685c08cb728140110ad213f167b14b66f8b1d8e"
+          if [ "$actual" != "$expected" ]; then
+            echo "vendored html5-qrcode hash mismatch: $actual != $expected" >&2
+            exit 1
+          fi
+          echo "vendored hash ok: $actual"
+
+      - name: Reject tracked local_dev / large files
+        run: |
+          if git ls-files | grep -q '^local_dev/'; then
+            echo "local_dev/ 不应被提交" >&2
+            exit 1
+          fi
+          big="$(git ls-files -z | xargs -0 ls -l | awk '$5 > 2000000 {print $9, $5}')"
+          if [ -n "$big" ]; then
+            echo "存在超过 2MB 的跟踪文件：" >&2
+            echo "$big" >&2
+            exit 1
+          fi
+          echo "repo hygiene ok"

@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#2563eb" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.github.com https://gist.githubusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta name="referrer" content="no-referrer" />
     <title>智能扫码 · 连续扫码</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%232563eb'/%3E%3Cpath%20d='M8%208h7v7H8zm9%200h7v7h-7zM8%2017h7v7H8zm11%200h5v5h-5z'%20fill='white'/%3E%3C/svg%3E" />
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- 扫码库本地自托管（供应链安全：不依赖第三方 CDN） -->
+    <script src="js/vendor/html5-qrcode.min.js"></script>
     <!-- 共享核心：严格读取 / 并发安全三方合并保存 / 转义 / 状态规范化 / toast -->
     <script src="js/core.js"></script>
     <style>
@@ -662,6 +665,67 @@
             .app-header h1 { font-size: 18px; }
             .scan-actions .btn { font-size: 14px; padding: 8px 10px; }
         }
+        /* ============================================================
+         * R3：只读保护条 / 逐字段冲突对话框 / 可访问性
+         * ============================================================ */
+        .error-bar {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            color: #b91c1c;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        .conflict-modal .modal { max-width: 520px; }
+        .conflict-intro { font-size: 13px; color: #475569; margin: 0 0 12px; line-height: 1.6; }
+        .conflict-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            background: #f8fafc;
+        }
+        .conflict-item .conflict-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; word-break: break-all; }
+        .conflict-item .conflict-note { font-size: 13px; color: #b91c1c; margin-bottom: 6px; word-break: break-all; }
+        .conflict-values { display: flex; gap: 8px; flex-wrap: wrap; }
+        .conflict-value {
+            flex: 1;
+            min-width: 130px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 8px;
+        }
+        .conflict-value-label { display: block; font-size: 12px; color: #64748b; margin-bottom: 2px; }
+        .conflict-value-text { font-size: 13px; word-break: break-all; }
+        .conflict-base { font-size: 12px; color: #94a3b8; margin-top: 6px; word-break: break-all; }
+        .conflict-options { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .conflict-option {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 44px;
+            padding: 0 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            background: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+            min-width: 120px;
+        }
+        .conflict-option input { width: 20px; height: 20px; accent-color: #2563eb; }
+        .deleted-badge.unknown { background: #e0f2fe; color: #075985; }
+        .modal-overlay:focus { outline: none; }
+        .modal h3:focus { outline: none; }
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        [tabindex]:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
     </style>
 </head>
 <body>
@@ -670,21 +734,25 @@
     <div class="login-box">
         <h2>登录</h2>
         <p style="color:#64748b; font-size:14px;">请输入 GitHub 凭证</p>
-        <label>GitHub Token</label>
-        <input type="password" id="login-token" placeholder="ghp_xxxx" />
-        <label>Gist ID</label>
-        <input type="text" id="login-gistid" value="f13d97c430522e4851afbf3cd2331e14" />
-        <label>文件名</label>
-        <input type="text" id="login-filename" value="data.json" />
+        <label for="login-token">GitHub Token</label>
+        <input type="password" id="login-token" placeholder="ghp_xxxx" autocomplete="off"
+               autocapitalize="off" spellcheck="false" />
+        <label for="login-gistid">Gist ID</label>
+        <input type="text" id="login-gistid" placeholder="请填写你自己的 Gist ID" autocomplete="off"
+               autocapitalize="off" spellcheck="false" />
+        <label for="login-filename">文件名</label>
+        <input type="text" id="login-filename" value="data.json" autocomplete="off"
+               autocapitalize="off" spellcheck="false" />
         <label class="login-remember" for="login-remember">
-            <input type="checkbox" id="login-remember" checked />
-            记住登录（本机）
+            <input type="checkbox" id="login-remember" />
+            记住登录（本机长期保存；公电脑请勿勾选）
         </label>
-        <p class="login-note">Token 仅保存在本机浏览器（localStorage/sessionStorage），不会上传到任何服务器。</p>
+        <p class="login-note">Token 仅保存在本机，只随请求发送给 GitHub API，不会写入 Gist/日志。</p>
         <div class="btn-group" style="margin-top:20px; justify-content:flex-end;">
-            <button class="btn btn-primary" id="login-btn">登录</button>
+            <button class="btn btn-secondary" id="clear-local-credentials-btn" type="button">清除本机登录信息</button>
+            <button class="btn btn-primary" id="login-btn" type="button">登录</button>
         </div>
-        <div id="login-error"></div>
+        <div id="login-error" role="status" aria-live="polite"></div>
     </div>
 </div>
 
@@ -692,7 +760,7 @@
 <div id="app-container" style="display:none;">
     <div class="container">
         <header class="app-header">
-            <h1>智能扫码 <span class="app-version" id="header-version">R2</span></h1>
+            <h1>智能扫码 <span class="app-version" id="header-version">R3 · v2.2.0</span></h1>
             <div class="app-header-actions">
                 <button class="icon-btn" id="more-btn" type="button" aria-label="更多" aria-haspopup="menu" aria-expanded="false">更多</button>
             </div>
@@ -707,7 +775,8 @@
                 <button class="icon-btn" id="refresh-btn" type="button" aria-label="刷新数据" title="刷新数据">⟳</button>
             </div>
         </div>
-        <div id="offline-bar" class="offline-bar" style="display:none;" role="status"></div>
+        <div id="offline-bar" class="offline-bar" style="display:none;" role="status" aria-live="polite"></div>
+        <div id="error-bar" class="error-bar" style="display:none;" role="status" aria-live="polite"></div>
         <div id="more-menu" class="more-menu" role="menu" style="display:none;">
             <button type="button" class="menu-item" id="menu-settings-btn" role="menuitem">设置</button>
             <button type="button" class="menu-item" id="clear-history-btn" role="menuitem">清空历史</button>
@@ -738,7 +807,10 @@
         </div>
         <div class="card">
             <div class="search-box">
-                <input type="text" id="manual-input" placeholder="手动输入编码 / 订单号 / 快递单号" />
+                <input type="text" id="manual-input" placeholder="手动输入编码 / 订单号 / 快递单号"
+                       aria-label="手动输入编码、订单号或快递单号"
+                       autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+                       inputmode="text" enterkeyhint="done" maxlength="512" />
                 <button class="btn btn-primary" id="manual-btn">查询</button>
             </div>
             <div id="associate-mode-bar">
@@ -753,14 +825,14 @@
             </div>
         </div>
         <footer class="app-footer">
-            <div class="version" id="footer-version">智能扫码 R2</div>
+            <div class="version" id="footer-version">智能扫码 R3 · v2.2.0</div>
             <div>数据仅存于你的 Gist，本页面不向其他服务器发送数据。</div>
         </footer>
     </div>
 </div>
 
 <!-- 商品详情（底部抽屉） -->
-<div id="product-detail-overlay" class="modal-overlay sheet-overlay" role="dialog" aria-modal="true" aria-label="商品详情">
+<div id="product-detail-overlay" class="modal-overlay sheet-overlay" role="dialog" aria-modal="true" aria-labelledby="detail-title">
     <div class="modal sheet" role="document">
         <div class="sheet-handle" aria-hidden="true"></div>
         <h3 id="detail-title">商品详情</h3>
@@ -774,9 +846,9 @@
 </div>
 
 <!-- 关联确认弹窗 -->
-<div id="associate-overlay" class="modal-overlay">
+<div id="associate-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="associate-title">
     <div class="modal">
-        <h3>关联确认</h3>
+        <h3 id="associate-title">关联确认</h3>
         <div id="associate-content"></div>
         <div id="associate-warning-area" class="associate-warning" style="display:none;"></div>
         <label>关联类型</label>
@@ -793,14 +865,14 @@
             <button class="btn btn-success" id="confirm-associate-btn">确认关联</button>
             <button class="btn btn-secondary" id="cancel-associate-btn">取消</button>
         </div>
-        <div class="save-status" id="associate-save-status" style="margin-top:8px;"></div>
+        <div class="save-status" id="associate-save-status" role="status" aria-live="polite" style="margin-top:8px;"></div>
     </div>
 </div>
 
 <!-- 未找到弹窗 -->
-<div id="not-found-overlay" class="modal-overlay not-found-modal">
+<div id="not-found-overlay" class="modal-overlay not-found-modal" role="dialog" aria-modal="true" aria-labelledby="not-found-title">
     <div class="modal">
-        <h3>⚠️ 未找到匹配商品</h3>
+        <h3 id="not-found-title">⚠️ 未找到匹配商品</h3>
         <p id="not-found-content">扫描内容无法关联到任何商品或库存项。</p>
         <p style="font-size:14px; color:#64748b;">当前已暂停解码，可继续扫码或查看历史记录。</p>
         <div class="btn-group">
@@ -810,7 +882,7 @@
 </div>
 
 <!-- 多匹配候选列表 -->
-<div id="match-list-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-label="多个匹配结果">
+<div id="match-list-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="match-list-title">
     <div class="modal match-list-modal">
         <h3 id="match-list-title">找到多个匹配</h3>
         <div id="match-list-warning" class="match-warning" style="display:none;"></div>
@@ -822,9 +894,9 @@
 </div>
 
 <!-- 设置 -->
-<div id="settings-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-label="设置">
+<div id="settings-overlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <div class="modal">
-        <h3>设置</h3>
+        <h3 id="settings-title">设置</h3>
         <label class="setting-row" for="setting-continuous">
             <input type="checkbox" id="setting-continuous" />
             <span>连续扫码模式（摄像头常开，关闭详情后继续扫描）</span>
@@ -845,23 +917,38 @@
 </div>
 
 <!-- 清空历史撤销条 -->
-<div id="undo-bar" class="undo-bar" style="display:none;" role="status">
+<div id="undo-bar" class="undo-bar" style="display:none;" role="status" aria-live="polite">
     <span id="undo-text">已清空扫码历史</span>
     <button type="button" class="undo-btn" id="undo-btn">撤销</button>
+</div>
+
+<!-- 并发修改：逐字段冲突对话框（默认选中“用远端”，取消=放弃保存） -->
+<div id="conflict-overlay" class="modal-overlay conflict-modal" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
+    <div class="modal">
+        <h3 id="conflict-title">检测到其它设备的并发修改</h3>
+        <p class="conflict-intro">下列字段已被其它设备修改。请逐项选择要保留的值：默认“用远端”；点“取消保存”将放弃本次保存，不做任何写入。</p>
+        <div id="conflict-list"></div>
+        <div class="btn-group">
+            <button class="btn btn-primary" id="conflict-apply-btn" type="button">应用选择并继续保存</button>
+            <button class="btn btn-secondary" id="conflict-cancel-btn" type="button">取消保存</button>
+        </div>
+    </div>
 </div>
 
 <script>
     'use strict';
     /* ============================================================
-     * 智能扫码页（scan.html）R2
+     * 智能扫码页（scan.html）R3 · v2.2.0
      * - 数据读写统一走 js/core.js：ZCFI.get 严格读取 / ZCFI.save 并发安全三方合并（R1）
      * - 所有动态 HTML 一律 escapeHtml；备注/链接只按纯文本处理（R1）
      * - 摄像头 idle/starting/scanning/stopping 串行状态机 + 扫码锁 + 2 秒去重（R1）
      * - 历史记录 localStorage 持久化（R1），R2 增加日期分组/点击回看/清空撤销
      * - R2：连续扫码（摄像头常开 + 解码暂停/恢复）、多匹配候选、手电筒/震动/提示音、
      *       相册图片识别、30s TTL 后台刷新、软删除过滤、移动端 UI 打磨
+     * - R3：本地扫码库 + CSP、ZCFI.credentials、错误分类/只读保护、多标签页同步、
+     *       逐字段冲突对话框、历史隔离与备份清理、扫码枪缓冲、可访问性、卸载释放摄像头
      * ============================================================ */
-    const SCAN_VERSION = 'R2.0';
+    const SCAN_VERSION = 'R3 · v2.2.0';
     const Z = window.ZCFI;
     if (!Z) {
         console.error('[scan] js/core.js 未加载，数据读写功能不可用');
@@ -917,16 +1004,21 @@
     // ============================================================
     // 本地存储键与状态
     // ============================================================
-    const STORAGE_KEYS = { TOKEN: 'github_token', GIST_ID: 'gist_id', FILENAME: 'gist_filename' };
-    const HISTORY_KEY = 'zcfi_scan_history_v1';
-    const HISTORY_BACKUP_KEY = 'zcfi_scan_history_backup_v1';
+    // 凭据键由 ZCFI.credentials 维护（session 优先 / local 兜底），此处仅用于多标签页 storage 事件识别
+    const CREDENTIAL_KEY_FALLBACK = ['github_token', 'gist_id', 'gist_filename'];
+    const HISTORY_KEY_BASE = 'zcfi_scan_history_v1';          // 实际键 = 基础键 + '：' + gistId（未登录 'anon'）
+    const HISTORY_BACKUP_KEY_BASE = 'zcfi_scan_history_backup_v1';
     const SETTINGS_KEY = 'zcfi_scan_settings_v1';
+    const LOGOUT_BROADCAST_KEY = 'zcfi_scan_logout_v1';       // 多标签页退出登录广播（仅触发 storage 事件）
     const HISTORY_LIMIT = 200;
     const HISTORY_UNDO_BACKUP = 20;      // 清空历史时保留最近 N 条用于撤销
     const DEDUPE_MS = 2000;
     const DATA_TTL_MS = 30000;           // 数据后台刷新 TTL
     const RESUME_GUARD_MS = 800;         // 恢复解码后忽略回调的时间窗
     const HISTORY_UNDO_TIMEOUT = 12000;
+    const SCAN_TEXT_MAX = 512;           // 条码/单号内容长度上限
+    const SCAN_START_TIMEOUT = 15000;    // 摄像头启动超时
+    const SCAN_GUN_IDLE_MS = 500;        // 扫码枪按键缓冲：500ms 无输入自动清空
 
     const DEFAULT_SETTINGS = { continuous: true, vibrate: true, sound: true };
 
@@ -976,6 +1068,17 @@
     let undoTimer = null;
     let resumeCameraOnVisible = false;
     let currentMatches = [];            // 多匹配候选（当前弹窗使用）
+
+    // R3 状态
+    let readOnlyMode = false;           // 数据损坏/不可读时的只读保护态
+    let associateSaving = false;        // 关联保存进行中
+    let associateCancelledDuringSave = false; // 保存期间用户尝试取消
+    let startCancelRequested = false;   // 启动阶段用户取消
+    let startupTimer = null;            // 摄像头启动超时计时器
+    let remoteLogoutInFlight = false;
+    let authFailureInFlight = false;
+    let scanGunBuffer = '';             // 扫码枪全局按键缓冲
+    let scanGunTimer = null;
 
     // ============================================================
     // DOM 引用
@@ -1049,6 +1152,14 @@
     const undoText = document.getElementById('undo-text');
     const undoBtn = document.getElementById('undo-btn');
     const footerVersion = document.getElementById('footer-version');
+    const errorBar = document.getElementById('error-bar');
+    const clearCredentialsBtn = document.getElementById('clear-local-credentials-btn');
+
+    // R3：逐字段冲突对话框 DOM
+    const conflictOverlay = document.getElementById('conflict-overlay');
+    const conflictList = document.getElementById('conflict-list');
+    const conflictApplyBtn = document.getElementById('conflict-apply-btn');
+    const conflictCancelBtn = document.getElementById('conflict-cancel-btn');
 
     // ============================================================
     // 通用小工具
@@ -1084,6 +1195,107 @@
             }
             return result;
         };
+    }
+
+    function clampText(value, max) {
+        const text = value === undefined || value === null ? '' : String(value);
+        const limit = typeof max === 'number' && max > 0 ? max : SCAN_TEXT_MAX;
+        return text.length > limit ? text.slice(0, limit) : text;
+    }
+
+    function removeStorageKey(key) {
+        try { window.localStorage.removeItem(key); } catch (e) { /* ignore */ }
+        try { window.sessionStorage.removeItem(key); } catch (e2) { /* ignore */ }
+        if (Z && Z.storage && typeof Z.storage.remove === 'function') Z.storage.remove(key);
+    }
+
+    function readRawStorageJson(key) {
+        try {
+            const raw = window.localStorage.getItem(key);
+            if (raw === null) return null;
+            return JSON.parse(raw);
+        } catch (e) { return null; }
+    }
+
+    /** 弹窗关闭后把焦点交还手动输入框（硬件扫码枪可直接继续输入） */
+    function focusManualInput() {
+        if (!manualInput) return;
+        if (appContainer && appContainer.style.display === 'none') return;
+        if (loginOverlay && loginOverlay.classList.contains('active')) return;
+        if (activeModalOverlay()) return;
+        try { manualInput.focus({ preventScroll: true }); } catch (e) {
+            try { manualInput.focus(); } catch (e2) { /* ignore */ }
+        }
+    }
+
+    function focusableElements(container) {
+        if (!container) return [];
+        const selector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), ' +
+            'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        const nodes = container.querySelectorAll(selector);
+        return Array.prototype.filter.call(nodes, function (el) {
+            if (!el || el.getAttribute('aria-hidden') === 'true') return false;
+            return el.offsetParent !== null || el === document.activeElement;
+        });
+    }
+
+    function trapModalFocus(overlay, event) {
+        const list = focusableElements(overlay);
+        if (!list.length) return;
+        const first = list[0];
+        const last = list[list.length - 1];
+        const active = document.activeElement;
+        if (event.shiftKey) {
+            if (active === first || !overlay.contains(active)) {
+                event.preventDefault();
+                last.focus();
+            }
+        } else if (active === last || !overlay.contains(active)) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+
+    function openModal(overlay, preferred) {
+        if (!overlay) return;
+        if (preferred && typeof preferred.focus === 'function') {
+            try { preferred.focus({ preventScroll: true }); } catch (e) { try { preferred.focus(); } catch (e2) { /* ignore */ } }
+            return;
+        }
+        const first = focusableElements(overlay)[0];
+        if (first && typeof first.focus === 'function') {
+            try { first.focus({ preventScroll: true }); } catch (e) { try { first.focus(); } catch (e2) { /* ignore */ } }
+        }
+    }
+
+    function activeModalOverlay() {
+        const overlays = [productDetailOverlay, associateOverlay, notFoundOverlay, matchListOverlay, settingsOverlay, conflictOverlay];
+        for (let i = overlays.length - 1; i >= 0; i -= 1) {
+            if (overlays[i] && overlays[i].classList.contains('active')) return overlays[i];
+        }
+        return null;
+    }
+
+    // 凭据统一走 ZCFI.credentials；禁止“写失败就换另一种存储”的兜底
+    function credentialsApi() {
+        if (!Z || !Z.credentials || typeof Z.credentials.read !== 'function') {
+            throw new Error('登录组件未加载（需要 js/core.js v2.2.0 及以上），请刷新页面后重试');
+        }
+        return Z.credentials;
+    }
+
+    function readCredentialsSafe() {
+        try {
+            const cred = credentialsApi().read();
+            return {
+                token: cred && cred.token ? String(cred.token) : '',
+                gistId: cred && cred.gistId ? String(cred.gistId) : '',
+                filename: cred && cred.filename ? String(cred.filename) : '',
+                remember: !!(cred && cred.remember)
+            };
+        } catch (e) {
+            return { token: '', gistId: '', filename: '', remember: false };
+        }
     }
 
     function detectCourier(text) {
@@ -1196,13 +1408,19 @@
         if (undoBar) undoBar.style.display = 'none';
     }
 
+    /** 撤销窗口结束：隐藏撤销条并清理备份键（M-9：备份不再常驻） */
+    function endUndoWindow() {
+        hideUndoBar();
+        clearHistoryBackup();
+    }
+
     function showUndoBar(message, onUndo) {
         if (!undoBar) return;
         if (undoTimer) clearTimeout(undoTimer);
         undoState = onUndo;
         if (undoText) undoText.textContent = message;
         undoBar.style.display = 'flex';
-        undoTimer = setTimeout(hideUndoBar, HISTORY_UNDO_TIMEOUT);
+        undoTimer = setTimeout(endUndoWindow, HISTORY_UNDO_TIMEOUT);
     }
 
     // ============================================================
@@ -1240,6 +1458,52 @@
         refreshBtn.setAttribute('aria-busy', busy ? 'true' : 'false');
     }
 
+    // ============================================================
+    // M-5：错误分类（只有 NETWORK/RATE_LIMIT/SERVER 才进入离线模式）
+    // ============================================================
+    function isOfflineError(err) {
+        return !!err && (err.code === 'NETWORK' || err.code === 'RATE_LIMIT' || err.code === 'SERVER');
+    }
+
+    function isAuthError(err) {
+        return !!err && (err.code === 'AUTH' || err.code === 'PERMISSION');
+    }
+
+    function isFatalDataError(err) {
+        return !!err && ['FILE_MISSING', 'PARSE', 'SCHEMA', 'TRUNCATED', 'EMPTY'].indexOf(err.code) !== -1;
+    }
+
+    function showTopError(message) {
+        if (!errorBar) return;
+        errorBar.textContent = message;
+        errorBar.style.display = 'block';
+    }
+
+    function hideTopError() {
+        if (!errorBar) return;
+        errorBar.textContent = '';
+        errorBar.style.display = 'none';
+    }
+
+    /** 数据损坏/文件不存在：进入只读保护态，禁用保存与关联，提示用备份恢复 */
+    function setReadOnlyMode(err) {
+        readOnlyMode = true;
+        const reason = errorText(err);
+        showTopError('数据保护模式：' + reason +
+            ' 已禁用保存/关联；请用备份恢复 data.json（或 GitHub Gist 历史版本）后刷新页面。');
+        if (scanAssociateBtn) scanAssociateBtn.disabled = true;
+        if (confirmAssociateBtn) confirmAssociateBtn.disabled = true;
+        associateSaving = false;
+        associateCancelledDuringSave = false;
+    }
+
+    function clearReadOnlyMode() {
+        readOnlyMode = false;
+        hideTopError();
+        if (scanAssociateBtn) scanAssociateBtn.disabled = false;
+        if (confirmAssociateBtn) confirmAssociateBtn.disabled = false;
+    }
+
     async function refreshData(options) {
         options = options || {};
         if (!currentToken || !currentGistId) return false;
@@ -1258,6 +1522,7 @@
                 lastSyncAt = new Date();
                 const wasOffline = offlineMode;
                 offlineMode = false;
+                clearReadOnlyMode();
                 updateSyncUI();
                 if (wasOffline) toast('已恢复在线，数据已更新', 'success');
                 else if (options.manual) toast('数据已更新', 'success');
@@ -1270,6 +1535,20 @@
                 }
                 return true;
             } catch (e) {
+                // 期间用户已退出登录：不再弹错误
+                if (currentToken !== tokenAtStart) return false;
+                // AUTH/PERMISSION：友好错误 + 强制回登录遮罩
+                if (isAuthError(e)) {
+                    handleAuthFailure(e);
+                    return false;
+                }
+                // FILE_MISSING / PARSE / SCHEMA / TRUNCATED / EMPTY：只读保护态
+                if (isFatalDataError(e)) {
+                    setReadOnlyMode(e);
+                    if (options.manual) toast('刷新失败：' + errorText(e), 'error');
+                    return false;
+                }
+                // NETWORK / RATE_LIMIT / SERVER 才进入离线模式
                 offlineMode = true;
                 updateSyncUI();
                 if (options.manual) {
@@ -1285,7 +1564,7 @@
     }
 
     function maybeRefreshInBackground(force) {
-        if (!currentToken || !currentGistId || savingNow) return;
+        if (!currentToken || !currentGistId || savingNow || readOnlyMode) return;
         const stale = !lastSyncAt || (Date.now() - lastSyncAt.getTime() > DATA_TTL_MS);
         if (!force && !stale) return;
         refreshData({ manual: false }).catch(function () {});
@@ -1383,11 +1662,13 @@
         applySettingsToUI();
         if (settingsOverlay) settingsOverlay.classList.add('active');
         syncSurfaceState();
+        openModal(settingsOverlay, settingsCloseBtn);
     }
 
     function closeSettings() {
         if (settingsOverlay) settingsOverlay.classList.remove('active');
         syncSurfaceState();
+        focusManualInput();
     }
 
     // ============================================================
@@ -1470,14 +1751,42 @@
     // 历史记录（localStorage 持久化，最近 200 条）
     // R2：日期分组 / 点击回看 / 清空可撤销（保留最近 20 条备份）
     // ============================================================
+    // 历史键按当前 Gist 命名空间隔离；未登录用 'anon'
+    function historyNamespace() {
+        return currentGistId || 'anon';
+    }
+
+    function historyKey() {
+        return HISTORY_KEY_BASE + '：' + historyNamespace();
+    }
+
+    function historyBackupKey() {
+        return HISTORY_BACKUP_KEY_BASE + '：' + historyNamespace();
+    }
+
+    function makeHistoryId() {
+        return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+    }
+
+    function historyEntryKey(entry) {
+        if (!entry) return '';
+        if (entry.id) return 'id:' + entry.id;
+        const time = entry.time instanceof Date ? entry.time.getTime() : Number(entry.time);
+        return 'legacy:' + (isFinite(time) ? time : 0) + '|' +
+            (entry.typeLabel || '') + '|' + (entry.detail || '');
+    }
+
     function normalizeHistoryEntry(entry) {
         const row = (entry && typeof entry === 'object') ? entry : {};
         const date = row.time ? new Date(row.time) : new Date();
+        const time = isNaN(date.getTime()) ? new Date() : date;
         const normalized = {
-            time: isNaN(date.getTime()) ? new Date() : date,
-            typeLabel: row.typeLabel ? String(row.typeLabel) : '记录',
-            detail: row.detail ? String(row.detail) : '',
-            debug: row.debug ? String(row.debug) : '',
+            id: row.id && typeof row.id === 'string' ? row.id : ('legacy:' + time.getTime() + '|' +
+                (row.typeLabel ? String(row.typeLabel) : '记录') + '|' + (row.detail ? String(row.detail) : '')),
+            time: time,
+            typeLabel: clampText(row.typeLabel ? String(row.typeLabel) : '记录', 64),
+            detail: clampText(row.detail ? String(row.detail) : '', SCAN_TEXT_MAX),
+            debug: clampText(row.debug ? String(row.debug) : '', SCAN_TEXT_MAX),
             matched: !!row.matched
         };
         if (row.ref && typeof row.ref === 'object' &&
@@ -1496,31 +1805,133 @@
         return normalized;
     }
 
-    function loadHistory() {
-        const raw = Z ? Z.storage.getJson(HISTORY_KEY, []) : [];
+    function serializeHistoryEntry(item) {
+        const time = item.time instanceof Date ? item.time.getTime() : Number(item.time);
+        const row = {
+            id: item.id || historyEntryKey(item) || makeHistoryId(),
+            time: isFinite(time) ? time : Date.now(),
+            typeLabel: clampText(item.typeLabel, 64),
+            detail: clampText(item.detail, SCAN_TEXT_MAX),
+            debug: clampText(item.debug, SCAN_TEXT_MAX),
+            matched: !!item.matched
+        };
+        if (item.ref) row.ref = item.ref;
+        return row;
+    }
+
+    /** 按 id（旧记录按 时间+类型+内容）去重合并，保持时间升序，取最近 HISTORY_LIMIT 条 */
+    function mergeHistoryEntries(list) {
+        const map = Object.create(null);
+        const order = [];
+        (list || []).forEach(function (entries) {
+            if (!Array.isArray(entries)) return;
+            entries.forEach(function (entry) {
+                if (!entry) return;
+                const key = historyEntryKey(entry);
+                if (!Object.prototype.hasOwnProperty.call(map, key)) {
+                    map[key] = entry;
+                    order.push(key);
+                    return;
+                }
+                const prev = map[key];
+                const prevTime = prev.time instanceof Date ? prev.time.getTime() : Number(prev.time);
+                const nextTime = entry.time instanceof Date ? entry.time.getTime() : Number(entry.time);
+                if ((isFinite(nextTime) ? nextTime : 0) >= (isFinite(prevTime) ? prevTime : 0)) {
+                    map[key] = entry;
+                }
+            });
+        });
+        const merged = order.map(function (key) { return map[key]; });
+        merged.sort(function (a, b) {
+            const at = a.time instanceof Date ? a.time.getTime() : Number(a.time);
+            const bt = b.time instanceof Date ? b.time.getTime() : Number(b.time);
+            return (isFinite(at) ? at : 0) - (isFinite(bt) ? bt : 0);
+        });
+        return merged.slice(-HISTORY_LIMIT);
+    }
+
+    function loadHistoryFromKey(key) {
+        const raw = Z ? Z.storage.getJson(key, []) : [];
         if (!Array.isArray(raw)) return [];
         return raw.slice(-HISTORY_LIMIT).map(normalizeHistoryEntry);
     }
 
-    function persistHistory() {
-        if (!Z) return;
-        const payload = history.slice(-HISTORY_LIMIT).map(function (item) {
-            const time = item.time instanceof Date ? item.time.getTime() : Number(item.time);
-            const row = {
-                time: isFinite(time) ? time : Date.now(),
-                typeLabel: item.typeLabel,
-                detail: item.detail,
-                debug: item.debug,
-                matched: !!item.matched
-            };
-            if (item.ref) row.ref = item.ref;
-            return row;
-        });
-        Z.storage.setJson(HISTORY_KEY, payload);
+    function loadHistory() {
+        return loadHistoryFromKey(historyKey());
+    }
+
+    function persistHistory(options) {
+        options = options || {};
+        if (!Z) return false;
+        let merged;
+        if (options.replace) {
+            merged = history.slice(-HISTORY_LIMIT);
+        } else {
+            // 读最新 — 按 id 去重合并 — 写回，避免整键覆盖丢其它标签页写入的记录
+            merged = mergeHistoryEntries([loadHistory(), history]);
+        }
+        history = merged;
+        const payload = merged.map(serializeHistoryEntry);
+        const ok = Z.storage.setJson(historyKey(), payload) !== false;
+        if (!ok) toast('本机存储已满，历史记录未能保存', 'error');
+        return ok;
+    }
+
+    /** 首次使用新版时，把旧版全局历史键迁移到当前命名空间（复制后可删旧键） */
+    function migrateLegacyHistoryTo(namespace) {
+        migrateLegacyHistoryKey(HISTORY_KEY_BASE, HISTORY_KEY_BASE + '：' + (namespace || 'anon'));
+    }
+
+    function migrateLegacyHistoryKey(legacyKey, targetKey) {
+        if (!Z || legacyKey === targetKey) return;
+        const raw = readRawStorageJson(legacyKey);
+        if (raw === null) return;
+        const targetRaw = readRawStorageJson(targetKey);
+        const merged = mergeHistoryEntries([
+            Array.isArray(targetRaw) ? targetRaw.map(normalizeHistoryEntry) : [],
+            Array.isArray(raw) ? raw.map(normalizeHistoryEntry) : []
+        ]);
+        Z.storage.setJson(targetKey, merged.map(serializeHistoryEntry));
+        removeStorageKey(legacyKey);
+    }
+
+    /** 页面重载后旧的“撤销备份”已无意义，统一清理（含旧版全局备份键） */
+    function clearAllHistoryBackups() {
+        try {
+            const keys = [];
+            for (let i = 0; i < window.localStorage.length; i += 1) {
+                const key = window.localStorage.key(i);
+                if (key && key.indexOf(HISTORY_BACKUP_KEY_BASE) === 0) keys.push(key);
+            }
+            keys.forEach(function (key) {
+                try { window.localStorage.removeItem(key); } catch (e) { /* ignore */ }
+            });
+        } catch (e) { /* 隐私模式 */ }
+    }
+
+    function clearHistoryBackup() {
+        removeStorageKey(historyBackupKey());
+    }
+
+    function readHistoryBackupEntries() {
+        const raw = Z ? Z.storage.getJson(historyBackupKey(), null) : null;
+        if (Array.isArray(raw)) return raw.map(normalizeHistoryEntry); // 兼容旧数组格式
+        if (raw && Array.isArray(raw.entries)) return raw.entries.map(normalizeHistoryEntry);
+        return [];
+    }
+
+    function clearCurrentNamespaceHistory() {
+        removeStorageKey(historyKey());
+        removeStorageKey(historyBackupKey());
+        history = [];
     }
 
     function pushHistory(entry) {
-        history.push(entry);
+        const item = normalizeHistoryEntry(entry);
+        item.id = makeHistoryId();
+        item.detail = clampText(item.detail, SCAN_TEXT_MAX);
+        item.debug = clampText(item.debug, SCAN_TEXT_MAX);
+        history.push(item);
         if (history.length > HISTORY_LIMIT) history = history.slice(-HISTORY_LIMIT);
         persistHistory();
         renderHistory();
@@ -1541,36 +1952,49 @@
         return { key: dateText, dateText: dateText, relative: relative };
     }
 
-    function findNodeStateInTree(container, targetCode, inheritedDeleted) {
-        if (!Z.isPlainObject(container)) return null;
-        const keys = Object.keys(container);
-        for (let i = 0; i < keys.length; i += 1) {
-            const key = keys[i];
-            const node = container[key];
-            if (!node || typeof node !== 'object') continue;
-            const deleted = inheritedDeleted || Z.isDeleted(node);
-            if (key === targetCode) return { found: true, deleted: deleted, node: node };
-            if (Z.isPlainObject(node.children)) {
-                const found = findNodeStateInTree(node.children, targetCode, deleted);
-                if (found) return found;
-            }
-        }
-        return null;
+    /**
+     * L-6：渲染历史前一次性构建 code→{deleted} / parent+item→{deleted} 索引，
+     * 避免对每条历史记录做整树 DFS（最多 200 条 × 全树）。祖先已删则子树视为已删。
+     */
+    function buildEntityStateIndex() {
+        const nodes = Object.create(null);
+        const items = Object.create(null);
+        const products = (Z && Z.isPlainObject(gistData.products)) ? gistData.products : {};
+        (function walk(container, inheritedDeleted) {
+            if (!Z || !Z.isPlainObject(container)) return;
+            Object.keys(container).forEach(function (code) {
+                const node = container[code];
+                if (!node || typeof node !== 'object') return;
+                const deleted = inheritedDeleted || Z.isDeleted(node);
+                nodes[code] = { deleted: !!deleted };
+                if (Array.isArray(node.items)) {
+                    node.items.forEach(function (item) {
+                        if (!item || typeof item !== 'object' || !item.code) return;
+                        items[code + '\u0000' + item.code] = { deleted: deleted || Z.isDeleted(item) };
+                    });
+                }
+                if (Z.isPlainObject(node.children)) walk(node.children, deleted);
+            });
+        })(products, false);
+        return { nodes: nodes, items: items };
     }
 
-    function historyRefDeleted(ref) {
-        if (!ref || !currentToken || !gistData || !Z.isPlainObject(gistData.products)) return false;
+    /** 返回 true=已删除，false=未删除，'unknown'=未登录/数据未加载，无法判断 */
+    function historyRefDeleted(ref, index) {
+        if (!ref) return false;
+        if (!currentToken || !Z || !Z.isPlainObject(gistData.products)) return 'unknown';
+        const stateIndex = index || { nodes: Object.create(null), items: Object.create(null) };
         if (ref.type === 'node') {
-            const state = findNodeStateInTree(gistData.products, ref.code, false);
+            const state = stateIndex.nodes[ref.code];
             return !state || state.deleted;
         }
         if (ref.type === 'item') {
-            const parentState = findNodeStateInTree(gistData.products, ref.parentCode, false);
+            const parentState = stateIndex.nodes[ref.parentCode];
             if (!parentState || parentState.deleted) return true;
-            const item = Z.findItem(parentState.node, ref.itemCode);
-            return !item || Z.isDeleted(item);
+            const itemState = stateIndex.items[ref.parentCode + '\u0000' + ref.itemCode];
+            return !itemState || itemState.deleted;
         }
-        return false;
+        return 'unknown';
     }
 
     function renderHistory() {
@@ -1580,6 +2004,7 @@
             resultArea.className = 'result-area';
             return;
         }
+        const stateIndex = buildEntityStateIndex();
         let html = '';
         let lastGroup = '';
         history.forEach(function (item, index) {
@@ -1594,14 +2019,19 @@
             }
             const time = Z ? Z.formatTime(item.time) : String(item.time);
             const clickable = !!item.ref;
-            const deletedRef = historyRefDeleted(item.ref);
-            const itemClass = 'result-item' + (clickable ? ' clickable' : '') + (deletedRef ? ' deleted' : '');
-            const itemTitle = deletedRef ? '该商品已删除，请到后台回收站恢复' : '点击回看';
+            const deletedRef = historyRefDeleted(item.ref, stateIndex);
+            const isDeleted = deletedRef === true;
+            const isUnknown = deletedRef === 'unknown';
+            const itemClass = 'result-item' + (clickable ? ' clickable' : '') + (isDeleted ? ' deleted' : '');
+            const itemTitle = isDeleted
+                ? '该商品已删除，请到后台回收站恢复'
+                : (isUnknown ? '登录后可判断该商品是否已删除' : '点击回看');
             html += '<div class="' + itemClass + '"' +
                 (clickable ? ' data-history-index="' + index + '" role="button" tabindex="0" title="' + esc(itemTitle) + '"' : '') + '>' +
                 '<div><span class="timestamp">' + esc(time) + '</span> ' +
                 '<span class="type-badge">' + esc(item.typeLabel) + '</span>' +
-                (deletedRef ? '<span class="deleted-badge">已删除</span>' : '') +
+                (isDeleted ? '<span class="deleted-badge">已删除</span>' : '') +
+                (isUnknown ? '<span class="deleted-badge unknown">登录后可判断</span>' : '') +
                 '</div>' +
                 '<div class="content">' + esc(item.detail) + '</div>' +
                 (item.debug ? '<div class="debug-info">' + esc(item.debug) + '</div>' : '') +
@@ -1647,35 +2077,41 @@
         renderProductDetail();
         productDetailOverlay.classList.add('active');
         syncSurfaceState();
+        openModal(productDetailOverlay, scanAssociateBtn);
     }
 
     function clearHistoryWithUndo() {
-        if (!history.length) return;
+        if (!history.length) {
+            toast('当前没有历史记录', 'info');
+            return;
+        }
         if (!window.confirm('确定清空扫码历史？可在清空后 12 秒内撤销。')) return;
-        const backup = history.slice(-HISTORY_UNDO_BACKUP).map(function (item) {
-            const row = {
-                time: item.time instanceof Date ? item.time.getTime() : item.time,
-                typeLabel: item.typeLabel,
-                detail: item.detail,
-                debug: item.debug,
-                matched: !!item.matched
-            };
-            if (item.ref) row.ref = item.ref;
-            return row;
-        });
-        if (Z) Z.storage.setJson(HISTORY_BACKUP_KEY, backup);
+        const backup = history.slice(-HISTORY_UNDO_BACKUP).map(serializeHistoryEntry);
+        // M-9：检查写入结果，失败时明确提示“本机存储已满，备份失败”且不提供撤销
+        const backupSaved = Z ? (Z.storage.setJson(historyBackupKey(), {
+            at: Date.now(),
+            entries: backup
+        }) !== false) : false;
         history = [];
-        persistHistory();
+        const persisted = persistHistory({ replace: true });
         renderHistory();
-        toast('已清空扫码历史', 'success');
-        showUndoBar('已清空历史（保留最近 ' + backup.length + ' 条备份）', function () {
-            const rawBackup = Z ? Z.storage.getJson(HISTORY_BACKUP_KEY, []) : [];
-            const restored = Array.isArray(rawBackup) ? rawBackup.map(normalizeHistoryEntry) : [];
+        if (!backupSaved) {
+            toast('本机存储已满，备份失败；本次清空将无法撤销', 'error');
+            return;
+        }
+        if (!persisted) {
+            toast('历史已清空，但本机存储写入失败，刷新后可能恢复', 'warn');
+        } else {
+            toast('已清空扫码历史', 'success');
+        }
+        showUndoBar('已清空历史（保留最近 ' + backup.length + ' 条备份，12 秒内可撤销）', function () {
+            const restored = readHistoryBackupEntries();
+            clearHistoryBackup(); // 撤销成功：立即清理备份键
             if (!restored.length) {
                 toast('没有可恢复的历史备份', 'warn');
                 return;
             }
-            history = restored.concat(history).slice(-HISTORY_LIMIT);
+            history = mergeHistoryEntries([restored, history]);
             persistHistory();
             renderHistory();
             toast('已恢复 ' + restored.length + ' 条历史记录', 'success');
@@ -1710,83 +2146,51 @@
     }
 
     // ============================================================
-    // 凭据存储（与 admin 一致：sessionStorage 优先，勾选记住才写 localStorage）
+    // 登录 / 退出
+    // 凭据统一走 ZCFI.credentials（session 优先 / local 兜底）；
+    // 页面内绝不自行实现“某种存储写失败就换另一种存储”的兜底。
     // ============================================================
-    function readStoredCredential(key) {
-        try {
-            const sessionValue = window.sessionStorage.getItem(key);
-            if (sessionValue !== null && sessionValue !== '') return sessionValue;
-        } catch (e) { /* sessionStorage 不可用时回退 */ }
-        return Z ? Z.storage.get(key, '') : '';
+    function showLoginMessage(message, isSuccess) {
+        if (!loginError) return;
+        loginError.textContent = message || '';
+        loginError.style.color = isSuccess ? '#16a34a' : '';
     }
 
-    function writeStoredCredential(key, value, remember) {
+    function clearLocalCredentials() {
         try {
-            if (remember) {
-                window.localStorage.setItem(key, value);
-                window.sessionStorage.removeItem(key);
-            } else {
-                window.sessionStorage.setItem(key, value);
-                window.localStorage.removeItem(key);
-            }
+            credentialsApi().clear();
         } catch (e) {
-            // 隐私模式等异常：至少用 core 的 localStorage 封装兜底
-            if (Z) Z.storage.set(key, value);
+            console.error('[scan] 清除本机登录信息失败', e);
         }
+        loginToken.value = '';
+        loginGistId.value = '';
+        loginFilename.value = 'data.json';
+        if (loginRemember) loginRemember.checked = false;
+        showLoginMessage('已清除本机登录信息（Token / Gist ID / 文件名）', true);
+        toast('已清除本机登录信息', 'success');
     }
 
-    function saveCredentials(token, gistId, filename, remember) {
-        writeStoredCredential(STORAGE_KEYS.TOKEN, token, remember);
-        writeStoredCredential(STORAGE_KEYS.GIST_ID, gistId, remember);
-        writeStoredCredential(STORAGE_KEYS.FILENAME, filename, remember);
-    }
-
-    function clearCredentials() {
-        [STORAGE_KEYS.TOKEN, STORAGE_KEYS.GIST_ID, STORAGE_KEYS.FILENAME].forEach(function (key) {
-            try { window.localStorage.removeItem(key); } catch (e) { /* ignore */ }
-            try { window.sessionStorage.removeItem(key); } catch (e) { /* ignore */ }
-            if (Z) Z.storage.remove(key);
-        });
-    }
-
-    function hasSessionCredential(key) {
-        try {
-            const value = window.sessionStorage.getItem(key);
-            return value !== null && value !== '';
-        } catch (e) {
-            return false;
-        }
-    }
-
-    function hasLocalCredential(key) {
-        try { return !!window.localStorage.getItem(key); } catch (e) { return false; }
-    }
-
-    /** 自动登录前清理“另一种存储”的残留：session 有值则以 session 为准 */
-    function pruneStaleCredentials() {
-        if (!hasSessionCredential(STORAGE_KEYS.TOKEN)) return;
-        [STORAGE_KEYS.TOKEN, STORAGE_KEYS.GIST_ID, STORAGE_KEYS.FILENAME].forEach(function (key) {
-            try { window.localStorage.removeItem(key); } catch (e) { /* ignore */ }
-        });
-    }
-
-    async function performLogin() {
-        if (loginBusy) return;
-        const token = loginToken.value.trim();
+    async function performLogin(options) {
+        options = options || {};
+        if (loginBusy) return false;
+        const token = options.token ? String(options.token).trim() : loginToken.value.trim();
         const gistId = loginGistId.value.trim();
         const filename = loginFilename.value.trim() || 'data.json';
         if (!token || !gistId) {
-            loginError.textContent = '请填写 Token 和 Gist ID';
-            return;
+            showLoginMessage('请填写 Token 和 Gist ID');
+            return false;
         }
         loginBusy = true;
         loginBtn.disabled = true;
         const oldBtnText = loginBtn.textContent;
         loginBtn.textContent = '登录中…';
-        loginError.textContent = '';
+        showLoginMessage('');
         try {
             const result = await loadDocument(token, gistId, filename);
-            // 仅在读取彻底成功后，才切换页面状态并保存凭据
+            const remember = !!(loginRemember && loginRemember.checked);
+            // 仅在读取彻底成功后，才写入凭据并切换页面状态
+            credentialsApi().write(token, gistId, filename, remember);
+
             currentToken = token;
             currentGistId = gistId;
             currentFilename = filename;
@@ -1795,7 +2199,9 @@
             dataUpdatedAt = result.updatedAt || null;
             lastSyncAt = new Date();
             offlineMode = false;
-            saveCredentials(token, gistId, filename, !!(loginRemember && loginRemember.checked));
+            readOnlyMode = false;
+            hideTopError();
+            loginToken.value = ''; // L-4：登录成功后不在 DOM 中驻留 Token
 
             loginOverlay.classList.remove('active');
             appContainer.style.display = 'block';
@@ -1809,21 +2215,34 @@
             processing = false;
             decodingPaused = false;
             cameraPaused = false;
+            associateSaving = false;
+            associateCancelledDuringSave = false;
             currentProductInfo = null;
             currentAssociateData = null;
             scanMode = 'normal';
             lastHandled = { text: '', time: 0 };
             if (continueScanBtn) continueScanBtn.style.display = 'none';
 
-            if (history.length) {
-                renderHistory();
-            } else {
-                resultContent.innerHTML = '<div style="color:#64748b;">已登录，请扫码或输入</div>';
-                resultArea.className = 'result-area';
-            }
+            // 历史按当前 Gist 命名空间隔离：先迁移旧版全局键，再重新加载
+            migrateLegacyHistoryTo(currentGistId);
+            history = loadHistory();
+            renderHistory();
             toast('登录成功', 'success');
+            return true;
         } catch (e) {
-            loginError.textContent = '登录失败：' + errorText(e);
+            showLoginMessage('登录失败：' + errorText(e));
+            if (isAuthError(e)) {
+                try { credentialsApi().clearToken(); } catch (e2) { /* ignore */ }
+                loginToken.value = '';
+            }
+            if (isOfflineError(e)) {
+                offlineMode = true;
+                updateSyncUI();
+            }
+            if (e && e.code === 'FILE_MISSING') {
+                showLoginMessage('登录失败：' + errorText(e) + ' 请同时检查 Gist ID 与“文件名”。');
+            }
+            return false;
         } finally {
             loginBusy = false;
             loginBtn.disabled = false;
@@ -1831,13 +2250,38 @@
         }
     }
 
-    async function logout() {
+    function broadcastLogout() {
+        try {
+            // 值带随机后缀，确保连续两次退出也能触发其它标签页的 storage 事件
+            window.localStorage.setItem(LOGOUT_BROADCAST_KEY,
+                String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8));
+        } catch (e) { /* 隐私模式忽略 */ }
+    }
+
+    /** 统一的退出/强制回登录实现（手动退出、AUTH 失效、其它标签页广播共用） */
+    async function performLogout(options) {
+        options = options || {};
+        remoteLogoutInFlight = true;
         processing = false;
+        associateSaving = false;
+        associateCancelledDuringSave = false;
         closeMoreMenu();
         closeSettings();
-        hideUndoBar();
-        await stopScan().catch(function () {});
-        clearCredentials();
+        endUndoWindow();
+        // 启动中立即标记取消，避免权限弹窗未响应时退出被卡住；最多等待 1.5s 释放摄像头
+        if (scanState === SCAN_STARTING) {
+            startCancelRequested = true;
+            clearStartupTimer();
+        }
+        const stopTask = stopScan().catch(function () {});
+        await Promise.race([
+            stopTask,
+            new Promise(function (resolve) { setTimeout(resolve, 1500); })
+        ]);
+        try { credentialsApi().clear(); } catch (e) { /* ignore */ }
+        if (options.clearHistory) clearCurrentNamespaceHistory();
+        if (options.broadcast) broadcastLogout();
+
         currentToken = '';
         currentGistId = '';
         currentFilename = 'data.json';
@@ -1846,22 +2290,27 @@
         dataUpdatedAt = null;
         lastSyncAt = null;
         offlineMode = false;
+        readOnlyMode = false;
+        hideTopError();
         refreshPromise = null;
         hideTorchButton();
         applySettingsToUI();
         updateSyncUI();
         appContainer.style.display = 'none';
         loginOverlay.classList.add('active');
-        loginError.textContent = '';
         loginToken.value = '';
-        loginGistId.value = 'f13d97c430522e4851afbf3cd2331e14';
+        loginGistId.value = '';
         loginFilename.value = 'data.json';
-        if (loginRemember) loginRemember.checked = true;
+        if (loginRemember) loginRemember.checked = false;
+        showLoginMessage(options.message || '');
         productDetailOverlay.classList.remove('active');
         associateOverlay.classList.remove('active');
         notFoundOverlay.classList.remove('active');
         matchListOverlay.classList.remove('active');
         settingsOverlay.classList.remove('active');
+        // 若退出时正停在冲突对话框，取消保存（返回 null），避免保存 Promise 永久挂起
+        if (conflictResolve) closeConflictDialog(null);
+        conflictOverlay.classList.remove('active');
         moreMenu.style.display = 'none';
         moreMenuOpen = false;
         associateModeBar.style.display = 'none';
@@ -1877,10 +2326,53 @@
         cameraPaused = false;
         resumeCameraOnVisible = false;
         lastHandled = { text: '', time: 0 };
+        startCancelRequested = false;
+        if (startupTimer) { clearTimeout(startupTimer); startupTimer = null; }
         if (continueScanBtn) continueScanBtn.style.display = 'none';
         setScanState(SCAN_IDLE);
         resetReaderArea();
-        renderHistory(); // 历史属于本机数据，保留并在下次登录后恢复
+        // 历史键随命名空间切换：退出后回到匿名命名空间（登录页不展示他人数据）
+        history = loadHistory();
+        renderHistory();
+        remoteLogoutInFlight = false;
+        return true;
+    }
+
+    async function logout() {
+        if (!window.confirm('确定退出登录并清除本机登录信息？')) return;
+        // M-10：二次确认是否同时删除本机扫码历史（默认保留，换账号后不可见）
+        const clearHistory = window.confirm(
+            '是否同时删除本机保存的扫码历史？\n\n' +
+            '点“确定”= 退出并删除本机历史（不可恢复）\n' +
+            '点“取消”= 仅退出，保留本机历史'
+        );
+        await performLogout({ clearHistory: clearHistory, broadcast: true });
+        toast(clearHistory ? '已退出登录并清除本机历史' : '已退出登录（本机历史已保留）', 'success');
+    }
+
+    /** 其它标签页退出登录（storage 广播 / 凭据键被清除） */
+    function handleRemoteLogout() {
+        if (remoteLogoutInFlight) return;
+        if (!currentToken && loginOverlay.classList.contains('active')) return;
+        performLogout({ message: '已在其它标签页退出登录' }).catch(function (e) {
+            console.error('[scan] 同步退出登录失败', e);
+        });
+    }
+
+    /** AUTH/PERMISSION：显示友好错误并强制回到登录遮罩（M-5） */
+    function handleAuthFailure(err) {
+        const message = errorText(err);
+        if (loginOverlay.classList.contains('active')) {
+            showLoginMessage(message);
+            return;
+        }
+        if (authFailureInFlight) return;
+        authFailureInFlight = true;
+        performLogout({ message: message }).catch(function (e) {
+            console.error('[scan] 登录失效处理失败', e);
+        }).then(function () {
+            authFailureInFlight = false;
+        });
     }
 
     // ============================================================
@@ -1902,11 +2394,12 @@
 
     function setScanState(nextState) {
         scanState = nextState;
-        startBtn.disabled = nextState !== SCAN_IDLE;
+        // L-1：启动中允许点“取消启动”（开始按钮在 starting 态变为取消）
+        startBtn.disabled = nextState !== SCAN_IDLE && nextState !== SCAN_STARTING;
         stopBtn.disabled = nextState !== SCAN_SCANNING;
-        startBtn.textContent = nextState === SCAN_STARTING ? '启动中…' : '开始扫码';
+        startBtn.textContent = nextState === SCAN_STARTING ? '取消启动' : '开始扫码';
         stopBtn.textContent = nextState === SCAN_STOPPING ? '停止中…' : '停止';
-        startBtn.title = '';
+        startBtn.title = nextState === SCAN_STARTING ? '点击取消摄像头启动' : '';
         updateScanFrameState();
     }
 
@@ -1943,6 +2436,47 @@
         // 通常为“本帧未识别到码”，无需提示，避免刷屏
     }
 
+    function clearStartupTimer() {
+        if (startupTimer) { clearTimeout(startupTimer); startupTimer = null; }
+    }
+
+    async function disposeCameraInstance(instance) {
+        if (!instance) return;
+        try { if (typeof instance.stop === 'function') await instance.stop(); } catch (e) { /* ignore */ }
+        try { if (typeof instance.clear === 'function') await instance.clear(); } catch (e) { /* ignore */ }
+    }
+
+    /** L-1：启动阶段允许用户取消 */
+    function cancelScanStartup() {
+        if (scanState !== SCAN_STARTING) return;
+        startCancelRequested = true;
+        clearStartupTimer();
+        setScanState(SCAN_IDLE);
+        showStoppedPlaceholder();
+        hideTorchButton();
+        if (cameraStatus) cameraStatus.textContent = '已取消摄像头启动';
+        toast('已取消摄像头启动', 'info');
+    }
+
+    /** L-1：15s 启动超时兜底（权限弹窗无响应/摄像头被占用时不至于一直卡住） */
+    function handleStartupTimeout() {
+        if (scanState !== SCAN_STARTING) return;
+        startupTimer = null;
+        startCancelRequested = true;
+        const instance = html5QrCode;
+        setScanState(SCAN_IDLE);
+        showStoppedPlaceholder();
+        hideTorchButton();
+        if (cameraStatus) cameraStatus.textContent = '摄像头启动超时，请检查权限/占用后重试';
+        toast('摄像头启动超时，请检查权限/占用后重试', 'error');
+        try {
+            if (instance && typeof instance.clear === 'function') {
+                const pending = instance.clear();
+                if (pending && typeof pending.catch === 'function') pending.catch(function () {});
+            }
+        } catch (e) { /* ignore */ }
+    }
+
     function startScan() {
         return enqueueScan(async function () {
             if (scanState === SCAN_SCANNING) return true;
@@ -1952,6 +2486,8 @@
                 setScanState(SCAN_IDLE);
                 return false;
             }
+            startCancelRequested = false;
+            clearStartupTimer();
             setScanState(SCAN_STARTING);
             if (cameraStatus) cameraStatus.textContent = '正在启动摄像头…';
             try {
@@ -1961,12 +2497,25 @@
                 }
                 const instance = new window.Html5Qrcode('reader-container');
                 html5QrCode = instance;
+                startupTimer = setTimeout(handleStartupTimeout, SCAN_START_TIMEOUT);
                 await instance.start(
                     { facingMode: 'environment' },
                     { fps: 15, qrbox: { width: 250, height: 250 } },
                     onScanSuccess,
                     onScanError
                 );
+                clearStartupTimer();
+                if (startCancelRequested) {
+                    // 启动期间用户已点“取消启动”：启动成功后立即释放摄像头，不进入扫码态
+                    startCancelRequested = false;
+                    await disposeCameraInstance(instance);
+                    if (html5QrCode === instance) html5QrCode = null;
+                    cameraPaused = false;
+                    hideTorchButton();
+                    setScanState(SCAN_IDLE);
+                    showStoppedPlaceholder();
+                    return false;
+                }
                 cameraPaused = false;
                 setScanState(SCAN_SCANNING);
                 if (cameraStatus) {
@@ -1985,11 +2534,18 @@
                 }
                 return true;
             } catch (err) {
+                clearStartupTimer();
+                const cancelled = startCancelRequested;
+                startCancelRequested = false;
                 try { if (html5QrCode) await html5QrCode.clear(); } catch (e) { /* ignore */ }
                 html5QrCode = null;
                 cameraPaused = false;
                 hideTorchButton();
                 setScanState(SCAN_IDLE);
+                if (cancelled) {
+                    showStoppedPlaceholder();
+                    return false;
+                }
                 resetReaderArea();
                 const message = cameraErrorMessage(err);
                 if (cameraStatus) cameraStatus.textContent = message + '（可重试，或使用手动输入）';
@@ -2220,6 +2776,7 @@
         if (matchListContent) matchListContent.innerHTML = html;
         matchListOverlay.classList.add('active');
         syncSurfaceState();
+        openModal(matchListOverlay, matchListContent ? matchListContent.querySelector('button') : null);
     }
 
     function closeMatchList() {
@@ -2227,6 +2784,7 @@
         currentMatches = [];
         processing = false;
         syncSurfaceState();
+        focusManualInput();
     }
 
     function selectMatch(index) {
@@ -2256,6 +2814,7 @@
         renderProductDetail();
         productDetailOverlay.classList.add('active');
         syncSurfaceState();
+        openModal(productDetailOverlay, scanAssociateBtn);
         const scopeLabel = match.type === 'node' ? '商品' : '库存';
         const codeDisplay = match.type === 'node' ? match.code : match.item.code;
         const ref = match.type === 'node'
@@ -2274,6 +2833,15 @@
             matched: true,
             ref: ref
         });
+    }
+
+    function currentCostText() {
+        const resolved = resolveCurrentEntity();
+        if (!resolved) return '';
+        const cost = resolved.entity.cost;
+        if (cost === undefined || cost === null || cost === '') return '';
+        const costNumber = Number(cost);
+        return isFinite(costNumber) ? costNumber.toFixed(2) : String(cost);
     }
 
     function renderProductDetail() {
@@ -2304,8 +2872,9 @@
         if (info.cost !== undefined && info.cost !== null && info.cost !== '') {
             const costNumber = Number(info.cost);
             const costText = isFinite(costNumber) ? costNumber.toFixed(2) : String(info.cost);
+            // L-5：成本隐藏时不在 DOM/属性里保留明文，点“显示”时再按当前实体取值渲染
             html += '<div class="detail-item"><strong>成本:</strong> ' +
-                '<span class="cost-display" data-cost="' + esc(costText) + '">' +
+                '<span class="cost-display">' +
                 (costVisible ? esc(costText) : '***') + '</span>' +
                 '<button class="cost-toggle" type="button">' + (costVisible ? '隐藏' : '显示') + '</button></div>';
         }
@@ -2322,7 +2891,7 @@
         }
         html += '<div class="detail-item"><strong>备注:</strong> ' +
             '<span id="remark-text">' + esc(remark) + '</span>' +
-            '<button class="remark-edit-btn" id="edit-remark-btn" type="button">编辑</button></div>';
+            (readOnlyMode ? '' : '<button class="remark-edit-btn" id="edit-remark-btn" type="button">编辑</button>') + '</div>';
         if (currentProductInfo.matchField) {
             html += '<div class="detail-item"><strong>匹配字段:</strong> ' +
                 esc(formatMatchField(currentProductInfo.matchField)) + '</div>';
@@ -2334,6 +2903,10 @@
     }
 
     function openRemarkEditor() {
+        if (readOnlyMode) {
+            toast('当前为只读保护状态：数据可能已损坏，请先用备份恢复后再编辑', 'error');
+            return;
+        }
         const resolved = resolveCurrentEntity();
         if (!resolved) {
             notifyMissingEntity();
@@ -2425,6 +2998,7 @@
         statusDiv.innerHTML = '<span class="spinner"></span> 保存中…';
         try {
             await saveEntityFields({ remark: newRemark || undefined });
+            if (!currentToken) return; // 保存期间已退出登录
             toast('备注已保存', 'success');
             // 成功后才用 result.data 重建详情；失败时页面与内存均保持原值
             renderProductDetail();
@@ -2440,22 +3014,116 @@
     // ============================================================
     // 并发安全保存：只提交实际变化的字段（ZCFI.save 内部重新 GET + 三方合并）
     // ============================================================
+    // ============================================================
+    // M-7：逐字段冲突对话框（复用 .modal-overlay 样式）
+    // 默认选中“用远端”；取消/关闭返回 null（中止保存）；确定返回与 conflicts 等长的决策数组。
+    // ============================================================
+    let conflictResolve = null;
+    let conflictDecisions = null;
+
+    function formatConflictValue(value) {
+        if (value === undefined || value === null || value === '') return '（空）';
+        if (typeof value === 'string') return clampText(value, 200);
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+        try { return clampText(JSON.stringify(value), 200); } catch (e) { return '（无法显示）'; }
+    }
+
+    function buildConflictValue(labelText, valueText, isRemote) {
+        const wrap = document.createElement('div');
+        wrap.className = 'conflict-value' + (isRemote ? ' remote' : ' mine');
+        const label = document.createElement('span');
+        label.className = 'conflict-value-label';
+        label.textContent = labelText;
+        const value = document.createElement('span');
+        value.className = 'conflict-value-text';
+        value.textContent = valueText;
+        wrap.appendChild(label);
+        wrap.appendChild(value);
+        return wrap;
+    }
+
+    function buildConflictOption(name, index, value, text, checked) {
+        const label = document.createElement('label');
+        label.className = 'conflict-option';
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = name;
+        input.value = value;
+        input.checked = !!checked;
+        input.addEventListener('change', function () {
+            if (conflictDecisions) conflictDecisions[index] = value;
+        });
+        const span = document.createElement('span');
+        span.textContent = text;
+        label.appendChild(input);
+        label.appendChild(span);
+        return label;
+    }
+
+    function closeConflictDialog(decisions) {
+        if (!conflictResolve) return;
+        const resolve = conflictResolve;
+        conflictResolve = null;
+        conflictDecisions = null;
+        if (conflictOverlay) conflictOverlay.classList.remove('active');
+        try { resolve(decisions); } catch (e) { /* ignore */ }
+        focusManualInput();
+    }
+
     function askConflict(conflicts) {
-        try {
-            const lines = conflicts.map(function (conflict) {
-                const label = conflict.label || conflict.field || '字段';
-                const target = conflict.target ? '（' + conflict.target + '）' : '';
-                return '· ' + label + target;
-            }).join('\n');
-            const ok = window.confirm(
-                '检测到其它设备同时修改了数据：\n' + lines +
-                '\n\n点击“确定”用本次修改覆盖远端；点击“取消”放弃本次保存。'
-            );
-            if (!ok) return null;
-            return conflicts.map(function () { return 'mine'; });
-        } catch (e) {
-            return null;
+        if (!conflictOverlay || !conflictList || !conflicts || !conflicts.length) {
+            // 没有可用弹窗时安全默认：放弃保存（绝不静默覆盖远端）
+            return Promise.resolve(null);
         }
+        return new Promise(function (resolve) {
+            conflictResolve = resolve;
+            conflictDecisions = conflicts.map(function () { return 'theirs'; });
+            conflictList.textContent = '';
+            conflicts.forEach(function (conflict, index) {
+                const item = document.createElement('div');
+                item.className = 'conflict-item';
+                const title = document.createElement('div');
+                title.className = 'conflict-title';
+                const target = conflict.target ? '（' + conflict.target + '）' : '';
+                title.textContent = (index + 1) + '. ' + (conflict.label || conflict.field || '字段') + target;
+                item.appendChild(title);
+
+                const kind = conflict.kind || 'field';
+                if (kind === 'field') {
+                    const values = document.createElement('div');
+                    values.className = 'conflict-values';
+                    values.appendChild(buildConflictValue('远端值', formatConflictValue(conflict.remote), true));
+                    values.appendChild(buildConflictValue('本次值', formatConflictValue(conflict.mine), false));
+                    item.appendChild(values);
+                    const base = document.createElement('div');
+                    base.className = 'conflict-base';
+                    base.textContent = '双方共同基准值：' + formatConflictValue(conflict.base);
+                    item.appendChild(base);
+                } else {
+                    const note = document.createElement('div');
+                    note.className = 'conflict-note';
+                    note.textContent = conflict.message ||
+                        (kind === 'remote-deleted' ? '该记录已被其它设备删除' : '该记录已被其它设备修改');
+                    item.appendChild(note);
+                }
+
+                const options = document.createElement('div');
+                options.className = 'conflict-options';
+                const radioName = 'conflict-' + index;
+                options.appendChild(buildConflictOption(radioName, index, 'theirs', '用远端', true));
+                options.appendChild(buildConflictOption(radioName, index, 'mine', '用本次', false));
+                item.appendChild(options);
+                conflictList.appendChild(item);
+            });
+            conflictOverlay.classList.add('active');
+            if (conflictApplyBtn) conflictApplyBtn.disabled = false;
+            if (conflictCancelBtn) conflictCancelBtn.disabled = false;
+            const firstRadio = conflictList.querySelector('input[type="radio"]');
+            const focusTarget = firstRadio || conflictApplyBtn;
+            if (focusTarget && typeof focusTarget.focus === 'function') {
+                try { focusTarget.focus({ preventScroll: true }); } catch (e) { try { focusTarget.focus(); } catch (e2) { /* ignore */ } }
+            }
+        });
     }
 
     function buildEntityOp(fields) {
@@ -2473,9 +3141,11 @@
 
     async function saveEntityFields(fields) {
         if (!Z) throw new Error('js/core.js 未加载，无法保存');
+        if (readOnlyMode) throw new Error('当前为只读保护状态：数据可能已损坏，请先用备份恢复 data.json 后再保存');
         if (!currentToken || !currentGistId) throw new Error('登录已失效，请重新登录');
         if (!baseDoc) throw new Error('本地数据尚未加载完成，请稍后重试');
         const op = buildEntityOp(fields);
+        const tokenAtStart = currentToken;
         savingNow = true;
         try {
             // 先 remote GET + 三方合并；成功才替换 gistData，失败时内存与界面保持原样
@@ -2491,6 +3161,8 @@
                     return askConflict(conflicts);
                 }
             });
+            // 保存期间用户已退出登录/切换账号：不把结果写回已失效的页面状态
+            if (!currentToken || currentToken !== tokenAtStart) return result;
             gistData = result.data;
             baseDoc = Z.clone(result.data);
             dataUpdatedAt = result.updatedAt || dataUpdatedAt;
@@ -2535,6 +3207,10 @@
     }
 
     async function exitAssociateMode() {
+        if (associateSaving) {
+            toast('正在保存，请稍候', 'info');
+            return;
+        }
         scanMode = 'normal';
         associateModeBar.style.display = 'none';
         associateOverlay.classList.remove('active');
@@ -2548,6 +3224,7 @@
         } else {
             await stopScan();
         }
+        focusManualInput();
     }
 
     function detectAssociateType(text) {
@@ -2655,6 +3332,7 @@
         markAsSoldCheckbox.checked = false;
         associateOverlay.classList.add('active');
         syncSurfaceState();
+        openModal(associateOverlay, confirmAssociateBtn);
     }
 
     function buildAssociateFields(target, type, rawText, markAsSold) {
@@ -2675,6 +3353,15 @@
         return fields;
     }
 
+    function setAssociateSaving(busy) {
+        associateSaving = !!busy;
+        if (cancelAssociateBtn) cancelAssociateBtn.disabled = !!busy;
+        if (exitAssociateBtn) exitAssociateBtn.disabled = !!busy;
+        if (confirmAssociateBtn) confirmAssociateBtn.disabled = !!busy || readOnlyMode;
+        if (markAsSoldCheckbox) markAsSoldCheckbox.disabled = !!busy;
+        if (associateTypeSelect) associateTypeSelect.disabled = !!busy;
+    }
+
     async function finishAssociateToDetail() {
         associateOverlay.classList.remove('active');
         currentAssociateData = null;
@@ -2685,11 +3372,17 @@
         renderProductDetail();
         productDetailOverlay.classList.add('active');
         syncSurfaceState();
+        openModal(productDetailOverlay, continueScanBtn);
     }
 
     async function confirmAssociate() {
+        if (associateSaving) return;
         if (!currentAssociateData) {
             toast('关联数据已失效，请重新扫描', 'warn');
+            return;
+        }
+        if (readOnlyMode) {
+            toast('当前为只读保护状态：数据可能已损坏，请先用备份恢复后再保存', 'error');
             return;
         }
         const resolved = resolveCurrentEntity();
@@ -2712,12 +3405,16 @@
             return;
         }
 
-        confirmAssociateBtn.disabled = true;
+        // M-8：保存期间禁用“取消/退出关联/类型/勾选”等可改变意图的控件
+        associateCancelledDuringSave = false;
+        setAssociateSaving(true);
         confirmAssociateBtn.textContent = '保存中…';
         associateSaveStatus.className = 'save-status';
         associateSaveStatus.innerHTML = '<span class="spinner"></span> 保存中…';
         try {
             await saveEntityFields(fields);
+            // 保存期间已退出登录：不再弹回详情、不写本机历史
+            if (!currentToken) return;
             const statusChanged = Object.prototype.hasOwnProperty.call(fields, 'status');
             const ref = currentProductInfo ? (currentProductInfo.type === 'node'
                 ? { type: 'node', code: currentProductInfo.code, matchField: currentProductInfo.matchField || null }
@@ -2727,31 +3424,57 @@
                     itemCode: currentProductInfo.itemCode,
                     matchField: currentProductInfo.matchField || null
                 }) : null;
-            toast('关联成功' + (statusChanged ? '（状态已更新为售出）' : ''), 'success');
-            await finishAssociateToDetail();
-            pushHistory({
+            const historyEntry = {
                 time: new Date(),
                 typeLabel: '关联',
                 detail: '关联' + (TYPE_LABELS[selectedType] || '信息') + '：' + rawText,
                 debug: statusChanged ? '关联成功，已标记售出' : '关联成功',
                 matched: true,
                 ref: ref
-            });
+            };
+            if (associateCancelledDuringSave) {
+                // 用户在保存中尝试取消：请求已落盘，不再弹回详情，只在列表/toast 提示后台保存成功
+                associateOverlay.classList.remove('active');
+                currentAssociateData = null;
+                scanMode = 'normal';
+                associateModeBar.style.display = 'none';
+                processing = false;
+                if (continuousMode) {
+                    syncSurfaceState();
+                } else {
+                    await stopScan().catch(function () {});
+                }
+                pushHistory(historyEntry);
+                toast('已在后台保存成功', 'success');
+                return;
+            }
+            toast('关联成功' + (statusChanged ? '（状态已更新为售出）' : ''), 'success');
+            await finishAssociateToDetail();
+            pushHistory(historyEntry);
         } catch (e) {
             associateSaveStatus.className = 'save-status error';
             associateSaveStatus.textContent = '保存失败：' + errorText(e) + '。请检查网络后点击“重试保存”。';
-            confirmAssociateBtn.disabled = false;
             confirmAssociateBtn.textContent = '重试保存';
             toast('关联保存失败：' + errorText(e), 'error');
+        } finally {
+            associateCancelledDuringSave = false;
+            setAssociateSaving(false);
         }
     }
 
     async function cancelAssociate() {
+        if (associateSaving) {
+            // M-8：保存中禁止取消；记录用户意图，保存完成后不回弹详情
+            associateCancelledDuringSave = true;
+            toast('正在保存，完成后会提示保存结果', 'info');
+            return;
+        }
         associateOverlay.classList.remove('active');
         currentAssociateData = null;
         associateSaveStatus.className = 'save-status';
         associateSaveStatus.innerHTML = '';
         markAsSoldCheckbox.checked = false;
+        setAssociateSaving(false);
         processing = false;
         if (scanMode === 'associate') {
             if (continuousMode) {
@@ -2762,6 +3485,7 @@
                 await startScan();
             }
         }
+        focusManualInput();
     }
 
     // ============================================================
@@ -2782,6 +3506,7 @@
             toast('该商品已删除，请到后台回收站恢复', 'warn');
             notFoundContent.textContent = '扫描内容: "' + cleaned + '"\n该商品已删除，请到后台回收站恢复。';
             notFoundOverlay.classList.add('active');
+            openModal(notFoundOverlay, notFoundOk);
             currentProductInfo = null;
             pushHistory({
                 time: new Date(),
@@ -2795,6 +3520,7 @@
         }
         notFoundContent.textContent = '扫描内容: "' + cleaned + '"\n无法关联到任何商品或库存项。';
         notFoundOverlay.classList.add('active');
+        openModal(notFoundOverlay, notFoundOk);
         currentProductInfo = null;
         pushHistory({
             time: new Date(),
@@ -2835,8 +3561,13 @@
             return;
         }
         if (processing) return;
-        const cleaned = Z.normalizeCode(rawText);
+        let cleaned = Z.normalizeCode(rawText);
         if (!cleaned) return;
+        // L-3：扫码/输入内容长度上限 512，超出提示并截断后再匹配/记录
+        if (cleaned.length > SCAN_TEXT_MAX) {
+            cleaned = cleaned.slice(0, SCAN_TEXT_MAX);
+            toast('内容过长（超过 ' + SCAN_TEXT_MAX + ' 字符），已截断处理', 'warn');
+        }
         const now = Date.now();
         if (lastHandled.text === cleaned && now - lastHandled.time < DEDUPE_MS) return;
         lastHandled = { text: cleaned, time: now };
@@ -2879,6 +3610,14 @@
         } else {
             stopScan().catch(function () {});
         }
+        focusManualInput();
+    }
+
+    function closeNotFound() {
+        notFoundOverlay.classList.remove('active');
+        processing = false;
+        syncSurfaceState();
+        focusManualInput();
     }
 
     async function closeDetailAndStop() {
@@ -2909,15 +3648,18 @@
     // 事件绑定
     // ============================================================
     loginBtn.addEventListener('click', runAsync(performLogin));
+    if (clearCredentialsBtn) clearCredentialsBtn.addEventListener('click', clearLocalCredentials);
     [loginToken, loginGistId, loginFilename].forEach(function (el) {
         el.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                performLogin();
+                if (!loginBusy) {
+                    performLogin().catch(function (err) { console.error('[scan] 登录失败', err); });
+                }
             }
         });
         el.addEventListener('input', function () {
-            if (loginError.textContent) loginError.textContent = '';
+            if (loginError.textContent) showLoginMessage('');
         });
         // 移动端键盘弹出时把输入框滚到可视区域，避免被键盘遮挡
         el.addEventListener('focus', function () {
@@ -2929,7 +3671,6 @@
 
     logoutBtn.addEventListener('click', function () {
         closeMoreMenu();
-        if (!window.confirm('确定退出登录？历史记录会保留在本机。')) return;
         logout().catch(function (e) {
             console.error('[scan] 退出失败', e);
             toast('退出失败：' + errorText(e), 'error');
@@ -2938,6 +3679,11 @@
 
     startBtn.addEventListener('click', function () {
         ensureAudioContext();
+        // L-1：启动中再次点击 = 取消启动
+        if (scanState === SCAN_STARTING) {
+            cancelScanStartup();
+            return;
+        }
         startScan().catch(function (e) { console.error('[scan] 启动扫描失败', e); });
     });
     stopBtn.addEventListener('click', function () {
@@ -2970,11 +3716,7 @@
             associateTypeSelect.value
         );
     });
-    notFoundOk.addEventListener('click', function () {
-        notFoundOverlay.classList.remove('active');
-        processing = false;
-        syncSurfaceState();
-    });
+    notFoundOk.addEventListener('click', closeNotFound);
 
     // 顶部：更多菜单 / 刷新 / 连续模式 / 设置
     moreBtn.addEventListener('click', function (e) {
@@ -3032,12 +3774,17 @@
         toggleTorch().catch(function (e) { console.error('[scan] 手电筒异常', e); });
     });
 
-    // 撤销清空历史
+    // 撤销清空历史（M-9：先隐藏撤销条但保留备份供恢复，恢复后立即清理备份键）
     undoBtn.addEventListener('click', function () {
         const action = undoState;
+        if (typeof action !== 'function') {
+            endUndoWindow();
+            return;
+        }
         hideUndoBar();
-        if (typeof action === 'function') {
-            try { action(); } catch (e) { console.error('[scan] 撤销失败', e); }
+        try { action(); } catch (e) {
+            console.error('[scan] 撤销失败', e);
+            clearHistoryBackup();
         }
     });
 
@@ -3072,7 +3819,158 @@
         toast('网络已断开，继续使用本地缓存数据', 'warn');
     });
 
-    // 成本显示/隐藏（事件委托，详情重绘后仍有效；状态在重渲染后保持）
+    // ============================================================
+    // M-6：多标签页同步（凭据清除 → 退出；历史键变化 → 重新读取渲染）
+    // ============================================================
+    function credentialKeys() {
+        const keys = (Z && Z.credentials && Z.credentials.keys) ? Z.credentials.keys : null;
+        if (keys && keys.TOKEN) return [keys.TOKEN, keys.GIST_ID, keys.FILENAME];
+        return CREDENTIAL_KEY_FALLBACK.slice();
+    }
+
+    function reloadHistoryFromStorage() {
+        history = loadHistory();
+        renderHistory();
+    }
+
+    function handleStorageEvent(event) {
+        if (!event) return;
+        const key = event.key;
+        if (key === LOGOUT_BROADCAST_KEY) {
+            handleRemoteLogout();
+            return;
+        }
+        if (key === null) {
+            // 其它标签页执行了 localStorage.clear()
+            handleRemoteLogout();
+            reloadHistoryFromStorage();
+            return;
+        }
+        if (credentialKeys().indexOf(key) !== -1) {
+            // 凭据键被其它标签页清除/改写：以存储中的实际登录态为准
+            if (currentToken) {
+                const cred = readCredentialsSafe();
+                if (!cred.token) handleRemoteLogout();
+            }
+            return;
+        }
+        if (key.indexOf(HISTORY_KEY_BASE) === 0 || key.indexOf(HISTORY_BACKUP_KEY_BASE) === 0) {
+            if (key.indexOf(HISTORY_KEY_BASE) === 0) reloadHistoryFromStorage();
+        }
+    }
+    window.addEventListener('storage', function (event) {
+        try {
+            handleStorageEvent(event);
+        } catch (e) {
+            console.error('[scan] storage 同步失败', e);
+        }
+    });
+
+    // ============================================================
+    // L-7/L-8：弹窗 Esc 关闭 / 遮罩点击关闭 / Tab 焦点循环
+    // ============================================================
+    function closeOverlayByEsc(overlay) {
+        if (!overlay) return;
+        if (overlay === conflictOverlay) { closeConflictDialog(null); return; }
+        if (overlay === productDetailOverlay) { closeDetailAndStop().catch(function () {}); return; }
+        if (overlay === associateOverlay) { cancelAssociate().catch(function () {}); return; }
+        if (overlay === notFoundOverlay) { closeNotFound(); return; }
+        if (overlay === matchListOverlay) { closeMatchList(); return; }
+        if (overlay === settingsOverlay) { closeSettings(); return; }
+    }
+
+    document.addEventListener('keydown', function (e) {
+        const overlay = activeModalOverlay();
+        if (!overlay) return;
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            closeOverlayByEsc(overlay);
+            return;
+        }
+        if (e.key === 'Tab') trapModalFocus(overlay, e);
+    });
+
+    [productDetailOverlay, associateOverlay, notFoundOverlay, matchListOverlay, settingsOverlay, conflictOverlay]
+        .forEach(function (overlay) {
+            if (!overlay) return;
+            overlay.addEventListener('click', function (e) {
+                if (e.target !== overlay) return; // 仅点击遮罩空白处
+                closeOverlayByEsc(overlay);
+            });
+        });
+
+    // M-7：冲突对话框按钮（确定 = 决策数组；取消/关闭 = null 中止保存）
+    if (conflictApplyBtn) {
+        conflictApplyBtn.addEventListener('click', function () {
+            const decisions = conflictDecisions ? conflictDecisions.slice() : null;
+            closeConflictDialog(decisions);
+        });
+    }
+    if (conflictCancelBtn) {
+        conflictCancelBtn.addEventListener('click', function () {
+            closeConflictDialog(null);
+        });
+    }
+
+    // ============================================================
+    // L-2：硬件扫码枪全局按键缓冲（输入框聚焦/弹窗打开时忽略；Enter 提交；500ms 无输入清空）
+    // ============================================================
+    function resetScanGunBuffer() {
+        scanGunBuffer = '';
+        if (scanGunTimer) { clearTimeout(scanGunTimer); scanGunTimer = null; }
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (activeModalOverlay() || loginOverlay.classList.contains('active') || moreMenuOpen) return;
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const target = e.target;
+        const tag = target && target.tagName ? String(target.tagName).toLowerCase() : '';
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || (target && target.isContentEditable)) return;
+        if (e.key === 'Enter') {
+            if (!scanGunBuffer) return;
+            const text = scanGunBuffer;
+            resetScanGunBuffer();
+            e.preventDefault();
+            handleScanResult(text).catch(function (err) {
+                console.error('[scan] 扫码枪内容处理失败', err);
+            });
+            return;
+        }
+        if (e.key && e.key.length === 1) {
+            scanGunBuffer += e.key;
+            if (scanGunBuffer.length > SCAN_TEXT_MAX) scanGunBuffer = scanGunBuffer.slice(-SCAN_TEXT_MAX);
+            if (scanGunTimer) clearTimeout(scanGunTimer);
+            scanGunTimer = setTimeout(resetScanGunBuffer, SCAN_GUN_IDLE_MS);
+            e.preventDefault();
+        }
+    });
+
+    // ============================================================
+    // L-15：页面卸载/冻结兜底释放摄像头
+    // ============================================================
+    function releaseCameraOnPageHide() {
+        processing = false;
+        startCancelRequested = true;
+        clearStartupTimer();
+        try { stopScan().catch(function () {}); } catch (e) { /* ignore */ }
+        const instance = html5QrCode;
+        if (!instance) return;
+        html5QrCode = null;
+        cameraPaused = false;
+        decodingPaused = false;
+        try {
+            const pendingStop = (typeof instance.stop === 'function') ? instance.stop() : null;
+            if (pendingStop && typeof pendingStop.catch === 'function') pendingStop.catch(function () {});
+        } catch (e) { /* ignore */ }
+        try {
+            const pendingClear = (typeof instance.clear === 'function') ? instance.clear() : null;
+            if (pendingClear && typeof pendingClear.catch === 'function') pendingClear.catch(function () {});
+        } catch (e) { /* ignore */ }
+    }
+    window.addEventListener('pagehide', releaseCameraOnPageHide);
+    document.addEventListener('freeze', releaseCameraOnPageHide);
+
+    // 成本显示/隐藏（事件委托，详情重绘后仍有效；L-5：隐藏时 DOM 中不保留明文）
     document.addEventListener('click', function (e) {
         if (moreMenuOpen && moreMenu && !moreMenu.contains(e.target) &&
             e.target !== moreBtn && !(moreBtn && moreBtn.contains(e.target))) {
@@ -3081,8 +3979,9 @@
         const button = e.target && e.target.closest ? e.target.closest('.cost-toggle') : null;
         if (!button) return;
         costVisible = !costVisible;
+        const costText = costVisible ? currentCostText() : '***';
         document.querySelectorAll('#detail-content .cost-display').forEach(function (span) {
-            span.textContent = costVisible ? (span.dataset.cost || '') : '***';
+            span.textContent = costText;
         });
         document.querySelectorAll('#detail-content .cost-toggle').forEach(function (btn) {
             btn.textContent = costVisible ? '隐藏' : '显示';
@@ -3092,54 +3991,78 @@
     // ============================================================
     // 初始化
     // ============================================================
+    const initialCredentials = readCredentialsSafe();
+    // 旧版全局历史键迁移到当前命名空间（未登录为 anon；记住的 Gist 直接用其 gistId）
+    migrateLegacyHistoryTo(initialCredentials.gistId || 'anon');
+    // 页面重载后旧的撤销备份已无意义（其它标签页仍在撤销窗口内的备份保留由时间戳判断）
+    clearAllHistoryBackups();
     history = loadHistory();
     setScanState(SCAN_IDLE);
     resetReaderArea();
     applySettingsToUI();
     updateSyncUI();
     hideTorchButton();
+    renderHistory();
     const headerVersion = document.getElementById('header-version');
     if (headerVersion) headerVersion.textContent = SCAN_VERSION;
     if (footerVersion) {
         footerVersion.textContent = '智能扫码 ' + SCAN_VERSION +
             ' · 核心 ' + (Z && Z.VERSION ? Z.VERSION : '?') +
-            ' · 构建 2026-10-21';
+            ' · 构建 2026-11-13';
     }
 
     // 30s TTL 后台刷新（页面可见且已登录时）
     setInterval(function () {
-        if (document.visibilityState === 'visible' && currentToken) {
+        if (document.visibilityState === 'visible' && currentToken && !readOnlyMode) {
             maybeRefreshInBackground(false);
         }
     }, DATA_TTL_MS);
 
-    // 便于本地自动化验证（非业务功能）
-    window.__scanDebug = {
-        getData: function () { return gistData; },
-        getBaseDoc: function () { return baseDoc; },
-        isProcessing: function () { return processing; },
-        getScanState: function () { return scanState; },
-        getHistory: function () { return history; },
-        isContinuous: function () { return continuousMode; },
-        isDecodingPaused: function () { return decodingPaused; },
-        isOffline: function () { return offlineMode; },
-        getLastSyncAt: function () { return lastSyncAt; },
-        isCostVisible: function () { return costVisible; },
-        getTorchSupported: function () { return !!torchFeature; },
-        getSettings: function () { return settings; }
-    };
+    // L-5：调试接口只在 localhost/127.0.0.1 或 URL 带 ?debug=1 时挂载
+    const DEBUG_ENABLED = (function () {
+        try {
+            const host = String(window.location.hostname || '').toLowerCase();
+            if (host === 'localhost' || host === '127.0.0.1') return true;
+            const params = new URLSearchParams(window.location.search);
+            return params.get('debug') === '1';
+        } catch (e) {
+            return false;
+        }
+    })();
+    if (DEBUG_ENABLED) {
+        window.__scanDebug = {
+            getData: function () { return gistData; },
+            getBaseDoc: function () { return baseDoc; },
+            isProcessing: function () { return processing; },
+            getScanState: function () { return scanState; },
+            getHistory: function () { return history; },
+            isContinuous: function () { return continuousMode; },
+            isDecodingPaused: function () { return decodingPaused; },
+            isOffline: function () { return offlineMode; },
+            isReadOnly: function () { return readOnlyMode; },
+            getLastSyncAt: function () { return lastSyncAt; },
+            isCostVisible: function () { return costVisible; },
+            getTorchSupported: function () { return !!torchFeature; },
+            getSettings: function () { return settings; },
+            getHistoryKey: function () { return historyKey(); }
+        };
+    }
 
     async function handleVisibilityChange() {
         if (document.visibilityState === 'hidden') {
             if (scanState === SCAN_SCANNING || scanState === SCAN_STARTING) {
                 resumeCameraOnVisible = true;
                 processing = false;
+                if (scanState === SCAN_STARTING) {
+                    startCancelRequested = true;
+                    clearStartupTimer();
+                }
                 await stopScan().catch(function () {});
                 if (cameraStatus) cameraStatus.textContent = '页面已隐藏，摄像头已暂停；返回后自动恢复';
             }
             return;
         }
-        if (currentToken) {
+        if (currentToken && !readOnlyMode) {
             refreshData({ manual: false }).catch(function () {});
         }
         if (resumeCameraOnVisible) {
@@ -3165,29 +4088,27 @@
             await stopScan();
             await startScan();
         }
+        focusManualInput();
     }
 
     (function autoLogin() {
-        pruneStaleCredentials();
-        const token = readStoredCredential(STORAGE_KEYS.TOKEN);
-        const gistId = readStoredCredential(STORAGE_KEYS.GIST_ID);
-        const filename = readStoredCredential(STORAGE_KEYS.FILENAME) || 'data.json';
-        if (loginRemember) {
-            loginRemember.checked = !hasSessionCredential(STORAGE_KEYS.TOKEN) &&
-                (hasLocalCredential(STORAGE_KEYS.TOKEN) || !token);
-        }
-        if (token && gistId) {
-            loginToken.value = token;
-            loginGistId.value = gistId;
-            loginFilename.value = filename;
-            performLogin();
+        const cred = initialCredentials;
+        if (loginRemember) loginRemember.checked = !!cred.remember;
+        if (cred.token && cred.gistId) {
+            loginGistId.value = cred.gistId;
+            loginFilename.value = cred.filename || 'data.json';
+            // L-4：自动登录不把 Token 回填到 DOM 输入框
+            performLogin({ token: cred.token }).catch(function (e) {
+                console.error('[scan] 自动登录失败', e);
+            });
         } else {
             loginOverlay.classList.add('active');
             appContainer.style.display = 'none';
+            renderHistory();
         }
     })();
 
-    console.log('智能扫码页面已加载（R2：连续扫码 / 多匹配 / 手电筒·相册 / 30s 刷新 / 软删除）');
+    console.log('智能扫码页面已加载（R3 · v2.2.0：连续扫码 / 多匹配 / 手电筒·相册 / 30s 刷新 / 软删除 / 多标签页同步）');
 </script>
 </body>
 </html>

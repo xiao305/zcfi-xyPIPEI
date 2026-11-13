@@ -3,27 +3,78 @@
 本项目的页面/数据层均随 GitHub Pages 发布，版本按「核心（js/core.js）+ 功能轮次」记录。
 日期格式：`YYYY-MM-DD`。
 
-## [未发布 / TODO]
+## [2.2.0] - 2026-11-13
 
-### R2b · 管理后台体验（进行中）
+统一版本号：**core v2.2.0 / admin R4 / scan R3**，文档更新日期 **2026-11-13**。
 
-- [ ] 搜索/筛选状态持久化（刷新后保留）
-- [ ] 节点排序、结果汇总、复制/批量新增
-- [ ] 移动端/响应式适配继续完善
-- [ ] 与扫码端字段可见性、打印入口守卫的一致性修复（见 `docs/CONSISTENCY-REVIEW.md`）
+### 安全
 
-### R3 · 打印 v2（待做）
+- **移除硬编码默认 Gist ID**：删除硬编码的默认 Gist ID 常量与两端登录框的默认值，登录页 Gist ID 默认空，必须填写自己的；退出登录/重新登录不再回填公开示例值。
+- **扫码库本地化**：`html5-qrcode` 从第三方 CDN 改为自托管 `js/vendor/html5-qrcode.min.js`（锁 2.3.8），站点不再依赖任何外部 CDN。
+- **CSP / Referrer-Policy**：`index.html`、`tools/scanner-test.html` 增加 `<meta http-equiv="Content-Security-Policy">` 与 `no-referrer`；根路径改为无内联脚本的导航页。
+- **Secret Gist 文案修正**：README / FAQ / 架构说明明确「Secret Gist 不是私有，链接即权限」，补充敏感数据提示、专用账号与 Token 轮换建议、信任边界清单。
+- **打印脚本不入库**：`CLodopFuncs.js` 不再提交仓库，改为运行时从本机 C-Lodop 加载，避免把作者本机打印机快照与第三方脚本快照带进公开站点。
 
-- [ ] 第二套标签模板
-- [ ] 打印份数顺序/结果反馈修正（真实打印现场验证）
-- [ ] 打印设置持久化、整节点批量打印、预览完善
+### 打印
 
-### 文档/一致性
+- 打印/预览返回 `null` / `undefined` / `false` 一律判定为失败并明确报错，不再静默“假成功”。
+- 注册 `LODOP.On_Return` 回调，打印结果以状态栏为准；未连接/失败时给出具体提示。
+- 打印机列表与索引改为取**本机 C-Lodop 实时列表**，移除作者本机 5 台打印机的静态快照。
+- 批量打印实现 `strict` **全有或全无**：复核时存在失效条目则取消整批并列出被跳过项。
+- 打印字段为 `null` 时按空串处理（不再抛异常或打出字符串 `"null"`）；预览加 try/catch。
 
-- [x] README、用户手册、备份恢复、FAQ、架构、发布清单、一致性审查（本次）
-- [ ] 修复 `docs/CONSISTENCY-REVIEW.md` 中 P1（admin/scan 凭据 localStorage/sessionStorage 不一致）
-- [ ] P2：打印导出函数回收站守卫、扫码历史已删除标记、编码大小写规范、后台字段可见性
-- [ ] R2b/R3 完成后更新 CHANGELOG 与截图
+### 数据层（core v2.2.0）
+
+- 修复 `findNodeEntry` 的 `parentCode` 恒为 `null`：复制嵌套节点、子节点自定义编码校验、回收站祖先守卫恢复正确。
+- 所有 GitHub 请求使用 `cache: 'no-store'`；GET + apply + PATCH **整体重试**（不再只重试 PATCH），读 body 也受超时约束。
+- 403/404 细分：限流 → `RATE_LIMIT`（带 `retryAfter` 与重置提示）、无权限 → `PERMISSION`、文件不存在 → `FILE_MISSING`，文案并列多种可能。
+- 根级新增 `schemaVersion`（当前 = `1`），保存/恢复时补写；根级未知字段保留，仅替换 `products`。
+- 新增统一凭据工具 `ZCFI.credentials`（`read` / `write` / `clearToken` / `clear`），admin/scan 共用，消除两份实现。
+- 新增 `ZCFI.sizeBytes`（`TextEncoder` 真实字节数）与 `ZCFI.deepEqual`（键序无关比较）；`save` 的 `unchanged` 判定不再受 JSON 键序影响。
+- `doc.replace` 前先 `GET` 远端并导出真实远端备份（`backup-before-*.json`）；远端与基准不一致时二次确认，避免恢复覆盖其他设备的并发修改。
+- `save` 新增 `createOnly` 语义：两端并发新建同码不再静默覆盖。
+- 严格读取保持：`EMPTY` / `PARSE` / `SCHEMA` / `TRUNCATED` 一律抛错，`raw_url` 回退失败明确报错，绝不用残缺数据覆盖远端。
+- 错误码中文映射补 `SAVE_FAILED` / `BAD_OP` 等。
+
+### 管理后台（admin R4）
+
+- 修复按大类筛选把子类与全部库存隐藏的问题（筛选只隐藏非该大类子树）。
+- 修复软删除父节点后顶部/节点汇总仍统计其子库存的问题。
+- 本地快照按 `gistId` 隔离，退出登录清理非当前 Gist 快照，列表显示归属。
+- 恢复历史版本 / 恢复快照 / 导入前：先从远端拉取最新数据并下载 `backup-before-*.json`。
+- 中文输入法组合期间（`isComposing`）不触发全量重渲染，`compositionend` 后再搜索。
+- 确认弹窗防重入、执行中不可重复确认；Esc/遮罩关闭与焦点处理；登录与表单 a11y（label/for、对比度）改进。
+- 退出与刷新竞态防护；登录 Enter 防并发；打印入口守卫与未知状态样式一致性修复。
+
+### 扫码端（scan R3）
+
+- 数据刷新错误分类：仅 `NETWORK` / `RATE_LIMIT` / `SERVER` 进入离线模式；`AUTH` 强制重新登录；`PARSE`/`SCHEMA`/`TRUNCATED` 明确报错并禁止写入。
+- 多标签页：监听 `storage` 同步登录态/退出广播，扫码历史按记录合并写入，不再整键覆盖或误删另一标签的凭据。
+- 冲突提示改为**逐字段**选择（展示基准/远端/我的值），不再一键整体覆盖；默认不静默采用本地值。
+- 历史按 `gistId` 隔离；退出登录可同时清理本机历史；清空历史的撤销备份在窗口结束/成功后删除。
+- “启动中”可取消并有超时；硬件扫码枪焦点与按键缓冲改进；`pagehide`/卸载兜底释放摄像头。
+
+### 站点与文档
+
+- 站点根路径 `index.html` 改为**轻量导航页**：无内联脚本、无 CDN，提供「进入管理后台 /admin」「手机扫码 /scan」两个入口与安全提示。
+- 原根路径扫码测试页迁移为 `tools/scanner-test.html`（调试用）：引用本地 `../js/vendor/html5-qrcode.min.js`，加 `noindex` 与 CSP，viewport 允许缩放。
+- 删除废弃的 `web-scanner-lib/` 示例目录（其 README 描述的 `src/` 从未存在、示例 CDN 路径失效且含不安全 innerHTML）。
+- README / CHANGELOG / docs 全量同步到 v2.2.0；修正旧文档中硬编码的本机绝对路径、`normalizeCode` 描述、标签清单、`validateDocDeep` 等低项。
+- 新增 `tools/verify.mjs`（静态/语法/文档一致性校验）与 `.github/workflows/ci.yml`（CI 自动执行），发布门禁不再依赖被忽略的本地测试目录。
+- 修正原 R2b/R3 的过期状态标注与“完成后更新 CHANGELOG”类未完成项；补记此前缺失的 R2b / R3 / scan 一致性 / 截断修复条目。
+
+### 历史轮次补记（此前未单独更新 CHANGELOG）
+
+- **R2b（admin，`65b8713`）**：搜索防抖/高亮、节点与库存排序、汇总、复制、添加 N 件、跨节点批量、视图持久化、390px 响应式、渲染性能。
+- **R3（admin 打印 v2，`63c9ca8`）**：3 套模板、打印指令顺序与份数、失败反馈、设置记忆、整节点/跨节点批量打印、打印前远端复核、编码大小写检查、未知状态样式。
+- **scan 一致性修复（`09afad0`）**：记住登录统一 local/session 凭据、退出清理两处、历史记录标记已删除并拦截。
+- **core 截断修复（`a82ea00`）**：Gist 文件被截断且 `raw_url` 回退失败时明确报 `TRUNCATED`，避免把残缺内容当数据。
+- **文档终稿（`69116c2`）**：同步 R2b/R3 打印与 scan 一致性修复说明。
+
+### 本轮提交与标签
+
+- 版本基线：`69116c2`（本 CHANGELOG 之前的文档终稿提交）之上的 v2.2.0 变更。
+- 备份标签：按发布流程在仓库根目录创建并推送（参见 [发布检查清单](docs/RELEASE-CHECKLIST.md) 与 [备份与恢复](docs/BACKUP-AND-RECOVERY.md)）。
 
 ---
 
@@ -63,7 +114,7 @@
 - 后台 R2a：`6922a6e feat(admin R2a): 数据菜单/回收站/编码规范/记住登录`
 - 扫码 R2：`9dc7bcf feat(scan R2): 连续扫码/多匹配/手电筒震动提示音/相册识别/离线刷新/移动端UI`
 - 备份标签：`backup-r1-core21`、`backup-r2a`、`backup-r2-scan`
-- 详见 `docs/BACKUP-AND-RECOVERY.md`。标签为本地标签，未经确认不要 push 到远端。
+- 详见 `docs/BACKUP-AND-RECOVERY.md`。
 
 ---
 
@@ -100,7 +151,8 @@
 
 | 版本 | 内容 | 标签 |
 | --- | --- | --- |
-| 2.1.0 + R2a + R2 | 核心 2.1、后台 R2a、扫码 R2 | `backup-r1-core21`、`backup-r2a`、`backup-r2-scan` |
+| 2.2.0 + R4 + R3 | 核心 2.2、后台 R4、扫码 R3、站点导航页与文档终稿 | 发布流程中创建并推送（见发布检查清单） |
+| 2.1.0 + R2a + R2b/R2 | 核心 2.1、后台 R2a、扫码 R2 | `backup-r1-core21`、`backup-r2a`、`backup-r2-scan`、`backup-r2b`、`backup-scan-fix`、`backup-r3` |
 | 2.0.0 + R1 | 核心 2.0、后台 R1、扫码 R1 | `backup-r1`、`backup-r1-admin` |
 | 初始基线 | 原始代码 | `backup-r0` |
 
