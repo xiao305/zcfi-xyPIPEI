@@ -6,7 +6,7 @@
 - 站点入口：`https://xypipei.zcfi.cn/`（导航页，选择下面两个入口）
 - 管理后台：`https://xypipei.zcfi.cn/admin`（商品树、库存、回收站、数据工具、标签打印）
 - 智能扫码：`https://xypipei.zcfi.cn/scan`（手机端连续扫码、关联快递/订单/链接、标记售出）
-- 当前版本：**v2.2.0**（核心 `js/core.js` v2.2.0 / 管理后台 **R4** / 扫码端 **R3**），文档更新日期 **2026-11-13**。
+- 当前版本：**v2.2.1**（核心 `js/core.js` v2.2.0 / 管理后台 **R4** / 扫码端 **R3**），文档更新日期 **2026-11-13**；v2.2.1 为打印服务连接修复（详见 [CHANGELOG](CHANGELOG.md)）。
 
 > ## ⚠️ 使用前必读：Secret Gist 不是私有仓库
 >
@@ -368,8 +368,9 @@ GitHub Gist 的 data.json（你自己的 Gist —— Secret 也只是「不公�
 
 ### 页面如何加载打印脚本
 
-- 页面在运行时从本机服务加载官方脚本：`https://localhost.lodop.net:8443/CLodopFuncs.js`（HTTPS），或 `http://localhost:8000/CLodopFuncs.js`（HTTP）。
-- 本机 C-Lodop 使用**自签名证书**，浏览器可能提示「不安全」。第一次需要在浏览器中打开 `https://localhost.lodop.net:8443`，手动选择「继续访问/信任证书」，然后刷新 `/admin`。
+- **协议规则（v2.2.1 起）**：HTTPS 页面只加载 `https://localhost.lodop.net:8443/CLodopFuncs.js`，**不会尝试 http**——http 子资源属于混合内容，会让浏览器地址栏显示「不安全」；只有 HTTP 页面（本机调试）才先加载 `http://localhost:8000/CLodopFuncs.js`，失败再试 HTTPS。
+- 本机 C-Lodop 使用**自签名证书**，浏览器可能提示证书不受信任。第一次需要在浏览器中打开 `https://localhost.lodop.net:8443`，手动选择「继续访问/信任证书」，然后刷新 `/admin`。
+- 本机脚本只提供 `getCLodop()`（页面已补 `getLodop()` 别名）；**就绪判定要求 C-Lodop 的 WebSocket 真正连上**，而不是“脚本加载成功”。C-Lodop 内部用字符串定时器做握手/重连，页面已用定向垫片处理，因此**不需要放开 CSP 的 `'unsafe-eval'`**。
 - 打印机列表来自**本机 C-Lodop 的实时列表**，不再使用作者本机的静态快照；换电脑/换打印机后会显示当前机器的设备。
 
 ### 打印结果以状态栏为准
@@ -418,6 +419,8 @@ GitHub Gist 的 data.json（你自己的 Gist —— Secret 也只是「不公�
 | --- | --- |
 | 顶部显示「打印服务未连接」 | 启动 C-Lodop；确认没有被杀毒软件拦截 |
 | 提示证书错误/无法加载 | 浏览器打开 `https://localhost.lodop.net:8443` 信任证书，再刷新 |
+| 地址栏显示「不安全」/控制台报混合内容 | v2.2.1 起 HTTPS 页面不再加载 http 脚本；若仍出现，强制刷新（Ctrl+F5）并检查是否有旧缓存/代理 |
+| 控制台报 CSP 拦截 eval（C-Lodop 相关） | 页面已用定向垫片兼容 C-Lodop 的字符串定时器；若仍出现，请记录 C-Lodop 版本与报错 |
 | 能预览但打印没反应 | 检查是否选择了真实打印机；查看 C-Lodop 打印队列/日志；再看状态栏的 `On_Return` 结果 |
 | 标签内容错位/字体不对 | 与打印机驱动、纸张尺寸（50×30 或 40×30mm）、C-Lodop 版本有关；需现场调 |
 | 份数不对/重复打印 | 已按 `SET_PRINT_COPIES` 顺序修复；如仍不对，请记录模板/纸张/驱动并现场验证 |
@@ -563,8 +566,10 @@ git checkout backup-r1-core21 -- js/core.js
 ├─ admin.html            管理后台（商品树/回收站/数据工具/打印）
 ├─ scan.html             手机扫码端（连续扫码/关联/历史）
 ├─ tools/
-│  ├─ scanner-test.html  扫码库调试页（noindex，非系统入口）
-│  └─ verify.mjs         静态/语法/文档一致性校验脚本
+│  ├─ scanner-test.html      扫码库调试页（noindex，非系统入口）
+│  ├─ verify.mjs             静态/语法/文档一致性校验脚本
+│  ├─ test-core.mjs          数据层单元测试（vm 沙箱，CI 必跑）
+│  └─ test-lodop-loader.mjs  C-Lodop 加载/就绪判定单元测试（CI 必跑）
 ├─ js/
 │  ├─ core.js            共享核心 v2.2.0：严格 Gist 读写 / 三方合并保存 / 凭据 / 软删除 / 转义 / 诊断
 │  └─ vendor/
@@ -572,13 +577,13 @@ git checkout backup-r1-core21 -- js/core.js
 │     └─ README.md             自托管依赖的来源/哈希/升级说明
 ├─ docs/                 用户/架构/运维文档
 ├─ .github/workflows/
-│  └─ ci.yml             CI：node --check + tools/verify.mjs
+│  └─ ci.yml             CI：verify + test-core + test-lodop-loader
 ├─ CNAME                 自定义域名
 ├─ CHANGELOG.md          版本变更记录
 └─ README.md             本文件
 ```
 
-> `CLodopFuncs.js` 不再入库；打印脚本运行时从本机 C-Lodop 加载（`https://localhost.lodop.net:8443/CLodopFuncs.js` 或 `http://localhost:8000/CLodopFuncs.js`）。
+> `CLodopFuncs.js` 不再入库；打印脚本运行时从本机 C-Lodop 加载：HTTPS 页面只用 `https://localhost.lodop.net:8443/CLodopFuncs.js`（**不会**回退 http，避免混合内容），HTTP 页面才用 `http://localhost:8000/CLodopFuncs.js`。
 
 | 文档 | 内容 |
 | --- | --- |
@@ -594,7 +599,7 @@ git checkout backup-r1-core21 -- js/core.js
 
 ## 版本与路线图
 
-- 当前（2026-11-13）：**v2.2.0** = `core v2.2.0` + `admin R4` + `scan R3` + 站点/文档终稿。
+- 当前（2026-11-13）：**v2.2.1** = `core v2.2.0` + `admin R4` + `scan R3` + 站点/文档终稿；v2.2.1 为打印服务连接修复（HTTPS 页面不再触发混合内容、兼容 `getCLodop`）。
 - 本版本已完成：
   - **安全**：移除硬编码默认 Gist ID；扫码库本地化（`js/vendor/html5-qrcode.min.js`）；新增 CSP/referrer；Secret Gist 文案全面修正；`CLodopFuncs.js` 不再入库。
   - **打印**：运行时加载本机 C-Lodop、打印结果真实反馈（`On_Return`）、打印机取本机实时列表、批量 strict、null 健壮性。
@@ -602,10 +607,10 @@ git checkout backup-r1-core21 -- js/core.js
   - **管理后台 R4**：筛选/汇总修复、快照隔离、恢复前远端备份、IME、确认弹窗、竞态、a11y。
   - **扫码端 R3**：错误分类、多标签页、逐字段冲突、历史隔离、启动取消、扫码枪、卸载兜底。
   - **站点**：根路径导航页、`tools/scanner-test.html`、删除废弃示例目录。
-  - **文档**：README/CHANGELOG/docs 全量同步到 v2.2.0。
+  - **文档**：README/CHANGELOG/docs 全量同步到 v2.2.1。
 - 历史轮次：R2a（数据菜单/回收站）、R2b（搜索/排序/汇总/复制/响应式）、R3 打印 v2（并入本版本基线）、scan R2 与一致性修复。
 - 后续方向（未承诺）：外置内联脚本以收紧 CSP、`schemaVersion` 迁移框架、后台列表字段可见性增强、PWA/Service Worker、多用户权限模型。
 
-> 文档与一致性审查已同步到 v2.2.0 最终代码；后续改动请继续更新本 README 与 [CHANGELOG](CHANGELOG.md)。
+> 文档与一致性审查已同步到 v2.2.1 最终代码；后续改动请继续更新本 README 与 [CHANGELOG](CHANGELOG.md)。
 
 变更记录见 [CHANGELOG.md](CHANGELOG.md)。

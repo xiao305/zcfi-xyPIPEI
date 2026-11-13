@@ -9,6 +9,7 @@
 - 扫码端：**R3**（R2 `9dc7bcf` + 一致性修复 `09afad0` + 本轮 R3 修复）
 - 站点：GitHub Pages 静态站，自定义域名 `xypipei.zcfi.cn`；根路径为导航页，`/admin`、`/scan` 为功能入口
 - 文档与代码同步日期：**2026-11-13**
+- 页面版本：**v2.2.1**（admin `R4 · v2.2.1` / scan `R3 · v2.2.1`；v2.2.1 修复 C-Lodop 连接判定与 HTTPS 混合内容）
 
 ---
 
@@ -47,7 +48,7 @@
 | --- | --- | --- |
 | `html5-qrcode` | 摄像头/图片扫码 | **本地** `js/vendor/html5-qrcode.min.js`（自托管，锁 `2.3.8`；来源与 SHA-256 见 `js/vendor/README.md`，CI 校验哈希） |
 | `js/core.js` | 共享数据层（读/存/合并/凭据/转义） | 仓库本地，v2.2.0 |
-| `CLodopFuncs.js` | 加载本机 C-Lodop 打印服务 | **运行时从本机加载，不入库**：`https://localhost.lodop.net:8443/CLodopFuncs.js` 或 `http://localhost:8000/CLodopFuncs.js` |
+| `CLodopFuncs.js` | 加载本机 C-Lodop 打印服务 | **运行时从本机加载，不入库**。HTTPS 页面只用 `https://localhost.lodop.net:8443/CLodopFuncs.js`（禁止 http，避免混合内容）；HTTP 页面才用 `http://localhost:8000/CLodopFuncs.js`，失败再试 HTTPS |
 | GitHub API | Gist 读写/历史 | `api.github.com` |
 | Gist raw | 大文件回退读取 | `gist.githubusercontent.com` |
 
@@ -308,7 +309,7 @@ ZCFI.save()
 | --- | --- | --- | --- |
 | `api.github.com` | 登录、读取、保存、历史版本 | Token（仅 `Authorization` 头）、Gist 内容 | GitHub 官方 API；Token 不进 URL/Gist/日志。泄露即可读写账号全部 Gist |
 | `gist.githubusercontent.com` | 大文件（>1 MB）`raw_url` 回退 | 公开/Secret Gist 的 raw 内容 | 无需 Token 即可读取；Secret Gist 的 raw 链接同样可被拿到链接者读取 |
-| `https://localhost.lodop.net:8443` / `http://localhost:8000` | 打印 | 标签数据（名称/编码/单号等） | **本机** C-Lodop 服务，运行时加载的第三方脚本通道；自签证书需手动信任；只应在本机使用 |
+| `https://localhost.lodop.net:8443` / `http://localhost:8000` | 打印 | 标签数据（名称/编码/单号等） | **本机** C-Lodop 服务，运行时加载的第三方脚本通道；自签证书需手动信任；只应在本机使用。**HTTPS 页面只允许 https:8443，绝不加载 http:8000**（混合内容会让地址栏显示“不安全”） |
 | CDN（原第三方脚本源） | — | — | **已移除**：`html5-qrcode` 自托管到 `js/vendor/`，站点不再从 CDN 加载脚本 |
 
 ### 8.3 CSP 现状与残留
@@ -316,6 +317,7 @@ ZCFI.save()
 - `index.html`：纯静态、**无内联脚本**，CSP 为 `default-src 'self'; script-src 'self'; ...`。
 - `tools/scanner-test.html`：调试页允许内联脚本（`script-src 'self' 'unsafe-inline'`），扫码库引用本地 `../js/vendor/html5-qrcode.min.js`。
 - `admin.html` / `scan.html`：仍是单文件内联脚本，CSP 需要 `'unsafe-inline'`；**严格 CSP 需先外置内联脚本/样式，属后续项**（未完成，别在文档里宣称已严格化）。
+- `admin.html` 的 CSP 白名单还包含本机打印所需来源：`script-src ... https://localhost.lodop.net:8443 http://localhost:8000`、`connect-src ... wss://localhost.lodop.net:8443 ws://localhost:8000 ws://127.0.0.1:8000`、`img-src` 与 `form-action` 同上。**未放开 `'unsafe-eval'`**：C-Lodop 内部字符串定时器由页面定向垫片转成函数调用（包装 `window.setTimeout`，只识别 `On_CLodop_Opened` / `OpenWebSocket` 两种）。
 - 三页均建议/已配置 `Referrer-Policy: no-referrer`（GitHub Pages 不能下发响应头，用 `<meta name="referrer">` 落地）。
 
 ### 8.4 数据渲染与 XSS

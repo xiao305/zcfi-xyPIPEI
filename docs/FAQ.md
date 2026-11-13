@@ -197,14 +197,14 @@
 - 本机安装并启动 C-Lodop；任务栏应有图标。
 - 防火墙/杀毒软件可能拦截，放行 C-Lodop。
 - 刷新后台页面。
-- 页面从本机加载打印脚本：`https://localhost.lodop.net:8443/CLodopFuncs.js`（HTTPS）或 `http://localhost:8000/CLodopFuncs.js`（HTTP）；仓库不再内置 `CLodopFuncs.js`。
+- 页面从本机加载打印脚本：HTTPS 页面用 `https://localhost.lodop.net:8443/CLodopFuncs.js`（**不会**回退 http），HTTP 页面用 `http://localhost:8000/CLodopFuncs.js`；仓库不再内置 `CLodopFuncs.js`。
 - 即使未连接，仍可打开打印弹窗看**内置示意图**；系统预览/直接打印会明确报错，**不会假成功**。
 
 ### Q27：HTTPS 下提示证书错误/无法加载？
 
 - 浏览器新开 `https://localhost.lodop.net:8443`，选择「继续访问/信任证书」。
 - 回到 `/admin` 刷新；仍不行重启 C-Lodop 再试。
-- 页面会先试 HTTPS，再试 HTTP `localhost:8000`；两者都失败会提示打印服务不可用。
+- 页面按协议选择脚本：**HTTPS 页面只试 HTTPS（8443），不会加载 http**（避免混合内容导致地址栏“不安全”）；HTTP 页面才先试 `localhost:8000`，失败再试 HTTPS。两者都失败会提示打印服务不可用。
 
 ### Q28：能预览但打印没反应/份数不对/内容错位？
 

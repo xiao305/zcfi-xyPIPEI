@@ -24,6 +24,12 @@ jobs:
       - name: Run verify.mjs
         run: node tools/verify.mjs
 
+      - name: Unit tests (core.js)
+        run: node tools/test-core.mjs
+
+      - name: Unit tests (C-Lodop loader)
+        run: node tools/test-lodop-loader.mjs
+
       - name: Check vendored dependency hash
         run: |
           actual="$(sha256sum js/vendor/html5-qrcode.min.js | cut -d' ' -f1)"

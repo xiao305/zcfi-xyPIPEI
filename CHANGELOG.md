@@ -3,6 +3,23 @@
 本项目的页面/数据层均随 GitHub Pages 发布，版本按「核心（js/core.js）+ 功能轮次」记录。
 日期格式：`YYYY-MM-DD`。
 
+## [2.2.1] - 2026-11-13
+
+修复 v2.2.0 上线后发现的打印服务连接问题。页面版本：admin `R4 · v2.2.1` / scan `R3 · v2.2.1`；core 仍为 v2.2.0。
+
+### 修复
+
+- **C-Lodop 就绪判定错误**：本机服务脚本只定义 `getCLodop()` / `window.CLODOP`，不定义 `getLodop()`；旧实现只查 `getLodop`/`window.CLodop`，所以服务明明可用仍显示「打印服务未连接」。现兼容 `getCLodop()`、`window.CLODOP`、`window.LODOP`，并补 `getLodop()` 别名。
+- **HTTPS 页面出现混合内容（地址栏变「不安全」）**：旧实现就绪判定失败后会回退加载 `http://localhost:8000/CLodopFuncs.js`。HTTPS 页面加载 http 脚本属于混合内容，浏览器会标记地址栏不安全。现改为：**HTTPS 页面只加载 `https://localhost.lodop.net:8443`，绝不尝试 http**；HTTP 页面（本机调试）才先试 8000、失败再试 HTTPS。
+- **就绪判定改为真实连接**：要求 C-Lodop 的 WebSocket 已连接（`SocketOpened` / `readyState === 1`）且能取到打印机数量；异步连上后通过 `On_CLodop_Opened` 与 `zcfi:lodop-ready` 事件刷新状态和打印机列表。
+- **CSP 与 C-Lodop 兼容**：放行 `ws://127.0.0.1:8000`（本机 8000 服务硬编码该地址）及预览所需的本机图片/表单目标；C-Lodop 内部字符串定时器（`setTimeout("...")`）改用定向垫片转函数调用，**不放开 `'unsafe-eval'`**。
+- **错误提示更准确**：区分「脚本加载失败（未安装/未启动/证书未信任）」与「脚本已加载但服务连接未建立」，并给出信任证书步骤。
+
+### 验证
+
+- 新增 22 项 loader 单元测试（HTTPS 只请求 https、失败不回退 http、Socket 判定、getCLodop 兼容、旧实现回归）；
+- 新增 9 项端到端测试（HTTPS 页面零 `http://localhost:8000` 请求、连接真实本机 C-Lodop 显示「已就绪（5 台打印机）」、HTTP 页面从 8000 连接成功、无 CSP 违规）。
+
 ## [2.2.0] - 2026-11-13
 
 统一版本号：**core v2.2.0 / admin R4 / scan R3**，文档更新日期 **2026-11-13**。

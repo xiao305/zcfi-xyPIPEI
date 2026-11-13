@@ -760,7 +760,7 @@
 <div id="app-container" style="display:none;">
     <div class="container">
         <header class="app-header">
-            <h1>智能扫码 <span class="app-version" id="header-version">R3 · v2.2.0</span></h1>
+            <h1>智能扫码 <span class="app-version" id="header-version">R3 · v2.2.1</span></h1>
             <div class="app-header-actions">
                 <button class="icon-btn" id="more-btn" type="button" aria-label="更多" aria-haspopup="menu" aria-expanded="false">更多</button>
             </div>
@@ -825,7 +825,7 @@
             </div>
         </div>
         <footer class="app-footer">
-            <div class="version" id="footer-version">智能扫码 R3 · v2.2.0</div>
+            <div class="version" id="footer-version">智能扫码 R3 · v2.2.1</div>
             <div>数据仅存于你的 Gist，本页面不向其他服务器发送数据。</div>
         </footer>
     </div>
@@ -938,7 +938,7 @@
 <script>
     'use strict';
     /* ============================================================
-     * 智能扫码页（scan.html）R3 · v2.2.0
+     * 智能扫码页（scan.html）R3 · v2.2.1
      * - 数据读写统一走 js/core.js：ZCFI.get 严格读取 / ZCFI.save 并发安全三方合并（R1）
      * - 所有动态 HTML 一律 escapeHtml；备注/链接只按纯文本处理（R1）
      * - 摄像头 idle/starting/scanning/stopping 串行状态机 + 扫码锁 + 2 秒去重（R1）
@@ -948,7 +948,7 @@
      * - R3：本地扫码库 + CSP、ZCFI.credentials、错误分类/只读保护、多标签页同步、
      *       逐字段冲突对话框、历史隔离与备份清理、扫码枪缓冲、可访问性、卸载释放摄像头
      * ============================================================ */
-    const SCAN_VERSION = 'R3 · v2.2.0';
+    const SCAN_VERSION = 'R3 · v2.2.1';
     const Z = window.ZCFI;
     if (!Z) {
         console.error('[scan] js/core.js 未加载，数据读写功能不可用');
@@ -4108,7 +4108,7 @@
         }
     })();
 
-    console.log('智能扫码页面已加载（R3 · v2.2.0：连续扫码 / 多匹配 / 手电筒·相册 / 30s 刷新 / 软删除 / 多标签页同步）');
+    console.log('智能扫码页面已加载（R3 · v2.2.1：连续扫码 / 多匹配 / 手电筒·相册 / 30s 刷新 / 软删除 / 多标签页同步）');
 </script>
 </body>
 </html>
