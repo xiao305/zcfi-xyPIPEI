@@ -5753,9 +5753,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'code',
-                    x: 1,
+                    x: 2,
                     y: 1,
-                    width: 48,
+                    width: 46,
                     height: 8.5,
                     fontSize: 24,
                     fontName: '黑体',
@@ -5770,9 +5770,9 @@ window.openBatchStatus = openBatchStatus;
                     type: 'text',
                     field: 'static',
                     text: '仅供内部查询使用',
-                    x: 1,
+                    x: 2,
                     y: 9.5,
-                    width: 48,
+                    width: 46,
                     height: 3.5,
                     fontSize: 11,
                     fontName: '黑体',
@@ -5802,9 +5802,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'code',
-                    x: 1,
+                    x: 2,
                     y: 1,
-                    width: 48,
+                    width: 46,
                     height: 7,
                     fontSize: 16,
                     fontName: '黑体',
@@ -5865,9 +5865,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'code',
-                    x: 1,
+                    x: 2,
                     y: 1,
-                    width: 38,
+                    width: 36,
                     height: 7,
                     fontSize: 16,
                     fontName: '黑体',
@@ -5895,9 +5895,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'barcode',
                     field: 'code',
-                    x: 1,
+                    x: 2,
                     y: 16.5,
-                    width: 42,
+                    width: 36,
                     height: 8.5,
                     barcodeType: 'PDF417',
                     align: 'center'
@@ -5915,9 +5915,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'code',
-                    x: 1,
+                    x: 2,
                     y: 1,
-                    width: 48,
+                    width: 46,
                     height: 9,
                     fontSize: 22,
                     fontName: '黑体',
@@ -5930,9 +5930,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'name',
-                    x: 1,
+                    x: 2,
                     y: 10.5,
-                    width: 48,
+                    width: 46,
                     height: 5,
                     fontSize: 10,
                     fontName: '黑体',
@@ -5943,9 +5943,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'trackingNumber',
-                    x: 1,
+                    x: 2,
                     y: 16,
-                    width: 48,
+                    width: 46,
                     height: 4,
                     fontSize: 8,
                     fontName: '黑体',
@@ -5976,9 +5976,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'code',
-                    x: 1,
+                    x: 2,
                     y: 1,
-                    width: 48,
+                    width: 46,
                     height: 9,
                     fontSize: 22,
                     fontName: '黑体',
@@ -5991,9 +5991,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'name',
-                    x: 1,
+                    x: 2,
                     y: 10.5,
-                    width: 48,
+                    width: 46,
                     height: 5,
                     fontSize: 10,
                     fontName: '黑体',
@@ -6004,9 +6004,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'barcode',
                     field: 'code',
-                    x: 4,
+                    x: 2,
                     y: 16.5,
-                    width: 42,
+                    width: 46,
                     height: 12,
                     barcodeType: 'PDF417',
                     align: 'center'
@@ -6024,9 +6024,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'code',
-                    x: 1,
+                    x: 2,
                     y: 1,
-                    width: 38,
+                    width: 36,
                     height: 8,
                     fontSize: 20,
                     fontName: '黑体',
@@ -6039,9 +6039,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'barcode',
                     field: 'code',
-                    x: 1,
+                    x: 2,
                     y: 16.5,
-                    width: 42,
+                    width: 36,
                     height: 8.5,
                     barcodeType: 'PDF417',
                     align: 'center'
@@ -6059,9 +6059,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'code',
-                    x: 1,
+                    x: 2,
                     y: 1,
-                    width: 48,
+                    width: 46,
                     height: 9,
                     fontSize: 22,
                     fontName: '黑体',
@@ -6074,9 +6074,9 @@ window.openBatchStatus = openBatchStatus;
                 {
                     type: 'text',
                     field: 'name',
-                    x: 1,
+                    x: 2,
                     y: 10.5,
-                    width: 48,
+                    width: 46,
                     height: 5,
                     fontSize: 10,
                     fontName: '黑体',
@@ -6480,13 +6480,34 @@ window.openBatchStatus = openBatchStatus;
         if (el.prefix && raw) return el.prefix + raw;
         return raw;
     }
-    /** 模板中居中显示“编码”文字的元素：打印时用整张纸宽作为文本框，避免 LODOP 原生文本折行 */
+    /** 打印安全区：所有打印项必须在纸张 2mm 安全区内（真机驱动会裁切/重锚定越界打印项） */
+    var PRINT_SAFE_MARGIN_MM = 2;
+    /** 普通文本元素的安全框：x/width 限制在 2mm..paperWidth-2mm 内（越界自动 clamp 并 warn） */
+    function ensureSafeTextBox(template, el) {
+        var pw = (template && template.paperWidth > 0) ? template.paperWidth : 50;
+        var maxW = Math.max(2, pw - PRINT_SAFE_MARGIN_MM * 2);
+        var width = Math.max(2, Math.min(Number(el.width) || maxW, maxW));
+        var left = Number(el.x);
+        if (!isFinite(left)) left = PRINT_SAFE_MARGIN_MM;
+        if (left < PRINT_SAFE_MARGIN_MM) {
+            console.warn('[print] 元素 ' + (el.field || el.type) + ' x=' + left + 'mm 越过 ' + PRINT_SAFE_MARGIN_MM + 'mm 安全区，已 clamp');
+            left = PRINT_SAFE_MARGIN_MM;
+        }
+        if (left + width > pw - PRINT_SAFE_MARGIN_MM) {
+            console.warn('[print] 元素 ' + (el.field || el.type) + ' 右边界 ' + (left + width) + 'mm 超出纸张安全区，已 clamp');
+            left = Math.max(PRINT_SAFE_MARGIN_MM, pw - PRINT_SAFE_MARGIN_MM - width);
+            width = Math.min(width, pw - PRINT_SAFE_MARGIN_MM - left);
+        }
+        return { left: Math.round(left * 100) / 100, width: Math.round(width * 100) / 100 };
+    }
+    /** 模板中居中显示“编码”文字的元素 */
     function isCenteredCodeText(el) {
         return !!(el && el.type === 'text' && el.field === 'code' && (el.align === undefined || el.align === 'center'));
     }
+    /** 居中编码文字的排版宽度：纸张宽度减去左右 2mm 安全区 */
     function codeTextLayoutWidth(template, el) {
-        if (template && template.paperWidth > 0) return template.paperWidth;
-        return el.width;
+        var pw = (template && template.paperWidth > 0) ? template.paperWidth : 50;
+        return Math.max(4, pw - PRINT_SAFE_MARGIN_MM * 2);
     }
     /** 字号解析：打印与页面内预览共用同一套计算，保证同源 */
     function resolveElementFontSize(el, text, data, template) {
@@ -6507,13 +6528,11 @@ window.openBatchStatus = openBatchStatus;
         }
         return el.fontSize;
     }
-    // ---------- 自定义文本（v2.3.3，仅“仅内部编码”模式显示） ----------
-    // v2.3.3 收尾：自定义文本右对齐框必须留出右侧安全边距（≥1.5mm），避免实打/预览时贴边裁字；
-    // LODOP 原生文本比 DOM 测量略宽（常规约 ×1.08），字号/截断按该系数保守计算。
-    var PRINT_CUSTOM_TEXT_RIGHT_MARGIN_MM = 1.5;
-    var PRINT_CUSTOM_TEXT_INNER_MARGIN_MM = 0.6;
-    // 实测：5~8pt 小字号下 LODOP 原生文本的宽度膨胀比大字号更明显（5pt、23.5mm 框内曾出现折行），
-    // 因此自定义文本在 DOM×1.08 基础上再乘 1.25 做保守估计，宁可多缩/多截断也不许折行或压边。
+    // ---------- 自定义文本（v2.3.3 / v2.3.4，仅“仅内部编码”模式显示） ----------
+    // v2.3.4：自定义文本右边界 = paperWidth - 2mm（2mm 安全区）；允许换行（多行），行高 = 字号 × 1.25，
+    // 但文本块底边不得低于“内部编码”所在行元素的底边（y + codeHeight 之内）；超长时先缩字号（到 5pt），仍放不下则截断加省略号。
+    // LODOP 原生文本比 DOM 测量略宽（约 ×1.08），小字号更明显，这里再 ×1.25 保守估计。
+    var PRINT_CUSTOM_TEXT_LINE_HEIGHT = 1.25;
     var PRINT_CUSTOM_TEXT_WIDTH_SAFETY = 1.25;
     function estimateCustomTextWidthMm(text, pt) {
         return estimateNativeTextWidthMm(text, pt, false) * PRINT_CUSTOM_TEXT_WIDTH_SAFETY;
@@ -6525,61 +6544,93 @@ window.openBatchStatus = openBatchStatus;
     function isLabelOnlyWithCustomText() {
         return normalizeCodeTextMode(printSettings.codeTextMode) === 'labelOnly' && !!normalizeCustomText(printSettings.customText);
     }
-    /** 自定义文本在给定宽度内适配：优先设置字号，超宽依次降到 5pt，仍超宽则截断（末尾省略号） */
-    function fitCustomTextForWidth(text, maxWidthMm, sizePt) {
-        var display = normalizeCustomText(text);
-        var pt = normalizeCustomTextSize(sizePt);
-        var avail = Math.max(4, maxWidthMm);
-        while (pt > 5 && display && estimateCustomTextWidthMm(display, pt) > avail) pt -= 1;
-        if (display && estimateCustomTextWidthMm(display, pt) > avail) {
-            var cut = display;
-            while (cut.length > 1 && estimateCustomTextWidthMm(cut + '…', pt) > avail) cut = cut.slice(0, -1);
-            display = cut.length < display.length ? cut + '…' : cut;
-            // 极端窄框：连“一个字 + 省略号”都放不下时只显示省略号，确保绝不越界
-            if (estimateCustomTextWidthMm(display, pt) > avail) {
-                display = estimateCustomTextWidthMm('…', pt) <= avail ? '…' : '';
+    /** 逐字符折行（预演/打印共用同一换行结果，避免 LODOP HTML 换行差异） */
+    function wrapCustomTextLines(text, pt, maxWidthMm) {
+        var lines = [];
+        var current = '';
+        for (var i = 0; i < text.length; i++) {
+            var ch = text.charAt(i);
+            var next = current + ch;
+            if (current && estimateCustomTextWidthMm(next, pt) > maxWidthMm) {
+                lines.push(current);
+                current = ch;
+            } else {
+                current = next;
             }
         }
-        return { text: display, pt: pt };
+        if (current) lines.push(current);
+        return lines;
+    }
+    /** 自定义文本块适配：按设置字号 → 逐级降到 5pt；仍放不下则截断末行加省略号；返回行数组/字号/行高/垂直居中偏移 */
+    function fitCustomTextBlock(text, maxWidthMm, maxHeightMm, sizePt) {
+        var display = normalizeCustomText(text);
+        var chosen = normalizeCustomTextSize(sizePt);
+        if (!display) return { lines: [], pt: chosen, lineHeight: chosen * PRINT_PT_TO_MM * PRINT_CUSTOM_TEXT_LINE_HEIGHT, topOffset: 0 };
+        var availW = Math.max(4, maxWidthMm);
+        var availH = Math.max(2, maxHeightMm);
+        var result = null;
+        for (var pt = chosen; pt >= 5; pt -= 1) {
+            var lineHeight = pt * PRINT_PT_TO_MM * PRINT_CUSTOM_TEXT_LINE_HEIGHT;
+            var maxLines = Math.max(1, Math.floor((availH + 0.001) / lineHeight));
+            var lines = wrapCustomTextLines(display, pt, availW);
+            if (lines.length <= maxLines) { result = { lines: lines, pt: pt, lineHeight: lineHeight }; break; }
+        }
+        if (!result) {
+            var ptMin = 5;
+            var lineHeightMin = ptMin * PRINT_PT_TO_MM * PRINT_CUSTOM_TEXT_LINE_HEIGHT;
+            var maxLinesMin = Math.max(1, Math.floor((availH + 0.001) / lineHeightMin));
+            var linesMin = wrapCustomTextLines(display, ptMin, availW);
+            if (linesMin.length > maxLinesMin) {
+                linesMin = linesMin.slice(0, maxLinesMin);
+                var last = linesMin[linesMin.length - 1];
+                while (last.length > 1 && estimateCustomTextWidthMm(last + '…', ptMin) > availW) last = last.slice(0, -1);
+                if (estimateCustomTextWidthMm(last + '…', ptMin) <= availW) last += '…';
+                else if (estimateCustomTextWidthMm('…', ptMin) <= availW) last = '…';
+                linesMin[linesMin.length - 1] = last;
+            }
+            result = { lines: linesMin, pt: ptMin, lineHeight: lineHeightMin };
+        }
+        var blockHeight = Math.min(availH, result.lines.length * result.lineHeight);
+        result.topOffset = Math.max(0, (availH - blockHeight) / 2);
+        return result;
     }
     /**
-     * 编码文字所在行的排版：普通模式=整纸宽居中；
-     * labelOnly + 自定义文本 = 左半「内部编码」（左对齐）+ 右半自定义文本（右对齐，同高垂直居中）。
-     * 打印与页面内预览共用这一套计算（字号同源）。
+     * 编码文字所在行的排版：普通模式=居中（2mm 安全区宽）；labelOnly + 自定义文本 =
+     * 左侧「内部编码」（左对齐，起点 2mm）+ 右侧自定义文本（右对齐，右边界 paperWidth-2mm，可多行）。
+     * 打印与页面内预览共用这一套计算（字号/换行同源）。
      */
     function getCodeRowLayout(el, data, template) {
-        var paperWidth = (template && template.paperWidth > 0) ? template.paperWidth : el.width;
+        var paperWidth = (template && template.paperWidth > 0) ? template.paperWidth : 50;
         var codeText = getElementDisplayText(el, data);
         var fullLayout = {
             split: false,
             codeText: codeText,
             codePt: resolveElementFontSize(el, codeText, data, template),
-            codeBox: { left: 0, width: paperWidth, align: 'center' },
-            customText: '',
-            customPt: 0,
-            customBox: null
+            codeBox: { left: PRINT_SAFE_MARGIN_MM, width: codeTextLayoutWidth(template, el), align: 'center' },
+            customBlock: null
         };
         if (!isCenteredCodeText(el) || !isLabelOnlyWithCustomText()) return fullLayout;
-        var half = paperWidth / 2;
-        // labelOnly 时编码文字只占左半宽：字号按 LODOP 原生宽度系数保守计算，确保不折行
-        var codePt = calcSingleLineFontSize(codeText, Math.max(6, half - 2), el.height, el.fontSize, el.bold, 0.96);
+        // labelOnly：左半（2mm 起）显示「内部编码」，右半（到 paperWidth-2mm）显示自定义文本
+        var leftWidth = Math.max(6, paperWidth / 2 - PRINT_SAFE_MARGIN_MM);
+        var rightWidth = Math.max(6, paperWidth / 2 - PRINT_SAFE_MARGIN_MM);
+        var codePt = calcSingleLineFontSize(codeText, leftWidth, el.height, el.fontSize, el.bold, 0.96);
         codePt = Math.min(codePt, fullLayout.codePt);
-        // 自定义文本框：右边界 = paperWidth - 1.5mm，给实打/预览留安全边距；内部再留 0.6mm 余量
-        var customBoxLeft = half;
-        var customBoxWidth = Math.max(6, half - PRINT_CUSTOM_TEXT_RIGHT_MARGIN_MM);
-        var customMaxWidth = Math.max(4, customBoxWidth - PRINT_CUSTOM_TEXT_INNER_MARGIN_MM);
-        var custom = fitCustomTextForWidth(getActiveCustomText(), customMaxWidth, printSettings.customTextSize);
+        var block = fitCustomTextBlock(getActiveCustomText(), Math.max(4, rightWidth - 0.4), el.height, printSettings.customTextSize);
         return {
             split: true,
             codeText: codeText,
             codePt: codePt,
-            codeBox: { left: 0.5, width: Math.max(6, half - 1), align: 'left' },
-            customText: custom.text,
-            customPt: custom.pt,
-            customBox: { left: customBoxLeft, width: customBoxWidth, align: 'right' }
+            codeBox: { left: PRINT_SAFE_MARGIN_MM, width: leftWidth, align: 'left' },
+            customBlock: {
+                lines: block.lines,
+                pt: block.pt,
+                lineHeight: block.lineHeight,
+                topOffset: block.topOffset,
+                box: { left: paperWidth / 2, width: rightWidth, align: 'right' }
+            }
         };
     }
-    /** 一个文字元素在预览/打印中要输出的“行片段”（编码行可能拆成左编码 + 右自定义文本） */
+    /** 一个文字元素在预览/打印中要输出的“行片段”（编码行可能拆成左编码 + 右侧多行自定义文本） */
     function getTextRowParts(el, data, template) {
         if (isCenteredCodeText(el)) {
             var layout = getCodeRowLayout(el, data, template);
@@ -6590,22 +6641,28 @@ window.openBatchStatus = openBatchStatus;
                 align: layout.codeBox.align,
                 bold: el.bold
             }];
-            if (layout.split) {
-                parts.push({
-                    text: layout.customText,
-                    pt: layout.customPt,
-                    box: layout.customBox,
-                    align: 'right',
-                    bold: false
+            if (layout.customBlock && layout.customBlock.lines.length) {
+                var block = layout.customBlock;
+                block.lines.forEach(function (line, idx) {
+                    parts.push({
+                        text: line,
+                        pt: block.pt,
+                        box: block.box,
+                        align: 'right',
+                        bold: false,
+                        lineHeight: block.lineHeight,
+                        topOffset: block.topOffset + idx * block.lineHeight
+                    });
                 });
             }
             return parts;
         }
         var text = getElementDisplayText(el, data);
+        var safeBox = ensureSafeTextBox(template, el);
         return [{
             text: text,
             pt: resolveElementFontSize(el, text, data, template),
-            box: { left: el.x, width: el.width, align: el.align || 'center' },
+            box: { left: safeBox.left, width: safeBox.width, align: el.align || 'center' },
             align: el.align || 'center',
             bold: el.bold
         }];
@@ -6621,39 +6678,75 @@ window.openBatchStatus = openBatchStatus;
             + 'text-align:' + align + ';word-break:break-all;overflow:hidden;margin:0;padding:0;">'
             + esc(String(text)) + '</div>';
     }
-    // ---------- PDF417 墨迹居中（v2.3.2 / v2.3.3） ----------
-    // 实测（本机 C-Lodop 6.5.6.6）：PDF417 的墨迹并不填满 ADD_PRINT_BARCODE 的对象框，而是从对象框左边界开始
-    // 按自己的模块宽度绘制（右侧留白），墨迹宽度随“编码值长度 / 对象框宽 / 对象框高”变化。实测样例：
-    //   46×14 短编码≈38mm、46×17≈38mm、46×9.5 短编码≈38mm / 长编码≈44.3mm、
-    //   42×17 短编码≈38mm、44×9.5 短编码≈38mm / 长编码≈29mm、36×18 短≈31.5 / 长≈25.5mm。
-    // 因此把对象框左边界设为 (纸张宽 - 预估墨迹宽)/2，墨迹就会尽量在标签上居中（对象框可略超出纸张右边，超出部分是空白）。
-    var PDF417_INK_LEFT_INSET_MM = 0.1;
-    function estimatePdf417InkWidthMm(value, areaWidthMm, areaHeightMm) {
-        var width = Math.max(6, Number(areaWidthMm) || 0);
-        var height = Number(areaHeightMm) || 0;
-        var len = String(value || '').length;
-        var base;
-        if (width >= 45.5) {
-            if (height >= 11) base = len <= 6 ? 38.5 : 38;       // 50mm 纸常规高度
-            else base = len <= 6 ? 38 : 44.3;                    // 50mm 纸宽扁条码：长编码会多列
-        } else if (width >= 41) {
-            if (height >= 11) base = 38;                         // 42×12 入库条码
-            else base = len <= 6 ? 38 : 29;                      // 44×9.5（40mm 纸宽扁）
-        } else if (width >= 34) {
-            base = len <= 6 ? 31.5 : 25.5;                       // 旧窄框（兼容历史模板）
-        } else {
-            base = width * 0.78;
-        }
-        return Math.max(6, Math.min(width, base));
+    // ---------- 条码几何（v2.3.4 安全区 + v2.3.5 预览墨迹居中） ----------
+    // 根因：C-Lodop 预览会“容忍”打印项越出纸张，但真机驱动会裁切/重锚定越界打印项；
+    // 同时 C-Lodop 预览把 PDF417 从对象框左边界开始绘制（框内左对齐），把对象框直接居中会让墨迹偏左。
+    // 解决：按“对象框宽 W ≈ 实际墨迹宽 ink(W)”选 W（保证预览左对齐/真机填框两种渲染下墨迹都居中），
+    // 再把对象框居中：left = (paperWidth - W) / 2，W ≤ paperWidth - 4（左右各 ≥2mm 安全区）。
+    // 下表由真实 C-Lodop 预览逐档标定得到（height → 编码长度档 → W），详见 local_dev/_fix-print/v235-calib.mjs。
+    var BARCODE_LENGTH_BUCKETS = { short: 6, long: 15 };
+    var BARCODE_BOX_WIDTH_BY_HEIGHT = {
+        '8.5': { short: 26, long: 26, xlong: 31 },
+        '9.5': { short: 39, long: 26, xlong: 26 },
+        '12': { short: 39, long: 39, xlong: 26 },
+        '13': { short: 39, long: 39, xlong: 26 },
+        '14': { short: 39, long: 39, xlong: 39 },
+        '17': { short: 33, long: 39, xlong: 39 }
+    };
+    function barcodeLengthBucket(value) {
+        var len = String(value == null ? '' : value).length;
+        if (len <= BARCODE_LENGTH_BUCKETS.short) return 'short';
+        if (len <= BARCODE_LENGTH_BUCKETS.long) return 'long';
+        return 'xlong';
     }
-    /** 计算条码打印项的左边界（让 PDF417 墨迹在纸张上水平居中） */
+    /** 条码对象框宽：优先模板/元素显式 barcodeBoxWidthMm，否则按高度+编码长度查标定表；统一 clamp 到 paperWidth-4 */
+    function resolveBarcodeBoxWidth(template, el, value) {
+        var pw = (template && template.paperWidth > 0) ? template.paperWidth : 50;
+        var maxW = Math.max(2, pw - PRINT_SAFE_MARGIN_MM * 2);
+        var explicit = Number(el && el.barcodeBoxWidthMm) || Number(template && template.barcodeBoxWidthMm) || 0;
+        var hKey = String(Math.round((Number(el && el.height) || 0) * 10) / 10);
+        var row = BARCODE_BOX_WIDTH_BY_HEIGHT[hKey];
+        var w = explicit > 0 ? explicit : (row ? row[barcodeLengthBucket(value)] : 0);
+        if (!(w > 0)) w = Number(el.width) || maxW;
+        return Math.max(2, Math.min(w, maxW));
+    }
+    /** 条码打印几何：对象框宽 = 标定 W（默认按编码长度），水平居中，left ≥2、right ≤paperWidth-2 */
     function barcodePrintGeometry(template, el, value) {
-        var inkW = estimatePdf417InkWidthMm(value, el.width, el.height);
-        var left = (template.paperWidth - inkW) / 2 - PDF417_INK_LEFT_INSET_MM;
-        // 兜底：墨迹必须完整留在纸张内
-        left = Math.min(left, template.paperWidth - inkW - PDF417_INK_LEFT_INSET_MM - 0.4);
-        left = Math.max(0.2, left);
-        return { top: el.y, left: Math.round(left * 100) / 100 };
+        var pw = (template && template.paperWidth > 0) ? template.paperWidth : 50;
+        var boxW = resolveBarcodeBoxWidth(template, el, value);
+        var left = (pw - boxW) / 2;
+        return { top: el.y, left: Math.round(left * 100) / 100, width: Math.round(boxW * 100) / 100 };
+    }
+    /** 几何自检：模板所有打印项必须在纸张 2mm 安全区内（条码按短/中/长编码三档分别校验） */
+    function validateTemplateGeometry(template) {
+        if (!template || !Array.isArray(template.elements)) return [];
+        var pw = template.paperWidth;
+        var problems = [];
+        var sampleValues = { short: 'A001', long: 'A001/B001/001', xlong: 'A001/B001/001/C001' };
+        template.elements.forEach(function (el) {
+            if (el.type === 'barcode') {
+                Object.keys(sampleValues).forEach(function (bucket) {
+                    var g = barcodePrintGeometry(template, el, sampleValues[bucket]);
+                    if (g.left < PRINT_SAFE_MARGIN_MM - 0.001 || g.left + g.width > pw - PRINT_SAFE_MARGIN_MM + 0.001) {
+                        problems.push('barcode(' + (el.field || '') + '/' + bucket + ') left=' + g.left + ' width=' + g.width);
+                    }
+                });
+            } else if (el.type === 'text') {
+                if (el.x < PRINT_SAFE_MARGIN_MM - 0.001 || el.x + el.width > pw - PRINT_SAFE_MARGIN_MM + 0.001) {
+                    problems.push('text(' + (el.field || '') + ') x=' + el.x + ' width=' + el.width);
+                }
+            }
+        });
+        if (problems.length) console.warn('[print] 模板几何越界：' + template.id + ' → ' + problems.join('; '));
+        return problems;
+    }
+    function validateAllTemplatesGeometry() {
+        var all = [];
+        printTemplates.forEach(function (tpl) {
+            var p = validateTemplateGeometry(tpl);
+            if (p.length) all.push(tpl.id + ': ' + p.join(', '));
+        });
+        return all;
     }
     /**
      * 页面内预览：与打印同源——纸张按 mm 渲染，元素用绝对定位 mm 坐标 + pt 字号，
@@ -6679,10 +6772,11 @@ window.openBatchStatus = openBatchStatus;
                 parts.forEach(function (part) {
                     var div = document.createElement('div');
                     div.className = 'label-el label-el-text';
+                    var lineHeight = part.lineHeight || el.height;
                     div.style.left = part.box.left + 'mm';
-                    div.style.top = el.y + 'mm';
+                    div.style.top = (part.lineHeight ? (el.y + part.topOffset) : el.y) + 'mm';
                     div.style.width = part.box.width + 'mm';
-                    div.style.height = el.height + 'mm';
+                    div.style.height = lineHeight + 'mm';
                     // 单行打印用 LODOP 原生文本（FontName=SimHei），预览也用 SimHei 以保持字宽一致；
                     // 多行打印走 ADD_PRINT_HTM（font-family 用 YaHei/SimHei 栈），预览用同一字体栈。
                     div.style.fontFamily = el.multiline ? PRINT_HTML_FONT_STACK : ('"' + PRINT_NATIVE_FONT + '","SimHei",sans-serif');
@@ -6710,14 +6804,15 @@ window.openBatchStatus = openBatchStatus;
                     page.appendChild(div);
                 });
             } else if (el.type === 'barcode') {
-                // v2.3.2：页面内预览不再画假 PDF417 纹理，改为一个“条码区域”占位框（按纸张宽度水平居中）
-                // v2.3.3：40*30 等窄纸上的条码对象框可能略宽于纸张，占位框按“纸张宽-2mm”显示并居中
-                var shownWidth = Math.min(el.width, template.paperWidth - 2);
+                // v2.3.2：页面内预览不再画假 PDF417 纹理，改为一个“条码区域”占位框
+                // v2.3.5：占位框 = 实际打印对象框（按编码长度标定的 W，水平居中，左右各 ≥2mm）
+                var barcodePreviewValue = safeText(data && data[el.field] != null ? data[el.field] : PRINT_DEMO_VALUES[el.field]);
+                var bcGeom = barcodePrintGeometry(template, el, barcodePreviewValue);
                 var box = document.createElement('div');
                 box.className = 'label-el label-el-barcode';
-                box.style.left = ((template.paperWidth - shownWidth) / 2) + 'mm';
-                box.style.top = el.y + 'mm';
-                box.style.width = shownWidth + 'mm';
+                box.style.left = bcGeom.left + 'mm';
+                box.style.top = bcGeom.top + 'mm';
+                box.style.width = bcGeom.width + 'mm';
                 box.style.height = el.height + 'mm';
                 var mainText = document.createElement('span');
                 mainText.className = 'label-barcode-label';
@@ -7062,12 +7157,12 @@ window.openBatchStatus = openBatchStatus;
 
     function buildLodopPrintData(LODOP, dataList, template, printerIndex, copies) {
         // 指令顺序：PRINT_INIT → SET_PRINT_PAGESIZE → SET_PRINT_COPIES → 内容 → PRINT/PREVIEW
-        // v2.3.1/v2.3.2 打印排版（实测校准）：
-        // - 单行文字用原生 ADD_PRINT_TEXT + FontSize(pt)，字号精确、不会被 HTML 渲染放大裁断；
-        //   原生文本顶部对齐，因此 top = 元素 y + (元素高 - 字号em)/2 实现垂直居中；
-        // - 名称等字段单行优先（10pt 基准，超宽自动缩到 6pt），如仍有 multiline 模板走 ADD_PRINT_HTM；
-        // - 条码不再设置 Horient/Alignment，ShowBarText=0 确保条码区只有条码；
-        // - 条码按预估墨迹宽把对象框左边界居中（见 barcodePrintGeometry），让 PDF417 墨迹在标签上居中。
+        // v2.3.1/v2.3.4 打印排版（实测校准）：
+        // - 单行文字用原生 ADD_PRINT_TEXT + FontSize(pt)，字号精确；原生文本顶部对齐，
+        //   top = 元素 y + (行高 - 字号em)/2 实现垂直居中；
+        // - 所有打印项都在纸张 2mm 安全区内（文本见 getTextRowParts/ensureSafeTextBox，条码见 barcodePrintGeometry）；
+        // - 条码对象框 = min(模板宽, paperWidth-4) 且水平居中，绝不越出纸张（真机驱动会裁切/重锚定越界项）；
+        // - labelOnly + 自定义文本：按自己的换行结果逐行 ADD_PRINT_TEXT（右对齐 Alignment=3），与页面内预览同源。
         LODOP.PRINT_INIT(template.name || '标签打印');
         LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
         LODOP.SET_PRINT_COPIES(copies);
@@ -7078,19 +7173,21 @@ window.openBatchStatus = openBatchStatus;
         dataList.forEach(function (data, i) {
             template.elements.forEach(function (el) {
                 if (el.type === 'text') {
-                    // 行片段：普通模式=单段（整纸宽居中）；labelOnly+自定义文本=左「内部编码」+ 右自定义文本
                     var parts = getTextRowParts(el, data, template);
                     parts.forEach(function (part) {
                         var text = part.text;
                         if (!text) return; // 空字段不添加打印项，避免留下空白对象
+                        var lineHeight = part.lineHeight || el.height;
+                        var emMm = part.pt * PRINT_PT_TO_MM;
+                        var topMm = part.lineHeight
+                            ? (el.y + part.topOffset + Math.max(0, (lineHeight - emMm) / 2))
+                            : (el.y + Math.max(0, (el.height - emMm) / 2));
                         if (el.multiline) {
-                            LODOP.ADD_PRINT_HTM(el.y + 'mm', el.x + 'mm', el.width + 'mm', el.height + 'mm',
+                            LODOP.ADD_PRINT_HTM(topMm.toFixed(2) + 'mm', part.box.left + 'mm', part.box.width + 'mm', lineHeight + 'mm',
                                 buildPrintHtmBlock(el, text, part.pt));
                             return;
                         }
-                        var emMm = part.pt * PRINT_PT_TO_MM;
-                        var topMm = el.y + Math.max(0, (el.height - emMm) / 2);
-                        LODOP.ADD_PRINT_TEXT(topMm.toFixed(2) + 'mm', part.box.left + 'mm', part.box.width + 'mm', el.height + 'mm', text);
+                        LODOP.ADD_PRINT_TEXT(topMm.toFixed(2) + 'mm', part.box.left + 'mm', part.box.width + 'mm', lineHeight + 'mm', text);
                         LODOP.SET_PRINT_STYLEA(0, 'FontName', PRINT_NATIVE_FONT);
                         LODOP.SET_PRINT_STYLEA(0, 'FontSize', part.pt);
                         LODOP.SET_PRINT_STYLEA(0, 'Bold', part.bold ? 1 : 0);
@@ -7099,8 +7196,8 @@ window.openBatchStatus = openBatchStatus;
                 } else if (el.type === 'barcode') {
                     var barcodeValue = safeText(data[el.field]);
                     if (!barcodeValue) return;
-                    var barcodePos = barcodePrintGeometry(template, el, barcodeValue);
-                    LODOP.ADD_PRINT_BARCODE(barcodePos.top + 'mm', barcodePos.left + 'mm', el.width + 'mm', el.height + 'mm',
+                    var barcodePos = barcodePrintGeometry(template, el, String(barcodeValue));
+                    LODOP.ADD_PRINT_BARCODE(barcodePos.top + 'mm', barcodePos.left + 'mm', barcodePos.width + 'mm', el.height + 'mm',
                         el.barcodeType || 'PDF417', String(barcodeValue));
                     // 条码区只显示条码（PDF417 默认无文字，这里显式关闭以防不同版本差异）
                     LODOP.SET_PRINT_STYLEA(0, 'ShowBarText', 0);
@@ -7342,8 +7439,14 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.3
-        setText(appVersionEl, 'R5 · v2.3.3 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.5
+        setText(appVersionEl, 'R5 · v2.3.5 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
+        try {
+            var geometryIssues = validateAllTemplatesGeometry();
+            if (geometryIssues.length) console.warn('[print] 模板几何自检发现问题：' + geometryIssues.join(' | '));
+            else console.info('[print] 模板几何自检通过：所有打印项均在 ' + PRINT_SAFE_MARGIN_MM + 'mm 安全区内');
+        } catch (e) { /* 自检失败不影响使用 */ }
         document.querySelectorAll('.modal-overlay .modal, #print-preview-overlay .print-preview-box').forEach(function (el) {
             el.setAttribute('role', 'dialog');
             el.setAttribute('aria-modal', 'true');
@@ -7380,7 +7483,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.3：50*40 入库模板/40*30 宽扁条码/自定义文本区/编码文字设置/出入库模板分类/打印同源）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.5：条码墨迹居中（按编码长度标定对象宽）/2mm 安全区/自定义文本自动换行/打印同源）');
 </script>
 </body>
 </html>
