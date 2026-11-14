@@ -200,6 +200,50 @@
             border-radius: 8px;
         }
 
+        /* ===== v2.3.7 降噪：树/表格内 text-button 与图标按钮（透明底灰字，hover 才浅底/下划线） ===== */
+        .btn-text {
+            background: transparent;
+            color: var(--color-gray-600);
+            box-shadow: none;
+            padding: 3px 7px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 12px;
+            transform: none;
+        }
+        .btn-text:hover {
+            background: var(--color-gray-100);
+            color: var(--color-gray-900);
+            text-decoration: underline;
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-text:active { transform: none; }
+        .btn-text.btn-text-danger { color: #b91c1c; }
+        .btn-text.btn-text-danger:hover { background: #fef2f2; color: #b91c1c; }
+        .icon-btn {
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            padding: 0;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--color-gray-500);
+            font-size: 17px;
+            line-height: 1;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .icon-btn:hover,
+        .icon-btn[aria-expanded="true"] {
+            background: var(--color-gray-100);
+            color: var(--color-gray-900);
+        }
+
         .btn:disabled {
             opacity: 0.6;
             pointer-events: none;
@@ -297,8 +341,12 @@
         }
         .tree-node .node-content .actions {
             display: flex;
-            gap: 4px;
-            flex-wrap: wrap;
+            gap: 2px;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            min-width: 150px;
+            justify-content: flex-end;
+            align-items: center;
             margin-left: auto;
         }
         .tree-node .node-content .toggle {
@@ -340,7 +388,7 @@
             background: var(--color-gray-50);
             color: var(--color-gray-600);
             font-weight: 600;
-            padding: 12px 14px;
+            padding: 8px 10px;
             text-align: left;
             border-bottom: 2px solid var(--color-gray-200);
             font-size: 12px;
@@ -348,7 +396,7 @@
             text-transform: uppercase;
         }
         .items-table td {
-            padding: 10px 14px;
+            padding: 8px 10px;
             border-bottom: 1px solid var(--color-gray-100);
             vertical-align: middle;
             background: #fff;
@@ -359,15 +407,17 @@
         }
         .items-table .actions {
             display: flex;
-            gap: 4px;
-            flex-wrap: wrap;
+            gap: 2px;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            min-width: 140px;
+            align-items: center;
         }
-        .items-table .status-badge {
-            padding: 2px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-            display: inline-block;
+        /* v2.3.7：操作列不折行（表格仍可横向滚动） */
+        .items-table th:last-child,
+        .items-table td:last-child {
+            min-width: 150px;
+            white-space: nowrap;
         }
 
         /* ===== 批量操作栏 ===== */
@@ -878,11 +928,22 @@
             cursor: pointer;
         }
 
-        /* ===== 状态徽章（统一词表：待售/在售/售出） ===== */
-        .status-badge.status-pending { background: #fef3c7; color: #92400e; }
-        .status-badge.status-onsale { background: #d1fae5; color: #065f46; }
-        .status-badge.status-sold { background: #e2e8f0; color: #475569; }
-        .status-badge.status-unknown { background: #e2e8f0; color: #475569; }
+        /* ===== 状态标签（v2.3.7：轻量浅底 + 文字，不做大色块） ===== */
+        .status-badge {
+            display: inline-block;
+            font-size: 11px;
+            line-height: 1.4;
+            padding: 1px 8px;
+            border-radius: 6px;
+            font-weight: 500;
+            white-space: nowrap;
+            background: #f1f5f9;
+            color: #475569;
+        }
+        .status-badge.status-pending { background: #fffbeb; color: #b45309; }
+        .status-badge.status-onsale { background: #ecfdf5; color: #047857; }
+        .status-badge.status-sold { background: #f1f5f9; color: #475569; }
+        .status-badge.status-unknown { background: #f1f5f9; color: #64748b; }
 
         /* ===== 顶栏同步信息 ===== */
         .sync-meta {
@@ -1107,6 +1168,48 @@
             text-align: center;
         }
 
+        /* ===== v2.3.7 树/库存行“更多操作”浮层菜单（挂 body，避免被 .table-scroll 裁剪） ===== */
+        .action-menu {
+            position: fixed;
+            z-index: 2200;
+            min-width: 150px;
+            max-width: 240px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+            border: 1px solid var(--color-gray-200);
+            padding: 5px;
+            display: none;
+        }
+        .action-menu.open { display: block; }
+        .action-menu [role="menuitem"] {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border: 0;
+            background: transparent;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--color-gray-700);
+            cursor: pointer;
+            text-align: left;
+            white-space: nowrap;
+            font-family: inherit;
+        }
+        .action-menu [role="menuitem"]:hover,
+        .action-menu [role="menuitem"]:focus-visible {
+            background: var(--color-gray-100);
+            color: var(--color-gray-900);
+            outline: none;
+        }
+        .action-menu [role="menuitem"].danger { color: #b91c1c; }
+        .action-menu [role="menuitem"].danger:hover,
+        .action-menu [role="menuitem"].danger:focus-visible { background: #fef2f2; color: #b91c1c; }
+        .action-menu .menu-icon { width: 16px; text-align: center; opacity: 0.75; }
+
         /* ===== 记住登录 ===== */
         .login-remember {
             display: flex;
@@ -1304,22 +1407,19 @@
         .summary-chip.sold { background: #e2e8f0; color: #475569; }
         .summary-chip.onsale { background: #d1fae5; color: #065f46; }
         .summary-chip.pending { background: #fef3c7; color: #92400e; }
+        /* v2.3.7：节点行汇总改为一段灰色紧凑文本（不再用小胶囊） */
         .node-summary {
-            display: inline-flex;
-            flex-wrap: wrap;
-            gap: 4px;
             font-size: 11px;
+            line-height: 1.5;
             color: var(--color-gray-500);
-        }
-        .node-summary span {
-            background: #f1f5f9;
-            border-radius: 14px;
-            padding: 1px 9px;
             white-space: nowrap;
+            display: inline-block;
+            font-variant-numeric: tabular-nums;
         }
-        .node-summary span.onsale { background: #ecfdf5; color: #047857; }
-        .node-summary span.sold { background: #f1f5f9; color: #475569; }
-        .node-summary span.pending { background: #fffbeb; color: #b45309; }
+        .node-summary .onsale { color: #047857; }
+        .node-summary .sold { color: #64748b; }
+        .node-summary .pending { color: #b45309; }
+        .node-summary b { font-weight: 500; }
 
         /* ===== 批量选择条 ===== */
         .batch-bar {
@@ -1349,6 +1449,24 @@
             margin: 0;
         }
         #global-selected-count { color: var(--color-gray-500); }
+        /* v2.3.7：跨节点批量操作默认隐藏，勾选 ≥1 项后平滑显示 */
+        .batch-bar .batch-actions-global {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            pointer-events: none;
+            transform: translateY(-4px);
+            transition: opacity 0.18s ease, max-height 0.18s ease, transform 0.18s ease;
+        }
+        .batch-bar.has-selection .batch-actions-global {
+            opacity: 1;
+            max-height: 44px;
+            pointer-events: auto;
+            transform: none;
+        }
 
         /* ===== 表格横向滚动容器 ===== */
         .table-scroll {
@@ -1411,7 +1529,7 @@
             .modal { padding: 20px; }
             .print-preview-box { padding: 20px; }
             .tree-node .node-content { flex-wrap: wrap; }
-            .tree-node .node-content .actions { margin-left: 0; width: 100%; }
+            .tree-node .node-content .actions { margin-left: 0; width: 100%; min-width: 0; justify-content: flex-start; }
             .items-table { font-size: 12px; }
             .items-table th, .items-table td { padding: 8px 10px; }
             .items-table { min-width: 760px; }
@@ -1461,8 +1579,7 @@
             .filter-bar input { max-width: 100%; }
             .summary-bar { gap: 6px; }
             .summary-chip { font-size: 11px; padding: 2px 9px; }
-            .node-summary { width: 100%; }
-            .node-summary span { padding: 2px 10px; font-size: 12px; }
+            .node-summary { width: 100%; white-space: normal; }
             .batch-bar { font-size: 12px; }
             .app-footer { padding-bottom: 32px; }
         }
@@ -1579,11 +1696,13 @@
                 <button class="btn btn-secondary" id="expand-all-btn" type="button">全部展开</button>
                 <button class="btn btn-secondary" id="collapse-all-btn" type="button">全部折叠</button>
             </div>
-            <div class="batch-bar">
+            <div class="batch-bar" id="batch-bar">
                 <label class="global-select"><input type="checkbox" id="global-select-all" /> 全选当前筛选结果</label>
                 <span id="global-selected-count" role="status" aria-live="polite">已选 0 项</span>
-                <button type="button" class="btn btn-secondary btn-sm" id="global-batch-status-btn">跨节点批量改状态</button>
-                <button type="button" class="btn btn-secondary btn-sm" id="global-batch-print-btn">跨节点批量打印</button>
+                <div class="batch-actions-global" id="global-batch-actions" inert aria-hidden="true">
+                    <button type="button" class="btn btn-secondary btn-sm" id="global-batch-status-btn">跨节点批量改状态</button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="global-batch-print-btn">跨节点批量打印</button>
+                </div>
             </div>
             <div class="card-body-wrap" style="position:relative;">
                 <div class="tree-container" id="tree-container">
@@ -1810,6 +1929,9 @@
         </div>
     </div>
 </div>
+
+<!-- v2.3.7：节点/库存行“更多操作”浮层菜单（挂 body，按触发按钮 rect 定位，避免被表格滚动容器裁剪） -->
+<div id="tree-action-menu" class="action-menu" role="menu" aria-label="更多操作"></div>
 
 <!-- ========== 运行时加载本机 C-Lodop（H-2：不再引用仓库内 CLodopFuncs.js 快照） ========== -->
 <script>
@@ -2198,6 +2320,10 @@ var globalSelectAllEl = $('global-select-all');
 var globalSelectedCount = $('global-selected-count');
 var globalBatchStatusBtn = $('global-batch-status-btn');
 var globalBatchPrintBtn = $('global-batch-print-btn');
+var globalBatchBar = $('batch-bar');
+var globalBatchActions = $('global-batch-actions');
+var treeActionMenu = $('tree-action-menu');
+var actionMenuState = null;            // { button, items } 当前打开的 ⋮ 菜单
 var saveStateEl = $('save-state');
 var appVersionEl = $('app-version');
 
@@ -2753,6 +2879,13 @@ function updateGlobalSelection() {
     if (globalSelectAllEl) {
         globalSelectAllEl.checked = visibleBoxes.length > 0 && checked.length === visibleBoxes.length;
         globalSelectAllEl.indeterminate = checked.length > 0 && checked.length < visibleBoxes.length;
+    }
+    // v2.3.7：跨节点批量操作默认隐藏，勾选 ≥1 项才平滑显示（inert 同时把它移出键盘 Tab 顺序）
+    var hasSelection = checked.length > 0;
+    if (globalBatchBar) globalBatchBar.classList.toggle('has-selection', hasSelection);
+    if (globalBatchActions) {
+        globalBatchActions.inert = !hasSelection;
+        globalBatchActions.setAttribute('aria-hidden', hasSelection ? 'false' : 'true');
     }
 }
 function collectCheckedItemEntries() {
@@ -4055,6 +4188,7 @@ function logout() {
     closeDataModal();
     if (confirmState) finishConfirm(false);
     closeDataMenu();
+    closeActionMenu(false); // v2.3.7：关闭行内 ⋮ 浮层菜单
     updateSyncMeta();
     updateRecycleCount();
     ['modal-node-overlay', 'modal-item-overlay', 'batch-status-overlay', 'delete-confirm-overlay',
@@ -4320,6 +4454,11 @@ function buildItemRowHtml(code, item, term) {
     if (Array.isArray(item.qrLinks) && item.qrLinks.length) {
         linksHtml = '<span class="qr-count" title="' + esc(item.qrLinks.join('\n')) + '">🔗' + item.qrLinks.length + '</span>';
     }
+    // v2.3.7：库存行只留「编辑 / 打印标签」，其余操作收进 ⋮ 菜单
+    var actionsHtml = '<button type="button" class="btn btn-sm btn-text" data-action="edit-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">编辑</button>'
+        + '<button type="button" class="btn btn-sm btn-text" data-action="print-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">打印标签</button>'
+        + '<button type="button" class="icon-btn" data-action="menu" data-menu-kind="item" data-parent="' + parentAttr + '" data-item="' + itemAttr
+        + '" aria-haspopup="menu" aria-expanded="false" aria-label="更多操作：库存 ' + itemAttr + '" title="更多操作">⋮</button>';
     return '<tr data-item-code="' + itemAttr + '">'
         + '<td><input type="checkbox" class="item-checkbox" data-parent="' + parentAttr + '" data-item-code="' + itemAttr + '" aria-label="选择库存 ' + itemAttr + '"></td>'
         + '<td>' + highlightText(itemCode, term) + '</td>'
@@ -4330,13 +4469,7 @@ function buildItemRowHtml(code, item, term) {
         + '<td><span class="status-badge ' + Z.statusClass(itemStatus) + '">' + esc(itemStatus) + '</span></td>'
         + '<td class="item-remark">' + (remarkHtml ? '📝 ' + remarkHtml : '') + '</td>'
         + '<td>' + linksHtml + '</td>'
-        + '<td class="actions">'
-        + '<button type="button" class="btn btn-primary btn-sm" data-action="edit-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">编辑</button>'
-        + '<button type="button" class="btn btn-primary btn-sm" data-action="print-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">打印标签</button>'
-        + '<button type="button" class="btn btn-secondary btn-sm" data-action="copy-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">复制</button>'
-        + '<button type="button" class="btn btn-secondary btn-sm" data-action="copy-code" data-code="' + itemAttr + '">复制编码</button>'
-        + '<button type="button" class="btn btn-danger btn-sm" data-action="delete-item" data-parent="' + parentAttr + '" data-item="' + itemAttr + '">删除</button>'
-        + '</td></tr>';
+        + '<td class="actions">' + actionsHtml + '</td></tr>';
 }
 
 function itemTableHeaderHtml(code) {
@@ -4352,6 +4485,21 @@ function itemTableHeaderHtml(code) {
     });
     html += '<th>备注</th><th>链接</th><th>操作</th>';
     return html;
+}
+
+/** v2.3.7：节点行汇总改为一段灰色紧凑文本，如「子类:1 库存:3（在售2, 待售1）」；状态项仅 >0 显示 */
+function buildNodeSummaryHtml(stats) {
+    var parts = [];
+    if (stats.onSale > 0) parts.push('在售<b class="onsale">' + stats.onSale + '</b>');
+    if (stats.sold > 0) parts.push('售出<b class="sold">' + stats.sold + '</b>');
+    if (stats.pending > 0) parts.push('待售<b class="pending">' + stats.pending + '</b>');
+    if (stats.other > 0) parts.push('其它' + stats.other);
+    var text = '子类:' + stats.directChildren + ' 库存:' + stats.items;
+    if (parts.length) text += '（' + parts.join(', ') + '）';
+    var title = '子类:' + stats.directChildren + ' 库存:' + stats.items
+        + '；在售' + stats.onSale + ' 售出' + stats.sold + ' 待售' + stats.pending
+        + (stats.other > 0 ? ' 其它' + stats.other : '');
+    return '<span class="node-summary" title="' + esc(title) + '">' + text + '</span>';
 }
 
 function buildNodeHtml(code, node, depth, term, ctx) {
@@ -4403,31 +4551,22 @@ function buildNodeHtml(code, node, depth, term, ctx) {
         ? '<span class="toggle" data-action="toggle" data-code="' + esc(code) + '" title="展开/收起" role="button" tabindex="0" aria-label="展开或收起 ' + esc(code) + '" aria-expanded="' + (expanded ? 'true' : 'false') + '">▼</span>'
         : '';
 
+    // v2.3.7：节点行只留「编辑 / 打印标签」两个核心操作，其余收进 ⋮ 菜单（渐进式披露）
     var actions = [
-        '<button type="button" class="btn btn-secondary btn-sm" data-action="edit-node" data-code="' + esc(code) + '">编辑</button>',
-        '<button type="button" class="btn btn-secondary btn-sm" data-action="copy-node" data-code="' + esc(code) + '">复制</button>',
-        unified
-            ? '<button type="button" class="btn btn-secondary btn-sm" data-action="add-node" data-parent="' + esc(code) + '">添加子类</button>'
-            : '<button type="button" class="btn btn-success btn-sm" data-action="add-item" data-parent="' + esc(code) + '">添加库存</button>',
-        '<button type="button" class="btn btn-primary btn-sm" data-action="print-node" data-code="' + esc(code) + '">打印标签</button>',
-        '<button type="button" class="btn btn-secondary btn-sm" data-action="print-node-items" data-code="' + esc(code) + '">打印全部库存</button>',
-        '<button type="button" class="btn btn-danger btn-sm" data-action="delete-node" data-code="' + esc(code) + '">删除</button>'
+        '<button type="button" class="btn btn-sm btn-text" data-action="edit-node" data-code="' + esc(code) + '">编辑</button>',
+        '<button type="button" class="btn btn-sm btn-text" data-action="print-node" data-code="' + esc(code) + '">打印标签</button>',
+        '<button type="button" class="icon-btn" data-action="menu" data-menu-kind="node" data-code="' + esc(code)
+            + '" aria-haspopup="menu" aria-expanded="false" aria-label="更多操作：节点 ' + esc(code) + '" title="更多操作">⋮</button>'
     ].join('');
 
-    var nodeSummaryHtml = '<span class="node-summary" title="当前节点汇总">'
-        + '<span>子类 ' + stats.directChildren + '</span>'
-        + '<span>库存 ' + stats.items + '</span>'
-        + '<span class="onsale">在售 ' + stats.onSale + '</span>'
-        + '<span class="sold">售出 ' + stats.sold + '</span>'
-        + '<span class="pending">待售 ' + stats.pending + '</span>'
-        + '</span>';
+    var nodeSummaryHtml = buildNodeSummaryHtml(stats);
 
     var itemsHtml = '';
     if (displayItems.length) {
         var rows = displayItems.map(function (item) { return buildItemRowHtml(code, item, term); }).join('');
         itemsHtml = '<div class="batch-actions">'
-            + '<button type="button" class="btn btn-secondary btn-sm" data-action="batch-print" data-parent="' + esc(code) + '">批量打印</button>'
-            + '<button type="button" class="btn btn-secondary btn-sm" data-action="batch-status" data-parent="' + esc(code) + '">批量修改状态</button>'
+            + '<button type="button" class="btn btn-sm btn-text" data-action="batch-print" data-parent="' + esc(code) + '">批量打印</button>'
+            + '<button type="button" class="btn btn-sm btn-text" data-action="batch-status" data-parent="' + esc(code) + '">批量修改状态</button>'
             + '</div>'
             + '<div class="table-scroll"><table class="items-table"><thead><tr>'
             + itemTableHeaderHtml(code)
@@ -4435,14 +4574,17 @@ function buildNodeHtml(code, node, depth, term, ctx) {
     }
 
     var hiddenClass = visible ? '' : ' tree-node-hidden';
+    // v2.3.7：降噪——类目/单件徽章、订单号徽章、以及“无库存”状态都不再渲染
+    var showStatusBadge = !(aggregatedStatus && aggregatedStatus.total === 0);
+    var statusBadgeHtml = showStatusBadge
+        ? '<span class="status-badge ' + nodeStatusClass + '"' + (nodeStatusTitle ? ' title="' + esc(nodeStatusTitle) + '"' : '') + '>' + esc(nodeStatus) + '</span>'
+        : '';
     var html = '<div class="tree-node' + (expanded ? ' expanded' : '') + hiddenClass + '" data-code="' + esc(code) + '" data-depth="' + depth + '">'
         + '<div class="node-content">'
         + toggleIcon
         + '<span class="name" data-action="toggle" data-code="' + esc(code) + '" role="button" tabindex="0">' + highlightText(node.name || code, term) + '</span>'
         + '<span class="code">' + highlightText(code, term) + '</span>'
-        + '<span class="badge" style="background:' + (unified ? '#dbeafe' : '#fef3c7') + ';" title="' + (unified ? '类目条码：整个类目共用一个编码' : '单件条码：每个库存单独编码') + '">' + (unified ? '类目' : '单件') + '</span>'
-        + '<span class="status-badge ' + nodeStatusClass + '"' + (nodeStatusTitle ? ' title="' + esc(nodeStatusTitle) + '"' : '') + '>' + esc(nodeStatus) + '</span>'
-        + ((!unified && node.orderNumber) ? '<span class="badge" style="background:#e0e7ff;">📋' + highlightText(node.orderNumber, term) + '</span>' : '')
+        + statusBadgeHtml
         + nodeSummaryHtml
         + '<span class="actions">' + actions + '</span>'
         + '</div>'
@@ -4454,6 +4596,7 @@ function buildNodeHtml(code, node, depth, term, ctx) {
 }
 
 function renderTree() {
+    closeActionMenu(false); // v2.3.7：重新渲染时关闭 ⋮ 浮层，避免菜单与旧 DOM 脱节
     var products = gistData.products || {};
     var term = Z.normalizeQuery(searchInput.value);
     var filter = filterSelect.value || 'all';
@@ -4539,21 +4682,99 @@ function toggleTableSort(key) {
     renderTree();
 }
 
-function onTreeClick(event) {
-    var target = event.target;
-    if (!target || !target.closest) return;
-    var th = target.closest('th[data-sort]');
-    if (th && treeContainer.contains(th)) {
-        toggleTableSort(th.getAttribute('data-sort'));
-        return;
+// ============================================================
+// v2.3.7 行内“更多操作”浮层菜单（渐进式披露）
+// 菜单挂在 document.body 上，按触发按钮 rect 定位（避免被 .table-scroll 裁剪）；
+// 同一时间只开一个；点菜单项 / 点外部 / Esc / 滚动 / 重新 renderTree 均关闭。
+// ============================================================
+function menuItemsForNode(code) {
+    var node = findNodeByCode(code);
+    var unified = !node || node.unified !== false;
+    return [
+        { action: unified ? 'add-node' : 'add-item', parent: code, label: unified ? '添加子类' : '添加库存', icon: '＋' },
+        { action: 'copy-node', code: code, label: '复制节点', icon: '⧉' },
+        { action: 'print-node-items', code: code, label: '打印全部库存', icon: '🖨' },
+        { action: 'delete-node', code: code, label: '删除节点', icon: '🗑', danger: true }
+    ];
+}
+function menuItemsForItem(parentCode, itemCode) {
+    return [
+        { action: 'copy-item', parent: parentCode, item: itemCode, label: '复制库存', icon: '⧉' },
+        { action: 'copy-code', code: itemCode, label: '复制编码', icon: '⧉' },
+        { action: 'delete-item', parent: parentCode, item: itemCode, label: '删除库存', icon: '🗑', danger: true }
+    ];
+}
+function isActionMenuOpen() {
+    return !!(treeActionMenu && treeActionMenu.classList.contains('open'));
+}
+function closeActionMenu(restoreFocus) {
+    if (!treeActionMenu) return;
+    var state = actionMenuState;
+    actionMenuState = null;
+    treeActionMenu.classList.remove('open');
+    treeActionMenu.innerHTML = '';
+    if (state && state.button) {
+        state.button.setAttribute('aria-expanded', 'false');
+        if (restoreFocus) { try { state.button.focus(); } catch (e) { /* ignore */ } }
     }
-    var el = target.closest('[data-action]');
-    if (!el || !treeContainer.contains(el)) return;
-    var action = el.getAttribute('data-action');
-    var code = el.getAttribute('data-code');
-    var parent = el.getAttribute('data-parent');
-    var itemCode = el.getAttribute('data-item');
+}
+function positionActionMenu(button) {
+    if (!treeActionMenu) return;
+    var rect = button.getBoundingClientRect();
+    var menuRect = treeActionMenu.getBoundingClientRect();
+    var gap = 4;
+    var left = rect.right - menuRect.width;
+    if (left < 8) left = 8;
+    if (left + menuRect.width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - menuRect.width - 8);
+    var top = rect.bottom + gap;
+    if (top + menuRect.height > window.innerHeight - 8) top = Math.max(8, rect.top - menuRect.height - gap);
+    treeActionMenu.style.left = Math.round(left) + 'px';
+    treeActionMenu.style.top = Math.round(top) + 'px';
+}
+function openActionMenu(button, items) {
+    if (!treeActionMenu || !button || !items || !items.length) return;
+    closeActionMenu(false);
+    treeActionMenu.innerHTML = items.map(function (item) {
+        return '<button type="button" role="menuitem" tabindex="-1" class="' + (item.danger ? 'danger' : '') + '"'
+            + ' data-menu-action="' + esc(item.action) + '" data-action="' + esc(item.action) + '"'
+            + (item.code ? ' data-code="' + esc(item.code) + '"' : '')
+            + (item.parent ? ' data-parent="' + esc(item.parent) + '"' : '')
+            + (item.item ? ' data-item="' + esc(item.item) + '"' : '')
+            + '>' + (item.icon ? '<span class="menu-icon" aria-hidden="true">' + item.icon + '</span>' : '')
+            + esc(item.label) + '</button>';
+    }).join('');
+    treeActionMenu.classList.add('open');
+    actionMenuState = { button: button, items: items };
+    button.setAttribute('aria-expanded', 'true');
+    positionActionMenu(button);
+    var first = treeActionMenu.querySelector('[role="menuitem"]');
+    if (first) first.focus();
+}
+function onActionMenuItemClick(event) {
+    if (!treeActionMenu) return;
+    var btn = event.target.closest('[data-menu-action]');
+    if (!btn) return;
+    var action = btn.getAttribute('data-menu-action');
+    var code = btn.getAttribute('data-code');
+    var parent = btn.getAttribute('data-parent');
+    var itemCode = btn.getAttribute('data-item');
+    closeActionMenu(false);
+    runTreeAction(action, code, parent, itemCode, null);
+}
+
+/** 树/表格动作统一分发：行内按钮与 ⋮ 菜单项复用同一套 data-action 语义 */
+function runTreeAction(action, code, parent, itemCode, trigger) {
     switch (action) {
+        case 'menu': {
+            if (!trigger) return;
+            if (actionMenuState && actionMenuState.button === trigger) { closeActionMenu(true); return; }
+            if (trigger.getAttribute('data-menu-kind') === 'item') {
+                openActionMenu(trigger, menuItemsForItem(parent, itemCode));
+            } else {
+                openActionMenu(trigger, menuItemsForNode(code));
+            }
+            break;
+        }
         case 'toggle': toggleNode(code); break;
         case 'edit-node': openNodeModal('edit', code); break;
         case 'add-node': openNodeModal('add', '', parent); break;
@@ -4581,6 +4802,19 @@ function onTreeClick(event) {
         case 'batch-print': window.batchPrintItems(parent); break;
         case 'batch-status': openBatchStatus(parent); break;
     }
+}
+
+function onTreeClick(event) {
+    var target = event.target;
+    if (!target || !target.closest) return;
+    var th = target.closest('th[data-sort]');
+    if (th && treeContainer.contains(th)) {
+        toggleTableSort(th.getAttribute('data-sort'));
+        return;
+    }
+    var el = target.closest('[data-action]');
+    if (!el || !treeContainer.contains(el)) return;
+    runTreeAction(el.getAttribute('data-action'), el.getAttribute('data-code'), el.getAttribute('data-parent'), el.getAttribute('data-item'), el);
 }
 
 function onTreeChange(event) {
@@ -5613,6 +5847,46 @@ loadErrorRetry.addEventListener('click', retryLoad);
 loadErrorLogin.addEventListener('click', showLoginForm);
 treeContainer.addEventListener('click', onTreeClick);
 treeContainer.addEventListener('change', onTreeChange);
+// v2.3.7 ⋮ 菜单：点菜单项 / 点外部 / 滚动 / 缩放 均关闭；方向键/Home/End 在菜单项间移动
+if (treeActionMenu) {
+    treeActionMenu.addEventListener('click', onActionMenuItemClick);
+    treeActionMenu.addEventListener('keydown', function (event) {
+        var items = Array.prototype.slice.call(treeActionMenu.querySelectorAll('[role="menuitem"]'));
+        if (!items.length) return;
+        var index = items.indexOf(document.activeElement);
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            items[(index + 1) % items.length].focus();
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            items[(index - 1 + items.length) % items.length].focus();
+        } else if (event.key === 'Home') {
+            event.preventDefault();
+            items[0].focus();
+        } else if (event.key === 'End') {
+            event.preventDefault();
+            items[items.length - 1].focus();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            closeActionMenu(true);
+        } else if (event.key === 'Tab') {
+            closeActionMenu(false);
+        }
+    });
+}
+document.addEventListener('click', function (event) {
+    if (!isActionMenuOpen()) return;
+    if (treeActionMenu.contains(event.target)) return;
+    if (event.target.closest && event.target.closest('[data-action="menu"]')) return;
+    closeActionMenu(false);
+});
+window.addEventListener('scroll', function () {
+    if (isActionMenuOpen()) closeActionMenu(false);
+}, true);
+window.addEventListener('resize', function () {
+    if (isActionMenuOpen()) closeActionMenu(false);
+});
 // L-8：让角色为 button 的树内元素/可排序表头支持 Enter/Space 激活
 treeContainer.addEventListener('keydown', function (event) {
     if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'Spacebar') return;
@@ -5699,6 +5973,7 @@ document.addEventListener('keydown', function (event) {
     }
     if (handleFocusTrap(event)) return;
     if (key === 'Escape') {
+        if (isActionMenuOpen()) { closeActionMenu(true); return; }
         if (dataMenu.classList.contains('open')) { closeDataMenu(); return; }
         if (confirmOverlay.classList.contains('active')) { cancelConfirm(); return; }
         if (conflictOverlay.classList.contains('active')) { finishConflict('cancel'); return; }
@@ -7457,8 +7732,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.6
-        setText(appVersionEl, 'R5 · v2.3.6 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.7
+        setText(appVersionEl, 'R5 · v2.3.7 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -7501,7 +7776,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.6：条码对象宽按编码长度细粒度标定（18/29/48 字符实测）/2mm 安全区/自定义文本自动换行/打印同源）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.7：树/库存表降噪与渐进式披露——text-button/⋮ 浮层菜单/紧凑汇总/轻量状态标签/批量条按需显示）');
 </script>
 </body>
 </html>
