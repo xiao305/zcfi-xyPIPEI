@@ -3,6 +3,40 @@
 本项目的页面/数据层均随 GitHub Pages 发布，版本按「核心（js/core.js）+ 功能轮次」记录。
 日期格式：`YYYY-MM-DD`。
 
+## [2.3.8] - 2026-11-14
+
+节点树展开图标与交互精修（大厂品质感）。页面版本 **R5 · v2.3.8**（core v2.3.0 / scan R3 不变）。
+
+### 图标与动画
+
+- 实心「▼」文本改为**内联 SVG chevron-right**（14×14、stroke=currentColor、round caps）；收起指向右、展开时 `transform: rotate(90deg)` 指向下；
+- SVG 加 `transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)`，展开/收起平滑旋转；toggle 容器 20×20 inline-flex 居中（移动端 44×44）。
+
+### 交互反馈
+
+- 整行 `cursor:pointer` + `hover` 背景 `#f8fafc`（移除旧白底/左边框/阴影）；
+- **点击标题区**（名称/编码/状态/统计/空白）即可展开收起，按钮/⋮/表单控件/复选框除外；`[data-action]` 先分发避免重复 toggle；
+- toggle/名称 `:active { transform: scale(0.94) }` 轻微按压反馈（transition .12s）；
+- 点击「编辑」「⋮」不会误切换展开；双击库存行编辑逻辑不变。
+
+### 层级与对齐
+
+- 层级引导线改为 **1px solid `#e2e8f0`**，去掉虚线/2px；每级固定 **24px** 缩进（margin-left 12 + padding-left 12），展开时 children 块首尾相接、连线连续；
+- `.node-content` 桌面端 flex + align-items:center + nowrap（≤768px 恢复 wrap）；图标/名称/编码/状态/统计/操作按钮中线差实测 0px。
+
+### 信息层级
+
+- 节点统计文字（`node-summary`）降为辅助信息：`#94a3b8` / 11px；数字高亮保留但整体更浅（在售 #059669 / 待售 #d97706 / 售出 #94a3b8），名称与状态仍是第一层级。
+
+### 验证
+
+- `local_dev/_fix-ui/smoke.mjs`：45/45 通过（SVG/90° 旋转矩阵/0.2s 过渡/点击 name 与统计区切换/编辑与 ⋮ 不切换/hover 背景/引导线 1px #e2e8f0/24px 缩进/中线差 0px/summary 颜色字号/无 pageerror）；
+- `fix-smoke` 34/34；内联脚本 `node --check` 2/2。
+
+### 工程约定
+
+- 本项目所有本地产物统一放在项目内 `local_dev/`（截图 `local_dev/_artifacts/screenshots/`），不写公共目录。
+
 ## [2.3.7] - 2026-11-14
 
 管理后台界面降噪与渐进式披露重构。页面版本 **R5 · v2.3.7**（core v2.3.0 / scan R3 不变）。

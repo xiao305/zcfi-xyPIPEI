@@ -303,26 +303,37 @@
         }
         .tree-node .node-content {
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             align-items: center;
             gap: 10px;
             padding: 8px 12px;
             border-radius: 10px;
-            background: var(--color-gray-50);
+            background: transparent;
             margin-bottom: 4px;
-            transition: var(--transition);
-            border-left: 4px solid transparent;
+            transition: background-color 0.18s ease, color 0.18s ease;
+            cursor: pointer;
+            min-width: 0;
         }
         .tree-node .node-content:hover {
-            background: #fff;
-            border-left-color: var(--color-primary-light);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            background: #f8fafc;
+        }
+        /* v2.3.8：行内图标/名称/编码/状态/统计/操作统一垂直居中 */
+        .tree-node .node-content > .toggle,
+        .tree-node .node-content > .name,
+        .tree-node .node-content > .code,
+        .tree-node .node-content > .status-badge,
+        .tree-node .node-content > .node-summary,
+        .tree-node .node-content > .actions {
+            align-self: center;
         }
         .tree-node .node-content .name {
             font-weight: 600;
             cursor: pointer;
             font-size: 15px;
+            align-self: center;
+            transition: transform 0.12s ease;
         }
+        .tree-node .node-content .name:active { transform: scale(0.94); }
         .tree-node .node-content .code {
             color: var(--color-gray-500);
             font-size: 12px;
@@ -351,25 +362,44 @@
         }
         .tree-node .node-content .toggle {
             cursor: pointer;
-            font-size: 12px;
             color: #64748b;
-            transition: var(--transition);
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             width: 20px;
-            text-align: center;
+            height: 20px;
+            flex: 0 0 20px;
+            align-self: center;
+            transition: color 0.2s ease, transform 0.12s ease;
         }
         .tree-node .node-content .toggle:hover {
             color: var(--color-primary);
         }
+        .tree-node .node-content .toggle:active { transform: scale(0.94); }
+        .tree-node .node-content .toggle svg {
+            display: block;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .tree-node.expanded > .node-content .toggle svg { transform: rotate(90deg); }
+        /* v2.3.8：叶子节点占位（同 toggle 尺寸、不可见/不可聚焦），保证名称左起点一致 */
+        .tree-node .node-content .toggle-placeholder {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            flex: 0 0 20px;
+            align-self: center;
+            visibility: hidden;
+            pointer-events: none;
+        }
         .tree-node .children {
             display: none;
-            margin-left: 24px;
-            padding-left: 16px;
-            border-left: 2px dashed var(--color-gray-200);
+            margin-left: 12px;
+            padding-left: 12px;
+            border-left: 1px solid #e2e8f0;
         }
         .tree-node.expanded > .children {
             display: block;
-            margin-top: 6px;
+            margin-top: 0;
         }
         .tree-node.tree-node-hidden { display: none; }
 
@@ -1408,17 +1438,18 @@
         .summary-chip.onsale { background: #d1fae5; color: #065f46; }
         .summary-chip.pending { background: #fef3c7; color: #92400e; }
         /* v2.3.7：节点行汇总改为一段灰色紧凑文本（不再用小胶囊） */
+        /* v2.3.8：统计文本再降一级（#94a3b8 / 11px），名称与状态仍最醒目 */
         .node-summary {
             font-size: 11px;
             line-height: 1.5;
-            color: var(--color-gray-500);
+            color: #94a3b8;
             white-space: nowrap;
             display: inline-block;
             font-variant-numeric: tabular-nums;
         }
-        .node-summary .onsale { color: #047857; }
-        .node-summary .sold { color: #64748b; }
-        .node-summary .pending { color: #b45309; }
+        .node-summary .onsale { color: #059669; }
+        .node-summary .sold { color: #94a3b8; }
+        .node-summary .pending { color: #d97706; }
         .node-summary b { font-weight: 500; }
 
         /* ===== 批量选择条 ===== */
@@ -1555,8 +1586,12 @@
             .tree-node .node-content .toggle {
                 width: 44px;
                 height: 44px;
-                line-height: 44px;
-                font-size: 16px;
+                flex: 0 0 44px;
+            }
+            .tree-node .node-content .toggle-placeholder {
+                width: 44px;
+                height: 44px;
+                flex: 0 0 44px;
             }
             .tree-node .node-content .name { padding: 8px 2px; word-break: break-word; overflow-wrap: anywhere; }
             .tree-node .node-content .code { word-break: break-all; }
@@ -4502,6 +4537,9 @@ function buildNodeSummaryHtml(stats) {
     return '<span class="node-summary" title="' + esc(title) + '">' + text + '</span>';
 }
 
+/** v2.3.8：展开/收起图标（内联 SVG chevron-right，展开时由 CSS rotate(90deg) 指向下） */
+var TREE_TOGGLE_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9 6 15 12 9 18"></polyline></svg>';
+
 function buildNodeHtml(code, node, depth, term, ctx) {
     // 软删除：已删除节点（含其整个子树）不参与渲染/搜索/打印
     if (Z.isDeleted(node)) return { html: '', visible: false };
@@ -4548,8 +4586,8 @@ function buildNodeHtml(code, node, depth, term, ctx) {
     var hasToggle = childResults.length > 0 || allItems.length > 0;
 
     var toggleIcon = hasToggle
-        ? '<span class="toggle" data-action="toggle" data-code="' + esc(code) + '" title="展开/收起" role="button" tabindex="0" aria-label="展开或收起 ' + esc(code) + '" aria-expanded="' + (expanded ? 'true' : 'false') + '">▼</span>'
-        : '';
+        ? '<span class="toggle" data-action="toggle" data-code="' + esc(code) + '" title="展开/收起" role="button" tabindex="0" aria-label="展开或收起 ' + esc(code) + '" aria-expanded="' + (expanded ? 'true' : 'false') + '">' + TREE_TOGGLE_SVG + '</span>'
+        : '<span class="toggle-placeholder" aria-hidden="true"></span>';
 
     // v2.3.7：节点行只留「编辑 / 打印标签」两个核心操作，其余收进 ⋮ 菜单（渐进式披露）
     var actions = [
@@ -4640,13 +4678,20 @@ function toggleNode(code) {
     var el = findTreeEl(code);
     if (!el) return;
     ensureExpandedExplicit();
+    var expandedNow;
     if (el.classList.contains('expanded')) {
         el.classList.remove('expanded');
         delete expandedSet[code];
+        expandedNow = false;
     } else {
         el.classList.add('expanded');
         expandedSet[code] = true;
+        expandedNow = true;
     }
+    // v2.3.8：同步展开/收起图标的 aria-expanded（无障碍）
+    var content = el.querySelector('.node-content');
+    var toggleEl = content ? content.querySelector('.toggle') : null;
+    if (toggleEl) toggleEl.setAttribute('aria-expanded', expandedNow ? 'true' : 'false');
     saveViewState();
     updateGlobalSelection();
 }
@@ -4812,9 +4857,20 @@ function onTreeClick(event) {
         toggleTableSort(th.getAttribute('data-sort'));
         return;
     }
+    // 行内按钮 / ⋮ / toggle / name 等带 data-action 的元素走原动作分发，避免与行点击重复 toggle
     var el = target.closest('[data-action]');
-    if (!el || !treeContainer.contains(el)) return;
-    runTreeAction(el.getAttribute('data-action'), el.getAttribute('data-code'), el.getAttribute('data-parent'), el.getAttribute('data-item'), el);
+    if (el && treeContainer.contains(el)) {
+        runTreeAction(el.getAttribute('data-action'), el.getAttribute('data-code'), el.getAttribute('data-parent'), el.getAttribute('data-item'), el);
+        return;
+    }
+    // v2.3.8：点击标题区（code/状态/统计/行内空白）切换展开收起；按钮/菜单/表单控件/复选框除外。
+    // 双击编辑（onTreeDblClick，仅库存行）不受影响。
+    if (target.closest('button, input, select, textarea, a, label, .actions')) return;
+    var content = target.closest('.node-content');
+    if (!content || !treeContainer.contains(content)) return;
+    var nodeEl = content.closest('.tree-node');
+    var nodeCode = nodeEl ? nodeEl.getAttribute('data-code') : '';
+    if (nodeCode) toggleNode(nodeCode);
 }
 
 function onTreeChange(event) {
@@ -7732,8 +7788,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.7
-        setText(appVersionEl, 'R5 · v2.3.7 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.8
+        setText(appVersionEl, 'R5 · v2.3.8 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -7776,7 +7832,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.7：树/库存表降噪与渐进式披露——text-button/⋮ 浮层菜单/紧凑汇总/轻量状态标签/批量条按需显示）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.8：节点树交互精修——SVG 展开图标/旋转动画/整行 hover 与点击展开/1px 引导线/垂直居中/统计文本降级）');
 </script>
 </body>
 </html>
