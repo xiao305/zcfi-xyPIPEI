@@ -130,6 +130,9 @@ const requirements = [
     ['admin.html', /tpl-50x40-full/, 'admin 缺少 50*40 模板'],
     ['admin.html', /tpl-50x30-inbound/, 'admin 缺少入库 50*30 模板'],
     ['admin.html', /tpl-40x30-inbound/, 'admin 缺少入库 40*30 模板'],
+    ['admin.html', /tpl-50x40-inbound/, 'admin 缺少入库 50*40 模板'],
+    ['admin.html', /customTextSize/, 'admin 缺少自定义文本字号'],
+    ['admin.html', /customText/, 'admin 缺少自定义文本设置'],
     ['admin.html', /codeTextMode/, 'admin 缺少编码文字设置'],
     ['admin.html', /labelCategory/, 'admin 缺少入库/出库分类'],
     ['admin.html', /条码区域/, 'admin 预览缺少条码区域占位'],
@@ -153,16 +156,16 @@ console.log('== 4. 版本一致性 ==');
 const versionFiles = ['README.md', 'CHANGELOG.md', 'docs/ARCHITECTURE.md', 'docs/RELEASE-CHECKLIST.md'];
 for (const rel of versionFiles) {
     if (!exists(rel)) { bad(`${rel} 不存在`); continue; }
-    check(/2\.3\.2/.test(read(rel)), `${rel} 未提及 v2.3.2`);
+    check(/2\.3\.3/.test(read(rel)), `${rel} 未提及 v2.3.3`);
 }
 check(/2\.2\.0/.test(read('js/core.js')) || /2\.3\.0/.test(read('js/core.js')), 'core 未标记 2.3.0');
 {
     const cspMeta = (read('admin.html').match(/Content-Security-Policy" content="([^"]*)"/) || [null, ''])[1];
     check(!/unsafe-eval/.test(cspMeta), 'admin CSP 不应放开 unsafe-eval');
 }
-check(/R5 · v2\.3\.2/.test(read('admin.html')), 'admin 未标记 R5 · v2.3.2');
+check(/R5 · v2\.3\.3/.test(read('admin.html')), 'admin 未标记 R5 · v2.3.3');
 check(/R3 · v2\.3\.0/.test(read('scan.html')), 'scan 未标记 R3 · v2.3.0');
-check(/\[2\.3\.2\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.3.2] 条目');
+check(/\[2\.3\.3\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.3.3] 条目');
 
 console.log('== 5. 文件结构与存在性 ==');
 check(!exists('CLodopFuncs.js'), 'CLodopFuncs.js 仍被提交（应删除，运行时加载）');
