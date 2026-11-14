@@ -622,6 +622,32 @@
             box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
             outline: none;
         }
+        .template-category-tabs {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .template-category-tab {
+            flex: 1 1 0;
+            padding: 8px 10px;
+            border: 1.5px solid var(--color-gray-200);
+            border-radius: 10px;
+            background: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-gray-500);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .template-category-tab:hover {
+            border-color: var(--color-primary-light);
+            color: var(--color-gray-700);
+        }
+        .template-category-tab.active {
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+            background: rgba(79, 70, 229, 0.06);
+        }
         .template-select-container {
             display: flex;
             flex-wrap: wrap;
@@ -708,11 +734,31 @@
             overflow: hidden;
         }
         .label-preview-page .label-el-barcode {
-            display: block;
-            background: #fff;
-            border: 0;
-            border-radius: 0;
-            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.7mm;
+            background: #f8fafc;
+            border: 0.25mm dashed #cbd5e1;
+            border-radius: 1.2mm;
+            color: #94a3b8;
+            text-align: center;
+            overflow: hidden;
+        }
+        .label-preview-page .label-barcode-label {
+            font-family: "Microsoft YaHei", "SimHei", sans-serif;
+            font-size: 9pt;
+            font-weight: 600;
+            line-height: 1;
+            color: #94a3b8;
+        }
+        .label-preview-page .label-barcode-note {
+            font-family: "Microsoft YaHei", "SimHei", sans-serif;
+            font-size: 5.5pt;
+            line-height: 1.1;
+            color: #b6c2d2;
+            white-space: nowrap;
         }
         .print-preview-note {
             font-size: 12px;
@@ -1702,11 +1748,22 @@
         <div class="print-summary" id="print-summary"></div>
         <div class="print-settings">
             <label id="print-template-label">标签模板</label>
+            <div id="template-category-tabs" class="template-category-tabs" role="tablist" aria-label="模板分类（入库/出库）">
+                <button type="button" class="template-category-tab" data-category="inbound" role="tab" aria-selected="false">入库</button>
+                <button type="button" class="template-category-tab" data-category="outbound" role="tab" aria-selected="true">出库</button>
+            </div>
             <div id="template-select-container" class="template-select-container" role="group" aria-labelledby="print-template-label"></div>
+
+            <label for="print-code-text">编码文字</label>
+            <select id="print-code-text">
+                <option value="last">内部编码：最后一级（默认）</option>
+                <option value="full">内部编码：完整编码</option>
+                <option value="labelOnly">仅显示“内部编码”（不显示编码值）</option>
+            </select>
 
             <label id="print-inner-preview-label">内置预览（示意图，实际以打印机为准）</label>
             <div id="inner-preview-container" aria-labelledby="print-inner-preview-label"></div>
-            <p class="print-preview-note">示意图（实际以打印机为准）：页面内预览与打印使用同一套 mm 坐标 + pt 字号（同源渲染）；条码为 2D PDF417 示意图（实际由 C-Lodop 生成）。模板切换会即时重绘。</p>
+            <p class="print-preview-note">示意图（实际以打印机为准）：页面内预览与打印使用同一套 mm 坐标 + pt 字号（同源渲染）；条码区域为占位框，实际条码由 C-Lodop 生成。模板切换、编码文字与分类切换都会即时重绘。</p>
 
             <label for="printer-select">选择打印机</label>
             <select id="printer-select"></select>
@@ -2035,7 +2092,7 @@ var expandedSet = null;                 // null = 按默认策略（数据量大
 
 // R3 打印设置（模板/打印机/份数/是否预览）
 var PRINT_SETTINGS_KEY = 'zcfi_print_settings_v1';
-var printSettings = { templateIndex: 0, printerName: '', copies: 1, previewBeforePrint: false };
+var printSettings = { templateIndex: 0, printerName: '', copies: 1, previewBeforePrint: false, codeTextMode: 'last', labelCategory: 'outbound' };
 var printBusy = false;
 
 // 编码规范（R5/v2.3.0：自定义编码只允许英文字母+数字混搭，禁中文/空格/斜杠/下划线等符号；
@@ -2214,6 +2271,8 @@ var printTemplateMeta = $('print-template-meta');
 var printStatusDiv = $('print-status');
 var printPreviewMode = $('print-preview-mode');
 var templateSelectContainer = $('template-select-container');
+var templateCategoryTabs = $('template-category-tabs');
+var printCodeTextSelect = $('print-code-text');
 var innerPreviewContainer = $('inner-preview-container');
 var printerSelect = $('printer-select');
 var printCopiesInput = $('print-copies');
@@ -5653,6 +5712,7 @@ window.openBatchStatus = openBatchStatus;
             id: 'tpl-50x30-code',
             name: '50*30 内部编码',
             desc: '现网默认模板（内容不变）',
+            category: 'public',
             paperWidth: 50,
             paperHeight: 30,
             elements: [
@@ -5701,6 +5761,7 @@ window.openBatchStatus = openBatchStatus;
             id: 'tpl-50x30-info',
             name: '50*30 编码+名称+快递单号',
             desc: '信息更全，适合贴箱',
+            category: 'outbound',
             paperWidth: 50,
             paperHeight: 30,
             elements: [
@@ -5731,8 +5792,7 @@ window.openBatchStatus = openBatchStatus;
                     fontName: '黑体',
                     bold: false,
                     align: 'center',
-                    wordWrap: true,
-                    multiline: true
+                    singleLineFit: true
                 },
                 {
                     type: 'text',
@@ -5764,6 +5824,7 @@ window.openBatchStatus = openBatchStatus;
             id: 'tpl-40x30-order',
             name: '40*30 编码+订单号',
             desc: '小标签，突出订单号',
+            category: 'outbound',
             paperWidth: 40,
             paperHeight: 30,
             elements: [
@@ -5813,6 +5874,7 @@ window.openBatchStatus = openBatchStatus;
             id: 'tpl-50x40-full',
             name: '50*40 编码+名称+快递单号+大条码',
             desc: '信息最全，大条码更易扫',
+            category: 'outbound',
             paperWidth: 50,
             paperHeight: 40,
             elements: [
@@ -5838,12 +5900,11 @@ window.openBatchStatus = openBatchStatus;
                     y: 10.5,
                     width: 48,
                     height: 5,
-                    fontSize: 9,
+                    fontSize: 10,
                     fontName: '黑体',
                     bold: false,
                     align: 'center',
-                    wordWrap: true,
-                    multiline: true
+                    singleLineFit: true
                 },
                 {
                     type: 'text',
@@ -5869,12 +5930,115 @@ window.openBatchStatus = openBatchStatus;
                     align: 'center'
                 }
             ]
+        },
+        {
+            id: 'tpl-50x30-inbound',
+            name: '50*30 入库 编码+名称+条码',
+            desc: '入库用，含名称与大条码',
+            category: 'inbound',
+            paperWidth: 50,
+            paperHeight: 30,
+            elements: [
+                {
+                    type: 'text',
+                    field: 'code',
+                    x: 1,
+                    y: 1,
+                    width: 48,
+                    height: 9,
+                    fontSize: 22,
+                    fontName: '黑体',
+                    bold: true,
+                    align: 'center',
+                    prefix: '内部编码：',
+                    dynamicSize: true,
+                    showLastLevelOnly: true
+                },
+                {
+                    type: 'text',
+                    field: 'name',
+                    x: 1,
+                    y: 10.5,
+                    width: 48,
+                    height: 5,
+                    fontSize: 10,
+                    fontName: '黑体',
+                    bold: false,
+                    align: 'center',
+                    singleLineFit: true
+                },
+                {
+                    type: 'barcode',
+                    field: 'code',
+                    x: 4,
+                    y: 16.5,
+                    width: 42,
+                    height: 12,
+                    barcodeType: 'PDF417',
+                    align: 'center'
+                }
+            ]
+        },
+        {
+            id: 'tpl-40x30-inbound',
+            name: '40*30 入库 编码+条码',
+            desc: '入库小标签，大条码',
+            category: 'inbound',
+            paperWidth: 40,
+            paperHeight: 30,
+            elements: [
+                {
+                    type: 'text',
+                    field: 'code',
+                    x: 1,
+                    y: 1,
+                    width: 38,
+                    height: 8,
+                    fontSize: 20,
+                    fontName: '黑体',
+                    bold: true,
+                    align: 'center',
+                    prefix: '内部编码：',
+                    dynamicSize: true,
+                    showLastLevelOnly: true
+                },
+                {
+                    type: 'barcode',
+                    field: 'code',
+                    x: 2,
+                    y: 10,
+                    width: 36,
+                    height: 18,
+                    barcodeType: 'PDF417',
+                    align: 'center'
+                }
+            ]
         }
     ];
 
-    // ---------- 打印设置（模板/打印机/份数/是否预览） ----------
+    // ---------- 打印设置（模板/分类/编码文字/打印机/份数/是否预览） ----------
     var printRunSeq = 0;          // L-11：每次执行打印的序号，await 后用于判断是否被取消
     var printersAvailable = false; // H-2：本机打印机是否可用（0 台时禁用打印）
+    var PRINT_CODE_TEXT_MODES = ['last', 'full', 'labelOnly'];
+    var PRINT_LABEL_CATEGORIES = ['inbound', 'outbound'];
+    function normalizeCodeTextMode(value) {
+        return PRINT_CODE_TEXT_MODES.indexOf(value) !== -1 ? value : 'last';
+    }
+    function normalizeLabelCategory(value) {
+        return PRINT_LABEL_CATEGORIES.indexOf(value) !== -1 ? value : 'outbound';
+    }
+    /** 模板是否属于当前分类（公共模板在入库/出库两类都显示） */
+    function templateInCategory(tpl, category) {
+        if (!tpl) return false;
+        return tpl.category === 'public' || tpl.category === category;
+    }
+    /** 当前分类下默认选中的模板：公共模板（50*30 内部编码） */
+    function findPublicTemplateIndex() {
+        for (var i = 0; i < printTemplates.length; i++) {
+            if (printTemplates[i].category === 'public') return i;
+        }
+        return 0;
+    }
     function clampInt(value, min, max, fallback) {
         var n = parseInt(value, 10);
         if (isNaN(n)) return fallback;
@@ -5887,7 +6051,10 @@ window.openBatchStatus = openBatchStatus;
             templateIndex: clampInt(raw.templateIndex, 0, printTemplates.length - 1, 0),
             printerName: typeof raw.printerName === 'string' ? raw.printerName : '',
             copies: clampInt(raw.copies, 1, 100, 1),
-            previewBeforePrint: !!raw.previewBeforePrint
+            previewBeforePrint: !!raw.previewBeforePrint,
+            // v2.3.2：旧设置对象缺字段时用默认值（编码文字=最后一级，分类=出库）
+            codeTextMode: normalizeCodeTextMode(raw.codeTextMode),
+            labelCategory: normalizeLabelCategory(raw.labelCategory)
         };
         return printSettings;
     }
@@ -5896,7 +6063,9 @@ window.openBatchStatus = openBatchStatus;
             templateIndex: clampInt(selectedTemplateIndex, 0, printTemplates.length - 1, 0),
             printerName: getSelectedPrinterName(),
             copies: clampInt(printCopiesInput.value, 1, 100, 1),
-            previewBeforePrint: !!(printPreviewMode && printPreviewMode.checked)
+            previewBeforePrint: !!(printPreviewMode && printPreviewMode.checked),
+            codeTextMode: normalizeCodeTextMode(printCodeTextSelect ? printCodeTextSelect.value : printSettings.codeTextMode),
+            labelCategory: normalizeLabelCategory(printSettings.labelCategory)
         };
         Z.storage.setJson(PRINT_SETTINGS_KEY, printSettings);
     }
@@ -5993,11 +6162,16 @@ window.openBatchStatus = openBatchStatus;
     }
     function setPrintBusy(busy) {
         printBusy = !!busy;
-        [printPreviewBtn, printPreviewCancel, printerSelect, printCopiesInput, printPreviewMode].forEach(function (el) {
+        [printPreviewBtn, printPreviewCancel, printerSelect, printCopiesInput, printPreviewMode, printCodeTextSelect].forEach(function (el) {
             if (!el) return;
             if (busy) el.disabled = true;
             else el.disabled = false;
         });
+        if (templateCategoryTabs) {
+            Array.prototype.forEach.call(templateCategoryTabs.querySelectorAll('.template-category-tab'), function (btn) {
+                btn.disabled = !!busy;
+            });
+        }
         // H-2：没有可用打印机时保持禁用
         if (printExecute) printExecute.disabled = !!busy || !printersAvailable;
         if (printPreviewBtn) printPreviewBtn.textContent = busy ? '处理中…' : '系统预览';
@@ -6055,21 +6229,30 @@ window.openBatchStatus = openBatchStatus;
     function normalizeLodopText(text) {
         return String(text).replace(/:/g, '：').replace(/ /g, '\u3000');
     }
-    /** 单行最大字号：可用宽度 × 0.92，最小 6pt，最大不超过元素高度对应值 */
-    function calcSingleLineFontSize(text, maxWidthMm, maxHeightMm, baseSize, bold) {
+    // 实测（本机 C-Lodop 6.5.6.6 真实预览）：原生文本的“推进宽度”比浏览器 DOM 测量更宽——
+    // 48mm 文本项里 16pt 的“内部编码：A001”仍单行，而 9.5pt 的 18 字符长编码（完整编码）会折行；
+    // 按折行阈值反推，LODOP 实际宽度 ≈ DOM 宽度 × 1.12~1.15。这里用 1.15（粗体）/1.08（常规）估算，
+    // 宁可字号小一点，也保证打印时单行不折行、不被裁断。
+    var PRINT_NATIVE_BOLD_WIDTH_FACTOR = 1.15;
+    var PRINT_NATIVE_WIDTH_FACTOR = 1.08;
+    function estimateNativeTextWidthMm(text, pt, bold) {
+        return measureTextMm(normalizeLodopText(text), pt, bold) * (bold ? PRINT_NATIVE_BOLD_WIDTH_FACTOR : PRINT_NATIVE_WIDTH_FACTOR);
+    }
+    /** 单行最大字号：可用宽度 × 安全系数（默认 0.92），最小 6pt，最大不超过元素高度对应值 */
+    function calcSingleLineFontSize(text, maxWidthMm, maxHeightMm, baseSize, bold, safety) {
         var display = safeText(text);
         var base = baseSize || 12;
         var maxByHeight = maxHeightMm > 0 ? maxHeightMm / PRINT_PT_TO_MM : 72;
         var high = Math.min(72, Math.max(PRINT_MIN_FONT_PT, maxByHeight), Math.max(PRINT_MIN_FONT_PT, base * 1.6));
         var low = PRINT_MIN_FONT_PT;
+        var factor = (typeof safety === 'number' && safety > 0) ? safety : PRINT_SAFETY_WIDTH;
         if (!display) return Math.max(PRINT_MIN_FONT_PT, Math.floor(Math.min(high, base) * 2) / 2);
-        var normalized = normalizeLodopText(display);
-        var availWidth = maxWidthMm * PRINT_SAFETY_WIDTH;
+        var availWidth = maxWidthMm * factor;
         if (availWidth <= 0) return PRINT_MIN_FONT_PT;
-        if (measureTextMm(normalized, low, bold) > availWidth) return low;
+        if (estimateNativeTextWidthMm(display, low, bold) > availWidth) return low;
         for (var i = 0; i < 24; i++) {
             var mid = (low + high) / 2;
-            if (measureTextMm(normalized, mid, bold) <= availWidth) low = mid; else high = mid;
+            if (estimateNativeTextWidthMm(display, mid, bold) <= availWidth) low = mid; else high = mid;
         }
         // 向下取 0.5pt，留出打印余量
         return Math.max(PRINT_MIN_FONT_PT, Math.floor(low * 2) / 2);
@@ -6078,6 +6261,21 @@ window.openBatchStatus = openBatchStatus;
     function calcDynamicFontSize(text, maxWidthMm, maxHeightMm, baseSize, fontName, bold, prefix) {
         var displayText = (prefix === undefined ? '内部编码：' : prefix) + safeText(text);
         return calcSingleLineFontSize(displayText, maxWidthMm, maxHeightMm, baseSize, bold);
+    }
+    /** “单行优先”字段（商品名称）：基准字号 10pt 优先，超宽才向下收缩，最小 6pt */
+    function calcFitDownFontSize(text, maxWidthMm, baseSize, bold) {
+        var base = Math.max(PRINT_MIN_FONT_PT, Math.min(72, baseSize || 10));
+        var display = safeText(text);
+        if (!display) return base;
+        var availWidth = Math.max(4, maxWidthMm * PRINT_SAFETY_WIDTH);
+        if (estimateNativeTextWidthMm(display, base, bold) <= availWidth) return base;
+        var low = PRINT_MIN_FONT_PT;
+        var high = base;
+        for (var i = 0; i < 18; i++) {
+            var mid = (low + high) / 2;
+            if (estimateNativeTextWidthMm(display, mid, bold) <= availWidth) low = mid; else high = mid;
+        }
+        return Math.max(PRINT_MIN_FONT_PT, Math.floor(low * 2) / 2);
     }
     /** 多行（名称）字号：按 DOM 换行后的真实高度收缩，保证不被裁切 */
     function calcMultilineFontSize(text, maxWidthMm, maxHeightMm, baseSize, bold) {
@@ -6145,9 +6343,23 @@ window.openBatchStatus = openBatchStatus;
         }
     }
 
-    /** 取元素要显示的文本（静态文本 / 数据字段 + 前缀 + 末级编码；无数据时用演示值） */
-    var PRINT_DEMO_VALUES = { code: 'C001', name: '商品名称', trackingNumber: 'JT0001234567890', orderNumber: 'ORD20261001001' };
-    function getElementDisplayText(el, data) {
+    /** 取元素要显示的文本（静态文本 / 数据字段 + 前缀；编码文字按“编码文字”设置处理；无数据时用演示值） */
+    var PRINT_DEMO_VALUES = { code: 'A001/C001', name: '商品名称', trackingNumber: 'JT0001234567890', orderNumber: 'ORD20261001001' };
+    /** 编码文字三选一：last=最后一级 / full=完整编码 / labelOnly=只显示“内部编码” */
+    function getCodeDisplayText(el, raw, mode) {
+        var value = safeText(raw);
+        if (mode === 'labelOnly') {
+            var label = safeText(el.prefix || '内部编码：').replace(/[：:\s]+$/, '');
+            return label || '内部编码';
+        }
+        if (mode !== 'full' && value.indexOf('/') !== -1) {
+            var parts = value.split('/');
+            value = parts[parts.length - 1];
+        }
+        if (el.prefix && value) return el.prefix + value;
+        return value;
+    }
+    function getElementDisplayText(el, data, codeModeOverride) {
         if (el.field === 'static') return safeText(el.text);
         var raw;
         if (data && data[el.field] !== undefined && data[el.field] !== null && data[el.field] !== '') {
@@ -6157,6 +6369,10 @@ window.openBatchStatus = openBatchStatus;
         } else {
             raw = PRINT_DEMO_VALUES[el.field] || el.field;
         }
+        if (el.type === 'text' && el.field === 'code') {
+            var mode = codeModeOverride || normalizeCodeTextMode(printSettings.codeTextMode);
+            return getCodeDisplayText(el, raw, mode);
+        }
         if (el.showLastLevelOnly && raw.indexOf('/') !== -1) {
             var parts = raw.split('/');
             raw = parts[parts.length - 1];
@@ -6164,10 +6380,31 @@ window.openBatchStatus = openBatchStatus;
         if (el.prefix && raw) return el.prefix + raw;
         return raw;
     }
+    /** 模板中居中显示“编码”文字的元素：打印时用整张纸宽作为文本框，避免 LODOP 原生文本折行 */
+    function isCenteredCodeText(el) {
+        return !!(el && el.type === 'text' && el.field === 'code' && (el.align === undefined || el.align === 'center'));
+    }
+    function codeTextLayoutWidth(template, el) {
+        if (template && template.paperWidth > 0) return template.paperWidth;
+        return el.width;
+    }
     /** 字号解析：打印与页面内预览共用同一套计算，保证同源 */
-    function resolveElementFontSize(el, text) {
+    function resolveElementFontSize(el, text, data, template) {
         if (el.multiline) return calcMultilineFontSize(text, el.width, el.height, el.fontSize, el.bold);
-        if (el.dynamicSize) return calcSingleLineFontSize(text, el.width, el.height, el.fontSize, el.bold);
+        // v2.3.2：名称等字段“单行优先”，基准 10pt，超宽才缩到最小 6pt
+        if (el.singleLineFit) return calcFitDownFontSize(text, el.width, el.fontSize, el.bold);
+        if (el.dynamicSize) {
+            // 编码文字：以“最后一级编码”作为字号基准，避免“仅内部编码”模式下字号被放大；
+            // 居中编码文字使用整张纸宽做排版宽度（v2.3.2 实测：LODOP 原生文本偏宽，48mm 框会折行）
+            if (isCenteredCodeText(el)) {
+                var layoutWidth = codeTextLayoutWidth(template, el);
+                var refText = getElementDisplayText(el, data, 'last');
+                var refSize = calcSingleLineFontSize(refText, layoutWidth, el.height, el.fontSize, el.bold, 0.96);
+                var curSize = calcSingleLineFontSize(text, layoutWidth, el.height, el.fontSize, el.bold, 0.96);
+                return Math.min(refSize, curSize);
+            }
+            return calcSingleLineFontSize(text, el.width, el.height, el.fontSize, el.bold);
+        }
         return el.fontSize;
     }
     /** 打印用：多行自动换行 HTML（pt 字号、flex 垂直居中、break-all、overflow hidden） */
@@ -6181,69 +6418,37 @@ window.openBatchStatus = openBatchStatus;
             + 'text-align:' + align + ';word-break:break-all;overflow:hidden;margin:0;padding:0;">'
             + esc(String(text)) + '</div>';
     }
-    /** 2D PDF417 风格占位（横排多行 + 起止符/行指示；真实条码由 C-Lodop 生成） */
-    function drawPdf417Placeholder(canvas, value) {
-        var ctx = canvas.getContext('2d');
-        var W = canvas.width, H = canvas.height;
-        if (!ctx || !W || !H) return;
-        ctx.save();
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, W, H);
-        // 实测：LODOP 的 PDF417 约为给定区域的 82% 宽、92% 高，且左对齐绘制
-        var boxW = Math.round(W * 0.82);
-        var boxH = Math.round(H * 0.92);
-        var boxX = Math.round(W * 0.01);
-        var boxY = Math.round((H - boxH) / 2);
-        var text = String(value || '');
-        var seed = 0;
-        for (var i = 0; i < text.length; i++) seed = (seed * 131 + text.charCodeAt(i)) % 2147483647;
-        if (!seed) seed = 20241114;
-        // 与实测 LODOP 输出接近的网格：约 51 个模块宽，行高约为模块宽的 1.7 倍
-        var moduleW = boxW / 51;
-        var rows = Math.max(5, Math.min(14, Math.round(boxH / (moduleW * 1.7))));
-        var rowGap = Math.max(1, Math.round((boxH / rows) * 0.12));
-        var rowH = Math.max(2, Math.round((boxH - rowGap * (rows - 1)) / rows));
-        var y = boxY;
-        for (var r = 0; r < rows; r++) {
-            var rowSeed = (seed + (r + 1) * 7919) % 2147483647;
-            var x = boxX;
-            // 起始符（左）：2 模块粗黑条 + 白 + 黑
-            ctx.fillStyle = '#111827';
-            ctx.fillRect(x, y, Math.max(1, Math.round(moduleW * 2)), rowH);
-            x += Math.round(moduleW * 2) + Math.round(moduleW);
-            ctx.fillRect(x, y, Math.max(1, Math.round(moduleW)), rowH);
-            x += Math.round(moduleW);
-            // 行指示符列
-            ctx.fillStyle = ((rowSeed >> 3) % 2 === 0) ? '#111827' : '#ffffff';
-            ctx.fillRect(x, y, Math.max(1, Math.round(moduleW)), rowH);
-            x += Math.round(moduleW);
-            // 数据区：PDF417 风格 4 条/4 空、条宽 1-3 模块（细条为主）
-            var dataEnd = boxX + boxW - Math.round(moduleW * 3);
-            var isDark = (rowSeed % 2 === 0);
-            while (x < dataEnd) {
-                rowSeed = (rowSeed * 1103515245 + 12345) & 0x7fffffff;
-                var run = 1 + (rowSeed % 2);
-                if ((rowSeed >> 9) % 7 === 0) run = 3;
-                var runW = Math.max(1, Math.round(moduleW * run));
-                if (x + runW > dataEnd) runW = dataEnd - x;
-                if (runW <= 0) break;
-                ctx.fillStyle = isDark ? '#111827' : '#ffffff';
-                ctx.fillRect(x, y, runW, rowH);
-                x += runW;
-                isDark = !isDark;
-            }
-            // 终止符（右）：黑 + 白 + 粗黑
-            ctx.fillStyle = '#111827';
-            ctx.fillRect(x, y, Math.max(1, Math.round(moduleW)), rowH);
-            x += Math.round(moduleW);
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(x, y, Math.max(1, Math.round(moduleW)), rowH);
-            x += Math.round(moduleW);
-            ctx.fillStyle = '#111827';
-            ctx.fillRect(x, y, Math.max(1, boxX + boxW - x), rowH);
-            y += rowH + rowGap;
+    // ---------- PDF417 墨迹居中（v2.3.2） ----------
+    // 实测（本机 C-Lodop 6.5.6.6）：PDF417 的墨迹并不填满 ADD_PRINT_BARCODE 的对象框，而是从对象框左边界开始
+    // 按自己的模块宽度绘制（右侧留白），墨迹宽度还随“编码值长度 / 对象框宽度”变化（实测：
+    // 46mm 框短编码≈38.5mm、42mm 框≈38mm、36mm 框短编码≈31.5mm、36mm 框长编码≈25.5mm）。
+    // 因此把对象框左边界设为 (纸张宽 - 预估墨迹宽)/2，墨迹就会尽量在标签上居中（对象框可略超出纸张右边，超出部分是空白）。
+    var PDF417_INK_LEFT_INSET_MM = 0.1;
+    function estimatePdf417InkWidthMm(value, areaWidthMm) {
+        var width = Math.max(6, Number(areaWidthMm) || 0);
+        var len = String(value || '').length;
+        var base;
+        if (width >= 44) {
+            base = 38.5;
+            if (len > 15) base = Math.min(width, 38.5 + Math.ceil((len - 15) / 5) * 2);
+        } else if (width >= 40) {
+            base = len > 15 ? 38.5 : 38;
+        } else if (width >= 34) {
+            // 36mm 左右的窄框：短编码墨迹较宽，长编码列数变化后会变窄（实测值）
+            base = len <= 6 ? 31.5 : (len <= 18 ? 25.5 : 30);
+        } else {
+            base = width * 0.78;
         }
-        ctx.restore();
+        return Math.max(6, Math.min(width, base));
+    }
+    /** 计算条码打印项的左边界（让 PDF417 墨迹在纸张上水平居中） */
+    function barcodePrintGeometry(template, el, value) {
+        var inkW = estimatePdf417InkWidthMm(value, el.width);
+        var left = (template.paperWidth - inkW) / 2 - PDF417_INK_LEFT_INSET_MM;
+        // 兜底：墨迹必须完整留在纸张内
+        left = Math.min(left, template.paperWidth - inkW - PDF417_INK_LEFT_INSET_MM - 0.4);
+        left = Math.max(0.2, left);
+        return { top: el.y, left: Math.round(left * 100) / 100 };
     }
     /**
      * 页面内预览：与打印同源——纸张按 mm 渲染，元素用绝对定位 mm 坐标 + pt 字号，
@@ -6265,12 +6470,14 @@ window.openBatchStatus = openBatchStatus;
         template.elements.forEach(function (el) {
             if (el.type === 'text') {
                 var text = getElementDisplayText(el, data);
-                var pt = resolveElementFontSize(el, text);
+                var pt = resolveElementFontSize(el, text, data, template);
+                var fullWidthCode = isCenteredCodeText(el);
                 var div = document.createElement('div');
                 div.className = 'label-el label-el-text';
-                div.style.left = el.x + 'mm';
+                // 居中编码文字与打印一致：文本框占满整张纸宽，避免 LODOP 原生文本折行，文字仍居中
+                div.style.left = (fullWidthCode ? 0 : el.x) + 'mm';
                 div.style.top = el.y + 'mm';
-                div.style.width = el.width + 'mm';
+                div.style.width = (fullWidthCode ? template.paperWidth : el.width) + 'mm';
                 div.style.height = el.height + 'mm';
                 // 单行打印用 LODOP 原生文本（FontName=SimHei），预览也用 SimHei 以保持字宽一致；
                 // 多行打印走 ADD_PRINT_HTM（font-family 用 YaHei/SimHei 栈），预览用同一字体栈。
@@ -6298,16 +6505,24 @@ window.openBatchStatus = openBatchStatus;
                 div.textContent = text;
                 page.appendChild(div);
             } else if (el.type === 'barcode') {
-                var canvas = document.createElement('canvas');
-                canvas.className = 'label-el label-el-barcode';
-                canvas.style.left = el.x + 'mm';
-                canvas.style.top = el.y + 'mm';
-                canvas.style.width = el.width + 'mm';
-                canvas.style.height = el.height + 'mm';
-                canvas.width = Math.max(40, Math.round(el.width * 12));
-                canvas.height = Math.max(20, Math.round(el.height * 12));
-                drawPdf417Placeholder(canvas, getElementDisplayText(el, data));
-                page.appendChild(canvas);
+                // v2.3.2：页面内预览不再画假 PDF417 纹理，改为一个“条码区域”占位框（按纸张宽度水平居中）
+                var box = document.createElement('div');
+                box.className = 'label-el label-el-barcode';
+                box.style.left = ((template.paperWidth - el.width) / 2) + 'mm';
+                box.style.top = el.y + 'mm';
+                box.style.width = el.width + 'mm';
+                box.style.height = el.height + 'mm';
+                var mainText = document.createElement('span');
+                mainText.className = 'label-barcode-label';
+                mainText.textContent = '条码区域';
+                box.appendChild(mainText);
+                if (el.height >= 10) {
+                    var subText = document.createElement('span');
+                    subText.className = 'label-barcode-note';
+                    subText.textContent = '实际条码由 C-Lodop 生成';
+                    box.appendChild(subText);
+                }
+                page.appendChild(box);
             }
         });
         wrap.appendChild(page);
@@ -6351,9 +6566,23 @@ window.openBatchStatus = openBatchStatus;
         }
     }
 
+    /** 刷新入库/出库分类 tab 的选中态 */
+    function updateTemplateCategoryTabs() {
+        if (!templateCategoryTabs) return;
+        var category = normalizeLabelCategory(printSettings.labelCategory);
+        Array.prototype.forEach.call(templateCategoryTabs.querySelectorAll('.template-category-tab'), function (btn) {
+            var active = btn.getAttribute('data-category') === category;
+            if (active) btn.classList.add('active'); else btn.classList.remove('active');
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+    }
     function renderTemplateCards() {
+        if (!templateSelectContainer) return;
+        var category = normalizeLabelCategory(printSettings.labelCategory);
         templateSelectContainer.innerHTML = '';
-        printTemplates.forEach((tpl, idx) => {
+        updateTemplateCategoryTabs();
+        printTemplates.forEach(function (tpl, idx) {
+            if (!templateInCategory(tpl, category)) return; // 公共模板在两类中都显示
             const card = document.createElement('div');
             card.className = 'template-card' + (idx === selectedTemplateIndex ? ' selected' : '');
             card.dataset.index = idx;
@@ -6399,6 +6628,34 @@ window.openBatchStatus = openBatchStatus;
             });
             templateSelectContainer.appendChild(card);
         });
+    }
+    /** 切换「入库 / 出库」分类：当前模板不属于该分类时自动选公共模板 */
+    function setLabelCategory(category) {
+        printSettings.labelCategory = normalizeLabelCategory(category);
+        var current = printTemplates[selectedTemplateIndex];
+        if (!templateInCategory(current, printSettings.labelCategory)) {
+            selectedTemplateIndex = findPublicTemplateIndex();
+        }
+        savePrintSettings();
+        try {
+            renderTemplateCards();
+            renderInnerPreview(window.currentPrintDataList || [], printTemplates[selectedTemplateIndex] || printTemplates[0]);
+            refreshPrintInfo();
+        } catch (e) {
+            setPrintStatus('预览渲染失败：' + (e && e.message ? e.message : String(e)), true);
+        }
+    }
+    /** 编码文字变更：卡片缩略图 / 内置预览 / 打印共用同一设置，立即重绘 */
+    function applyCodeTextMode() {
+        printSettings.codeTextMode = normalizeCodeTextMode(printCodeTextSelect ? printCodeTextSelect.value : printSettings.codeTextMode);
+        savePrintSettings();
+        try {
+            renderTemplateCards();
+            renderInnerPreview(window.currentPrintDataList || [], printTemplates[selectedTemplateIndex] || printTemplates[0]);
+            refreshPrintInfo();
+        } catch (e) {
+            setPrintStatus('预览渲染失败：' + (e && e.message ? e.message : String(e)), true);
+        }
     }
 
     // R5：虚拟打印机关键字（覆盖常见 PDF/虚拟打印驱动）；默认优先实体打印机
@@ -6504,6 +6761,12 @@ window.openBatchStatus = openBatchStatus;
         window.currentPrintDataList = resolved.dataList;
 
         selectedTemplateIndex = clampInt(printSettings.templateIndex, 0, printTemplates.length - 1, 0);
+        // v2.3.2：恢复编码文字设置；若保存的模板不属于当前分类（入库/出库），回退到公共模板
+        printSettings.labelCategory = normalizeLabelCategory(printSettings.labelCategory);
+        if (!templateInCategory(printTemplates[selectedTemplateIndex], printSettings.labelCategory)) {
+            selectedTemplateIndex = findPublicTemplateIndex();
+        }
+        if (printCodeTextSelect) printCodeTextSelect.value = normalizeCodeTextMode(printSettings.codeTextMode);
         // R5：打开弹窗先展示“正在连接打印服务…”并禁用打印；等 ensureLodopLoaded resolve 后再判定，
         // 不再同步误报“未连接打印机，已禁用打印”。
         populatePrinters();
@@ -6550,12 +6813,12 @@ window.openBatchStatus = openBatchStatus;
 
     function buildLodopPrintData(LODOP, dataList, template, printerIndex, copies) {
         // 指令顺序：PRINT_INIT → SET_PRINT_PAGESIZE → SET_PRINT_COPIES → 内容 → PRINT/PREVIEW
-        // v2.3.1 打印排版（实测校准）：
+        // v2.3.1/v2.3.2 打印排版（实测校准）：
         // - 单行文字用原生 ADD_PRINT_TEXT + FontSize(pt)，字号精确、不会被 HTML 渲染放大裁断；
         //   原生文本顶部对齐，因此 top = 元素 y + (元素高 - 字号em)/2 实现垂直居中；
-        // - 需要自动换行的名称用 ADD_PRINT_HTM（pt 字号 + flex 居中 + break-all + overflow hidden）；
-        // - 条码不再设置 Horient/Alignment（旧代码 Horient=2 会按纸张重新锚定打印项位置，
-        //   导致条码位置不可控），ShowBarText=0 确保条码区只有条码。
+        // - 名称等字段单行优先（10pt 基准，超宽自动缩到 6pt），如仍有 multiline 模板走 ADD_PRINT_HTM；
+        // - 条码不再设置 Horient/Alignment，ShowBarText=0 确保条码区只有条码；
+        // - 条码按预估墨迹宽把对象框左边界居中（见 barcodePrintGeometry），让 PDF417 墨迹在标签上居中。
         LODOP.PRINT_INIT(template.name || '标签打印');
         LODOP.SET_PRINT_PAGESIZE(1, template.paperWidth * 10, template.paperHeight * 10, '');
         LODOP.SET_PRINT_COPIES(copies);
@@ -6569,15 +6832,18 @@ window.openBatchStatus = openBatchStatus;
                     var text = getElementDisplayText(el, data);
                     if (!text) return; // 空字段不添加打印项，避免留下空白对象
                     if (el.multiline) {
-                        var multilinePt = resolveElementFontSize(el, text);
+                        var multilinePt = resolveElementFontSize(el, text, data, template);
                         LODOP.ADD_PRINT_HTM(el.y + 'mm', el.x + 'mm', el.width + 'mm', el.height + 'mm',
                             buildPrintHtmBlock(el, text, multilinePt));
                         return;
                     }
-                    var pt = resolveElementFontSize(el, text);
+                    var pt = resolveElementFontSize(el, text, data, template);
                     var emMm = pt * PRINT_PT_TO_MM;
                     var topMm = el.y + Math.max(0, (el.height - emMm) / 2);
-                    LODOP.ADD_PRINT_TEXT(topMm.toFixed(2) + 'mm', el.x + 'mm', el.width + 'mm', el.height + 'mm', text);
+                    // 居中编码文字：文本框用整张纸宽（文字仍居中），避免 LODOP 原生文本因偏宽而折行
+                    var boxLeft = isCenteredCodeText(el) ? 0 : el.x;
+                    var boxWidth = isCenteredCodeText(el) ? template.paperWidth : el.width;
+                    LODOP.ADD_PRINT_TEXT(topMm.toFixed(2) + 'mm', boxLeft + 'mm', boxWidth + 'mm', el.height + 'mm', text);
                     LODOP.SET_PRINT_STYLEA(0, 'FontName', PRINT_NATIVE_FONT);
                     LODOP.SET_PRINT_STYLEA(0, 'FontSize', pt);
                     LODOP.SET_PRINT_STYLEA(0, 'Bold', el.bold ? 1 : 0);
@@ -6585,7 +6851,8 @@ window.openBatchStatus = openBatchStatus;
                 } else if (el.type === 'barcode') {
                     var barcodeValue = safeText(data[el.field]);
                     if (!barcodeValue) return;
-                    LODOP.ADD_PRINT_BARCODE(el.y + 'mm', el.x + 'mm', el.width + 'mm', el.height + 'mm',
+                    var barcodePos = barcodePrintGeometry(template, el, barcodeValue);
+                    LODOP.ADD_PRINT_BARCODE(barcodePos.top + 'mm', barcodePos.left + 'mm', el.width + 'mm', el.height + 'mm',
                         el.barcodeType || 'PDF417', String(barcodeValue));
                     // 条码区只显示条码（PDF417 默认无文字，这里显式关闭以防不同版本差异）
                     LODOP.SET_PRINT_STYLEA(0, 'ShowBarText', 0);
@@ -6806,6 +7073,14 @@ window.openBatchStatus = openBatchStatus;
     });
     if (printPreviewMode) printPreviewMode.addEventListener('change', function () { savePrintSettings(); });
     printerSelect.addEventListener('change', function () { savePrintSettings(); });
+    if (templateCategoryTabs) {
+        templateCategoryTabs.addEventListener('click', function (event) {
+            var btn = event.target && event.target.closest ? event.target.closest('.template-category-tab') : null;
+            if (!btn || !templateCategoryTabs.contains(btn)) return;
+            setLabelCategory(btn.getAttribute('data-category'));
+        });
+    }
+    if (printCodeTextSelect) printCodeTextSelect.addEventListener('change', applyCodeTextMode);
     if (globalBatchPrintBtn) globalBatchPrintBtn.addEventListener('click', globalBatchPrintItems);
 
     // ---------- 初始化与自动登录 ----------
@@ -6814,8 +7089,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.1
-        setText(appVersionEl, 'R5 · v2.3.1 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.2
+        setText(appVersionEl, 'R5 · v2.3.2 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         document.querySelectorAll('.modal-overlay .modal, #print-preview-overlay .print-preview-box').forEach(function (el) {
             el.setAttribute('role', 'dialog');
             el.setAttribute('aria-modal', 'true');
@@ -6852,7 +7127,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.1：打印排版同源修复/50*40 模板/编码本级段/类目条码/乐观保存队列/实体打印机优先）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.2：编码文字设置/出入库模板分类/条码居中/名称单行自适应/打印排版同源修复/50*40 模板）');
 </script>
 </body>
 </html>

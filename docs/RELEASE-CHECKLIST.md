@@ -1,7 +1,7 @@
 # 发布检查清单
 
 适用对象：维护者。每次把页面改动发布到 GitHub Pages 前，按本清单执行。
-当前基线：**`core v2.3.0` + `admin R5` + `scan R3`**（站点版本号 **v2.3.1**，文档更新日期 2026-11-14）。
+当前基线：**`core v2.3.0` + `admin R5` + `scan R3`**（站点版本号 **v2.3.2**，文档更新日期 2026-11-14）。
 
 > ⚠️ 未经用户明确授权，**不要 push 到 GitHub、不要动 `main`、不要删除远端标签**。
 > 发布由用户确认后按第 6 节流程执行；tag 与 commit 在授权后推送。
@@ -83,7 +83,7 @@ node tools/test-lodop-loader.mjs
 - `index.html` 无内联 `<script>`、无 CDN 引用，CSP/referrer meta 存在；
 - `admin.html` / `scan.html` / 站点中无第三方 CDN 引用，扫码库引用本地 `js/vendor/`；
 - 登录页/仓库中无示例 Gist ID、无硬编码默认 Gist ID；
-- README / ARCHITECTURE / CHANGELOG / RELEASE-CHECKLIST 的版本一致性（站点 v2.3.1 / core v2.3.0 / R5 / R3）；
+- README / ARCHITECTURE / CHANGELOG / RELEASE-CHECKLIST 的版本一致性（站点 v2.3.2 / core v2.3.0 / R5 / R3）；
 - 文档中无硬编码的本机绝对路径（旧版本地路径写法）与过期状态表述。
 
 CI：`.github/workflows/ci.yml` 在 push/PR 时自动执行 `node tools/verify.mjs`、`node tools/test-core.mjs`、`node tools/test-lodop-loader.mjs`，并校验 `js/vendor/html5-qrcode.min.js` 的 SHA-256、拒绝跟踪 `local_dev/` 与超过 2 MB 的文件。**CI 不绿不得发布**。
@@ -197,7 +197,9 @@ git tag --list
 - [ ] **打印按需连接**：点打印/预览后才请求本机服务（优先 `http://localhost:8000`），允许本地网络后状态变「已就绪」。
 - [ ] **编码/类目条码回归**：自定义编码只接受英文+数字；子类只改本级；同级已有 `NN/YO1`、`NN/YO2` 时新增子类默认 `NN/YO3`；类目条码节点无成本/快递/订单且状态为汇总值。
 - [ ] **保存体验**：连续两次编辑后弹窗立即关闭、顶部出现保存指示，最终远端数据包含两次修改。
-- [ ] **打印排版**：4 套模板（含 50\*40）在 C-Lodop 系统预览中文字完整不截断、PDF417 正立；页面内预览与实打位置/字号基本一致。
+- [ ] **打印排版**：6 套模板（公共/入库/出库，含 50\*40）在 C-Lodop 系统预览中文字完整不截断、PDF417 正立居中；页面内预览与实打位置/字号基本一致。
+- [ ] **编码文字三模式**：最后一级 / 完整编码 / 仅“内部编码”在实打与预览中均正确、不裁断。
+- [ ] **入库模板**：仅出现在「入库」分组，且不含订单号/快递单号字段。
 - [ ] **打印服务就绪**：已装 C-Lodop 的机器上，admin 顶部显示「✅ 打印服务已就绪（N 台打印机）」；未安装时明确提示证书/未启动，不误报。
 - [ ] **备份 tag 已推送**：本次发布 tag 已创建并已推送到远端（`git ls-remote --tags origin` 可见），远端有可回滚点。
 
