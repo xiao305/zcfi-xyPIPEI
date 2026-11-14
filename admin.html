@@ -6678,39 +6678,57 @@ window.openBatchStatus = openBatchStatus;
             + 'text-align:' + align + ';word-break:break-all;overflow:hidden;margin:0;padding:0;">'
             + esc(String(text)) + '</div>';
     }
-    // ---------- 条码几何（v2.3.4 安全区 + v2.3.5 预览墨迹居中） ----------
+    // ---------- 条码几何（v2.3.4 安全区 + v2.3.5/2.3.6 预览墨迹居中） ----------
     // 根因：C-Lodop 预览会“容忍”打印项越出纸张，但真机驱动会裁切/重锚定越界打印项；
     // 同时 C-Lodop 预览把 PDF417 从对象框左边界开始绘制（框内左对齐），把对象框直接居中会让墨迹偏左。
     // 解决：按“对象框宽 W ≈ 实际墨迹宽 ink(W)”选 W（保证预览左对齐/真机填框两种渲染下墨迹都居中），
     // 再把对象框居中：left = (paperWidth - W) / 2，W ≤ paperWidth - 4（左右各 ≥2mm 安全区）。
-    // 下表由真实 C-Lodop 预览逐档标定得到（height → 编码长度档 → W），详见 local_dev/_fix-print/v235-calib.mjs。
-    var BARCODE_LENGTH_BUCKETS = { short: 6, long: 15 };
-    var BARCODE_BOX_WIDTH_BY_HEIGHT = {
-        '8.5': { short: 26, long: 26, xlong: 31 },
-        '9.5': { short: 39, long: 26, xlong: 26 },
-        '12': { short: 39, long: 39, xlong: 26 },
-        '13': { short: 39, long: 39, xlong: 26 },
-        '14': { short: 39, long: 39, xlong: 39 },
-        '17': { short: 33, long: 39, xlong: 39 }
+    // v2.3.6：细粒度长度标定——每个条码高度存一组“编码长度 → W”锚点（实测真实 C-Lodop 预览墨迹），
+    // 运行时按最近长度锚点取 W；超过最大锚点用最长锚点（饱和）。标定见 local_dev/_fix-print/v236-calibU*.mjs。
+    // 关键点：用户实测 18 字符编码居中正常、29 字符编码错位——29 字符在 h14 的墨迹约 45mm，
+    // 必须用 W=46（旧版 W=39 会让墨迹 45mm 超出 39mm 对象框 → 真机裁切/重锚定导致错位）。
+    var BARCODE_WIDTH_ANCHORS = {
+        '8.5': [[4, 26], [18, 31], [29, 35], [48, 36]],
+        '9.5': [[4, 39], [18, 46], [29, 32], [48, 39]],
+        '12': [[4, 39], [18, 46], [29, 46], [48, 35]],
+        '13': [[4, 39], [18, 39], [29, 46], [48, 35]],
+        '14': [[4, 39], [18, 39], [29, 46], [48, 32]],
+        '17': [[4, 33], [18, 39], [29, 39], [48, 31]]
     };
-    function barcodeLengthBucket(value) {
-        var len = String(value == null ? '' : value).length;
-        if (len <= BARCODE_LENGTH_BUCKETS.short) return 'short';
-        if (len <= BARCODE_LENGTH_BUCKETS.long) return 'long';
-        return 'xlong';
+    function barcodeAnchorsForHeight(heightMm) {
+        var hKey = String(Math.round((Number(heightMm) || 0) * 10) / 10);
+        if (BARCODE_WIDTH_ANCHORS[hKey]) return BARCODE_WIDTH_ANCHORS[hKey];
+        // 非标高度：取最接近的标准高度锚点
+        var keys = Object.keys(BARCODE_WIDTH_ANCHORS).map(Number);
+        var best = keys[0];
+        var bestD = Infinity;
+        keys.forEach(function (k) {
+            var d = Math.abs(k - (Number(heightMm) || 0));
+            if (d < bestD) { bestD = d; best = k; }
+        });
+        return BARCODE_WIDTH_ANCHORS[String(best)];
     }
-    /** 条码对象框宽：优先模板/元素显式 barcodeBoxWidthMm，否则按高度+编码长度查标定表；统一 clamp 到 paperWidth-4 */
+    /** 按编码长度在锚点中取最近档位的 W（长度越大墨迹列数会跳变，需分档） */
     function resolveBarcodeBoxWidth(template, el, value) {
         var pw = (template && template.paperWidth > 0) ? template.paperWidth : 50;
         var maxW = Math.max(2, pw - PRINT_SAFE_MARGIN_MM * 2);
         var explicit = Number(el && el.barcodeBoxWidthMm) || Number(template && template.barcodeBoxWidthMm) || 0;
-        var hKey = String(Math.round((Number(el && el.height) || 0) * 10) / 10);
-        var row = BARCODE_BOX_WIDTH_BY_HEIGHT[hKey];
-        var w = explicit > 0 ? explicit : (row ? row[barcodeLengthBucket(value)] : 0);
+        var w = explicit;
+        if (!(w > 0)) {
+            var len = String(value == null ? '' : value).length;
+            var anchors = barcodeAnchorsForHeight(el && el.height);
+            var bestAnchor = anchors[0];
+            var bestDist = Infinity;
+            anchors.forEach(function (a) {
+                var d = Math.abs(a[0] - len);
+                if (d < bestDist || (d === bestDist && a[0] < bestAnchor[0])) { bestDist = d; bestAnchor = a; }
+            });
+            w = bestAnchor[1];
+        }
         if (!(w > 0)) w = Number(el.width) || maxW;
         return Math.max(2, Math.min(w, maxW));
     }
-    /** 条码打印几何：对象框宽 = 标定 W（默认按编码长度），水平居中，left ≥2、right ≤paperWidth-2 */
+    /** 条码打印几何：对象框宽 = 标定 W（按高度+编码长度），水平居中，left ≥2、right ≤paperWidth-2 */
     function barcodePrintGeometry(template, el, value) {
         var pw = (template && template.paperWidth > 0) ? template.paperWidth : 50;
         var boxW = resolveBarcodeBoxWidth(template, el, value);
@@ -6722,7 +6740,7 @@ window.openBatchStatus = openBatchStatus;
         if (!template || !Array.isArray(template.elements)) return [];
         var pw = template.paperWidth;
         var problems = [];
-        var sampleValues = { short: 'A001', long: 'A001/B001/001', xlong: 'A001/B001/001/C001' };
+        var sampleValues = { short: 'A001', mid: 'XICHA/HWD261113/XK', long: 'XICHA/HWD261113/XK/261113/XY1', xlong: 'XICHA/HWD261113/XK/261113/XY1/A001/B001/001' };
         template.elements.forEach(function (el) {
             if (el.type === 'barcode') {
                 Object.keys(sampleValues).forEach(function (bucket) {
@@ -7439,8 +7457,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.5
-        setText(appVersionEl, 'R5 · v2.3.5 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.6
+        setText(appVersionEl, 'R5 · v2.3.6 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -7483,7 +7501,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.5：条码墨迹居中（按编码长度标定对象宽）/2mm 安全区/自定义文本自动换行/打印同源）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.6：条码对象宽按编码长度细粒度标定（18/29/48 字符实测）/2mm 安全区/自定义文本自动换行/打印同源）');
 </script>
 </body>
 </html>
