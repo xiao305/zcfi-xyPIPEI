@@ -661,38 +661,35 @@
             line-height: 1.7;
         }
         .app-footer .version { color: #64748b; font-weight: 600; }
-        /* ===== v2.3.9 页脚品牌组合（zcfi.cn | 出品） ===== */
+        /* ===== v2.3.10 品牌组合（zcfi.cn | 出品，非交互文本；页脚/登录页共用） ===== */
         .brand-line {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 12px;
         }
         .brand-logo {
             font-weight: 700;
-            font-size: 13px;
+            font-size: 16px;
             color: #4a6fa5;
-            text-decoration: none;
             letter-spacing: 0.2px;
         }
         .brand-logo span { color: #4fc3a1; }
-        .brand-logo:hover,
-        .brand-logo:focus-visible { color: #2563eb; text-decoration: underline; }
-        .brand-logo:focus-visible { outline: 2px solid #4fc3a1; outline-offset: 2px; border-radius: 2px; }
         .brand-bar {
             width: 1px;
-            height: 1.5em;
+            height: 1.6em;
             background: currentColor;
             opacity: 0.25;
         }
         .brand-txt {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 500;
             letter-spacing: 6px;
             margin-right: -6px;
             color: #94a3b8;
         }
         .app-footer .brand-line { margin-bottom: 7px; }
+        .login-box .brand-line { margin-top: 14px; }
         @media (max-width: 380px) {
             .app-header h1 { font-size: 18px; }
             .scan-actions .btn { font-size: 14px; padding: 8px 10px; }
@@ -785,6 +782,11 @@
             <button class="btn btn-primary" id="login-btn" type="button">登录</button>
         </div>
         <div id="login-error" role="status" aria-live="polite"></div>
+        <div class="brand-line" aria-label="zcfi.cn 出品">
+            <span class="brand-logo">zcfi<span>.</span>cn</span>
+            <span class="brand-bar" aria-hidden="true"></span>
+            <span class="brand-txt">出品</span>
+        </div>
     </div>
 </div>
 
@@ -792,7 +794,7 @@
 <div id="app-container" style="display:none;">
     <div class="container">
         <header class="app-header">
-            <h1>智能扫码 <span class="app-version" id="header-version">R3 · v2.3.9</span></h1>
+            <h1>智能扫码 <span class="app-version" id="header-version">R3 · v2.3.10</span></h1>
             <div class="app-header-actions">
                 <button class="icon-btn" id="more-btn" type="button" aria-label="更多" aria-haspopup="menu" aria-expanded="false">更多</button>
             </div>
@@ -858,11 +860,11 @@
         </div>
         <footer class="app-footer">
             <div class="brand-line" aria-label="zcfi.cn 出品">
-                <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
+                <span class="brand-logo">zcfi<span>.</span>cn</span>
                 <span class="brand-bar" aria-hidden="true"></span>
                 <span class="brand-txt">出品</span>
             </div>
-            <div class="version" id="footer-version">智能扫码 R3 · v2.3.9</div>
+            <div class="version" id="footer-version">智能扫码 R3 · v2.3.10</div>
             <div>数据仅存于你的 Gist，本页面不向其他服务器发送数据。</div>
         </footer>
     </div>
@@ -975,7 +977,7 @@
 <script>
     'use strict';
     /* ============================================================
-     * 智能扫码页（scan.html）R3 · v2.3.9
+     * 智能扫码页（scan.html）R3 · v2.3.10
      * - 数据读写统一走 js/core.js：ZCFI.get 严格读取 / ZCFI.save 并发安全三方合并（R1）
      * - 所有动态 HTML 一律 escapeHtml；备注/链接只按纯文本处理（R1）
      * - 摄像头 idle/starting/scanning/stopping 串行状态机 + 扫码锁 + 2 秒去重（R1）
@@ -985,7 +987,7 @@
      * - R3：本地扫码库 + CSP、ZCFI.credentials、错误分类/只读保护、多标签页同步、
      *       逐字段冲突对话框、历史隔离与备份清理、扫码枪缓冲、可访问性、卸载释放摄像头
      * ============================================================ */
-    const SCAN_VERSION = 'R3 · v2.3.9';
+    const SCAN_VERSION = 'R3 · v2.3.10';
     const Z = window.ZCFI;
     if (!Z) {
         console.error('[scan] js/core.js 未加载，数据读写功能不可用');
@@ -4172,7 +4174,7 @@
         }
     })();
 
-    console.log('智能扫码页面已加载（R3 · v2.3.9：连续扫码 / 多匹配 / 手电筒·相册 / 30s 刷新 / 软删除 / 多标签页同步 / 品牌页脚 / favicon）');
+    console.log('智能扫码页面已加载（R3 · v2.3.10：连续扫码 / 多匹配 / 手电筒·相册 / 30s 刷新 / 软删除 / 多标签页同步 / 品牌页脚与登录页品牌）');
 </script>
 </body>
 </html>

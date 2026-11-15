@@ -1560,38 +1560,43 @@
             padding: 8px 0 24px;
             line-height: 1.7;
         }
-        /* ===== v2.3.9 页脚品牌组合（zcfi.cn | 出品） ===== */
+        /* ===== v2.3.10 品牌组合（zcfi.cn | 出品，非交互文本；页脚/顶栏/登录页共用） ===== */
         .brand-line {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 12px;
         }
         .brand-logo {
             font-weight: 700;
-            font-size: 13px;
+            font-size: 16px;
             color: #4a6fa5;
-            text-decoration: none;
             letter-spacing: 0.2px;
         }
         .brand-logo span { color: #4fc3a1; }
-        .brand-logo:hover,
-        .brand-logo:focus-visible { color: #2563eb; text-decoration: underline; }
-        .brand-logo:focus-visible { outline: 2px solid #4fc3a1; outline-offset: 2px; border-radius: 2px; }
         .brand-bar {
             width: 1px;
-            height: 1.5em;
+            height: 1.6em;
             background: currentColor;
             opacity: 0.25;
         }
         .brand-txt {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 500;
             letter-spacing: 6px;
             margin-right: -6px;
             color: #94a3b8;
         }
         .app-footer .brand-line { margin-bottom: 7px; }
+        .login-box .brand-line { margin-top: 14px; }
+        /* v2.3.10：顶栏标题与品牌同行（窄屏自动换行） */
+        .title-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .brand-line--header { margin: 0; }
 
         /* ===== 空状态 ===== */
         .empty-state {
@@ -1610,6 +1615,8 @@
             body { padding: 12px; }
             .top-bar { flex-direction: column; align-items: stretch; }
             .top-bar .actions { justify-content: flex-start; }
+            .title-row { gap: 8px; }
+            .brand-line--header { gap: 10px; }
             .modal { padding: 20px; }
             .print-preview-box { padding: 20px; }
             .tree-node .node-content { flex-wrap: wrap; }
@@ -1702,6 +1709,11 @@
             <button class="btn btn-primary" id="login-btn">登录</button>
         </div>
         <div id="login-error" role="status" aria-live="polite"></div>
+        <div class="brand-line" aria-label="zcfi.cn 出品">
+            <span class="brand-logo">zcfi<span>.</span>cn</span>
+            <span class="brand-bar" aria-hidden="true"></span>
+            <span class="brand-txt">出品</span>
+        </div>
     </div>
 </div>
 
@@ -1724,7 +1736,14 @@
     <div class="container">
         <div class="top-bar">
             <div>
-                <h1>📦 商品管理</h1>
+                <div class="title-row">
+                    <h1>商品管理</h1>
+                    <span class="brand-line brand-line--header" aria-label="zcfi.cn 出品">
+                        <span class="brand-logo">zcfi<span>.</span>cn</span>
+                        <span class="brand-bar" aria-hidden="true"></span>
+                        <span class="brand-txt">出品</span>
+                    </span>
+                </div>
                 <div class="sub">
                     <span id="user-status">已登录</span>
                     <span id="sync-time" class="sync-meta">最后同步：—</span>
@@ -1800,7 +1819,7 @@
         </div>
         <footer class="app-footer">
             <div class="brand-line" aria-label="zcfi.cn 出品">
-                <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
+                <span class="brand-logo">zcfi<span>.</span>cn</span>
                 <span class="brand-bar" aria-hidden="true"></span>
                 <span class="brand-txt">出品</span>
             </div>
@@ -7846,8 +7865,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.9
-        setText(appVersionEl, 'R5 · v2.3.9 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.10
+        setText(appVersionEl, 'R5 · v2.3.10 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -7890,7 +7909,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.9：节点树展开/收起平滑动画（grid 高度+淡入）/全站 favicon/页脚 zcfi.cn 出品品牌组合）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.10：品牌标识放大去交互/顶栏与登录页品牌组合/树展开动画）');
 </script>
 </body>
 </html>

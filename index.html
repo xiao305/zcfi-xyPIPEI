@@ -120,32 +120,28 @@
         }
         footer a { color: #475569; }
         footer a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-        /* v2.3.9 页脚品牌组合（zcfi.cn | 出品） */
+        /* v2.3.10 品牌组合（zcfi.cn | 出品，非交互文本） */
         .brand-line {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 12px;
         }
         .brand-logo {
             font-weight: 700;
-            font-size: 13px;
+            font-size: 16px;
             color: #4a6fa5;
-            text-decoration: none;
             letter-spacing: 0.2px;
         }
         .brand-logo span { color: #4fc3a1; }
-        .brand-logo:hover,
-        .brand-logo:focus-visible { color: #2563eb; text-decoration: underline; }
-        .brand-logo:focus-visible { outline: 2px solid #4fc3a1; outline-offset: 2px; border-radius: 2px; }
         .brand-bar {
             width: 1px;
-            height: 1.5em;
+            height: 1.6em;
             background: currentColor;
             opacity: 0.25;
         }
         .brand-txt {
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 500;
             letter-spacing: 6px;
             margin-right: -6px;
@@ -185,11 +181,11 @@
 
     <footer>
         <div class="brand-line" aria-label="zcfi.cn 出品">
-            <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
+            <span class="brand-logo">zcfi<span>.</span>cn</span>
             <span class="brand-bar" aria-hidden="true"></span>
             <span class="brand-txt">出品</span>
         </div>
-        <p>当前版本 v2.3.9 · <a href="tools/scanner-test.html">扫码测试页（调试用）</a></p>
+        <p>当前版本 v2.3.10 · <a href="tools/scanner-test.html">扫码测试页（调试用）</a></p>
     </footer>
 </main>
 </body>

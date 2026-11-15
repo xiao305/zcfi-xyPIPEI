@@ -3,6 +3,24 @@
 本项目的页面/数据层均随 GitHub Pages 发布，版本按「核心（js/core.js）+ 功能轮次」记录。
 日期格式：`YYYY-MM-DD`。
 
+## [2.3.10] - 2026-11-15
+
+「zcfi.cn | 出品」品牌标识优化。页面版本 **R5 · v2.3.10**（core v2.3.0 不变）。
+
+### 变更
+
+- **整体放大**：logo 13px → **16px**、「出品」12px → **13px**（letter-spacing 6px 保留）、竖线 1.5em → **1.6em**、间距 10px → **12px**；页脚/顶栏/登录页统一规格。
+- **去交互**：移除 hover/focus 变蓝 + 下划线与 `text-decoration` 规则；品牌由 `<a>` 改为非交互 `<span>`（无 cursor:pointer、悬停无任何变化），保留容器 aria-label。
+- **顶栏**：admin 顶栏 `<h1>📦 商品管理</h1>` → `商品管理`（去掉 📦），h1 旁加入品牌组合（`.title-row` flex 居中，窄屏自动换行）。
+- **登录页**：admin 与 scan 的 `.login-box` 底部（`#login-error` 之后）加入同款品牌，居中、`margin-top:14px`。
+- 三页版本同步 v2.3.10（admin `R5 · v2.3.10` / scan `R3 · v2.3.10` / index `v2.3.10`）。
+
+### 验证
+
+- 三页内联脚本 `node --check` 全过（3 页 / 9062 行）；
+- `local_dev/_fix-ui/smoke.mjs`：**79/79**（新增：三页 logo 16px/出品 13px/竖线 1.6em/gap 12px、无 `brand-logo:hover` 规则、`.brand-line a` 数量 0、顶栏 h1 无 📦 + `.brand-line` 存在、admin/scan 登录页品牌存在、版本号）；
+- `fix-smoke` 34/34。
+
 ## [2.3.9] - 2026-11-15
 
 节点树展开动画、全站 favicon 与页脚品牌组合。页面版本 **R5 · v2.3.9**（core v2.3.0 不变）。
