@@ -3,6 +3,35 @@
 本项目的页面/数据层均随 GitHub Pages 发布，版本按「核心（js/core.js）+ 功能轮次」记录。
 日期格式：`YYYY-MM-DD`。
 
+## [2.3.9] - 2026-11-15
+
+节点树展开动画、全站 favicon 与页脚品牌组合。页面版本 **R5 · v2.3.9**（core v2.3.0 不变）。
+
+### 节点树展开/收起动画
+
+- `.tree-node .children` 改为 CSS grid 高度动画：收起 `grid-template-rows:0fr; opacity:0; visibility:hidden`，展开 `1fr; opacity:1; visibility:visible`；
+  过渡 `grid-template-rows .25s cubic-bezier(.4,0,.2,1), opacity .2s ease, visibility .25s`；
+- 两个 children 块（子类 / 库存表）均包 `.children-inner`（overflow:hidden; min-height:0）避免动画中截断；动画结束完整显示；
+- 收起后内部内容不可聚焦；覆盖单节点/子类/库存表/两者、展开全部、折叠全部、搜索自动展开、连续快速点击；
+- `@media (prefers-reduced-motion: reduce)` 下关闭 children/chevron/name/toggle 动画。
+
+### 全站 favicon
+
+- 新增仓库根 `favicon.svg`（来源 https://zcfi.cn/favicon/favicon.svg，自托管）；三页统一
+  `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />`（admin/scan 替换原 data: 图标，index 新增）。
+
+### 页脚品牌（Qwen 变体 1 · 竖线分隔）
+
+- 三页页脚加入「zcfi.cn | 出品」：logo（#4a6fa5，点号 #4fc3a1）+ 1px 竖线（opacity .25）+ 「出品」（letter-spacing 6px，#94a3b8）；
+- admin/scan 版本行上方、index 版本行前，间距 7-8px；hover/focus-visible 轻微反馈；
+- 版本号同步：admin `R5 · v2.3.9`、scan `R3 · v2.3.9`、index `v2.3.9`。
+
+### 验证
+
+- 三页内联脚本 `node --check` 全部通过（3 页 / 9062 行）；
+- `local_dev/_fix-ui/smoke.mjs`：**72/72**（新增：动画 grid/transition、收起不可聚焦、展开全部/折叠全部、搜索自动展开、快速点击、reduced-motion、移动端；三页 favicon 200 + svg、品牌竖线 1px/opacity .25、出品 letter-spacing 6px、版本号）；
+- `fix-smoke` 34/34。
+
 ## [2.3.8] - 2026-11-14
 
 节点树展开图标与交互精修（大厂品质感）。页面版本 **R5 · v2.3.8**（core v2.3.0 / scan R3 不变）。

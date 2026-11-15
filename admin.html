@@ -6,7 +6,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://localhost.lodop.net:8443 http://localhost:8000; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://localhost.lodop.net:8443 http://localhost:8000; font-src 'self' data:; connect-src 'self' https://api.github.com https://gist.githubusercontent.com wss://localhost.lodop.net:8443 ws://localhost:8000 ws://127.0.0.1:8000; frame-src https://localhost.lodop.net:8443 http://localhost:8000; object-src 'none'; base-uri 'none'; form-action 'self' https://localhost.lodop.net:8443 http://localhost:8000 http://127.0.0.1:8000" />
     <meta name="referrer" content="no-referrer" />
     <title>商品管理后台（带标签打印）</title>
-    <link rel="icon" href="data:," />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <style>
         /* ===== 全局重置与变量 ===== */
         * {
@@ -392,16 +392,37 @@
             pointer-events: none;
         }
         .tree-node .children {
-            display: none;
+            display: grid;
+            grid-template-rows: 0fr;
+            opacity: 0;
+            visibility: hidden;
             margin-left: 12px;
             padding-left: 12px;
             border-left: 1px solid #e2e8f0;
+            min-width: 0;
+            transition: grid-template-rows 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, visibility 0.25s;
+        }
+        .tree-node .children-inner {
+            overflow: hidden;
+            min-height: 0;
+            min-width: 0;
         }
         .tree-node.expanded > .children {
-            display: block;
-            margin-top: 0;
+            grid-template-rows: 1fr;
+            opacity: 1;
+            visibility: visible;
         }
         .tree-node.tree-node-hidden { display: none; }
+        /* v2.3.9：尊重系统“减少动态效果”偏好，关闭展开/收起与图标旋转动画 */
+        @media (prefers-reduced-motion: reduce) {
+            .tree-node .children,
+            .tree-node .node-content .toggle svg,
+            .tree-node .node-content .name,
+            .tree-node .node-content .toggle {
+                transition: none;
+            }
+            .tree-node.expanded > .node-content .toggle svg { transform: rotate(90deg); }
+        }
 
         /* ===== 表格 ===== */
         .items-table {
@@ -1539,6 +1560,38 @@
             padding: 8px 0 24px;
             line-height: 1.7;
         }
+        /* ===== v2.3.9 页脚品牌组合（zcfi.cn | 出品） ===== */
+        .brand-line {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .brand-logo {
+            font-weight: 700;
+            font-size: 13px;
+            color: #4a6fa5;
+            text-decoration: none;
+            letter-spacing: 0.2px;
+        }
+        .brand-logo span { color: #4fc3a1; }
+        .brand-logo:hover,
+        .brand-logo:focus-visible { color: #2563eb; text-decoration: underline; }
+        .brand-logo:focus-visible { outline: 2px solid #4fc3a1; outline-offset: 2px; border-radius: 2px; }
+        .brand-bar {
+            width: 1px;
+            height: 1.5em;
+            background: currentColor;
+            opacity: 0.25;
+        }
+        .brand-txt {
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 6px;
+            margin-right: -6px;
+            color: #94a3b8;
+        }
+        .app-footer .brand-line { margin-bottom: 7px; }
 
         /* ===== 空状态 ===== */
         .empty-state {
@@ -1746,6 +1799,11 @@
             </div>
         </div>
         <footer class="app-footer">
+            <div class="brand-line" aria-label="zcfi.cn 出品">
+                <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
+                <span class="brand-bar" aria-hidden="true"></span>
+                <span class="brand-txt">出品</span>
+            </div>
             <span id="app-version">管理后台</span>
         </footer>
     </div>
@@ -4626,8 +4684,8 @@ function buildNodeHtml(code, node, depth, term, ctx) {
         + nodeSummaryHtml
         + '<span class="actions">' + actions + '</span>'
         + '</div>'
-        + (childResults.length ? '<div class="children">' + childResults.map(function (r) { return r.html; }).join('') + '</div>' : '')
-        + (itemsHtml ? '<div class="children">' + itemsHtml + '</div>' : '')
+        + (childResults.length ? '<div class="children"><div class="children-inner">' + childResults.map(function (r) { return r.html; }).join('') + '</div></div>' : '')
+        + (itemsHtml ? '<div class="children"><div class="children-inner">' + itemsHtml + '</div></div>' : '')
         + '</div>';
 
     return { html: html, visible: visible };
@@ -7788,8 +7846,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.8
-        setText(appVersionEl, 'R5 · v2.3.8 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.9
+        setText(appVersionEl, 'R5 · v2.3.9 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -7832,7 +7890,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.8：节点树交互精修——SVG 展开图标/旋转动画/整行 hover 与点击展开/1px 引导线/垂直居中/统计文本降级）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.9：节点树展开/收起平滑动画（grid 高度+淡入）/全站 favicon/页脚 zcfi.cn 出品品牌组合）');
 </script>
 </body>
 </html>

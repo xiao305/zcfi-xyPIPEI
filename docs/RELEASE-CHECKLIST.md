@@ -1,7 +1,7 @@
 # 发布检查清单
 
 适用对象：维护者。每次把页面改动发布到 GitHub Pages 前，按本清单执行。
-当前基线：**`core v2.3.0` + `admin R5` + `scan R3`**（站点版本号 **v2.3.8**，文档更新日期 2026-11-14）。
+当前基线：**`core v2.3.0` + `admin R5` + `scan R3`**（站点版本号 **v2.3.9**，文档更新日期 2026-11-15）。
 
 > ⚠️ 未经用户明确授权，**不要 push 到 GitHub、不要动 `main`、不要删除远端标签**。
 > 发布由用户确认后按第 6 节流程执行；tag 与 commit 在授权后推送。
@@ -83,7 +83,7 @@ node tools/test-lodop-loader.mjs
 - `index.html` 无内联 `<script>`、无 CDN 引用，CSP/referrer meta 存在；
 - `admin.html` / `scan.html` / 站点中无第三方 CDN 引用，扫码库引用本地 `js/vendor/`；
 - 登录页/仓库中无示例 Gist ID、无硬编码默认 Gist ID；
-- README / ARCHITECTURE / CHANGELOG / RELEASE-CHECKLIST 的版本一致性（站点 v2.3.8 / core v2.3.0 / R5 / R3）；
+- README / ARCHITECTURE / CHANGELOG / RELEASE-CHECKLIST 的版本一致性（站点 v2.3.9 / core v2.3.0 / R5 / R3）；
 - 文档中无硬编码的本机绝对路径（旧版本地路径写法）与过期状态表述。
 
 CI：`.github/workflows/ci.yml` 在 push/PR 时自动执行 `node tools/verify.mjs`、`node tools/test-core.mjs`、`node tools/test-lodop-loader.mjs`，并校验 `js/vendor/html5-qrcode.min.js` 的 SHA-256、拒绝跟踪 `local_dev/` 与超过 2 MB 的文件。**CI 不绿不得发布**。
@@ -203,6 +203,7 @@ git tag --list
 - [ ] **长编码**：用 18 字符与 29 字符（如 `XICHA/HWD261113/XK`、`XICHA/HWD261113/XK/261113/XY1`）各打一张，条码不溢出/不错位；40mm 纸超长编码已提示用“最后一级编码”。
 - [ ] **界面降噪**：节点行无「类目/单件/无库存」标签；行内只有「编辑/打印标签」+ ⋮ 菜单；状态标签为浅底小标签；勾选库存后跨节点批量按钮才出现。
 - [ ] **节点树交互**：SVG 展开图标随展开旋转 90°；整行 hover 浅灰；点击标题展开收起；1px 引导线/24px 缩进；统计文字为辅助色。
+- [ ] **v2.3.9**：节点展开/收起有 0.25s 平滑动画（reduced-motion 下关闭）；三页 favicon 为 `/favicon.svg`；页脚显示「zcfi.cn | 出品」。
 - [ ] **编码文字三模式**：最后一级 / 完整编码 / 仅“内部编码”在实打与预览中均正确、不裁断。
 - [ ] **入库模板**：仅出现在「入库」分组，且不含订单号/快递单号字段。
 - [ ] **打印服务就绪**：已装 C-Lodop 的机器上，admin 顶部显示「✅ 打印服务已就绪（N 台打印机）」；未安装时明确提示证书/未启动，不误报。

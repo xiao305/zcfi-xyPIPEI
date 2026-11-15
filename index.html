@@ -8,6 +8,7 @@
     <meta name="description" content="zcfi 商品管理与智能扫码：无服务器、数据保存在你自己的 GitHub Gist。" />
     <meta name="theme-color" content="#f1f5f9" />
     <title>zcfi 商品管理与智能扫码</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <style>
         :root {
             --ink: #0f172a;
@@ -119,6 +120,38 @@
         }
         footer a { color: #475569; }
         footer a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+        /* v2.3.9 页脚品牌组合（zcfi.cn | 出品） */
+        .brand-line {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .brand-logo {
+            font-weight: 700;
+            font-size: 13px;
+            color: #4a6fa5;
+            text-decoration: none;
+            letter-spacing: 0.2px;
+        }
+        .brand-logo span { color: #4fc3a1; }
+        .brand-logo:hover,
+        .brand-logo:focus-visible { color: #2563eb; text-decoration: underline; }
+        .brand-logo:focus-visible { outline: 2px solid #4fc3a1; outline-offset: 2px; border-radius: 2px; }
+        .brand-bar {
+            width: 1px;
+            height: 1.5em;
+            background: currentColor;
+            opacity: 0.25;
+        }
+        .brand-txt {
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 6px;
+            margin-right: -6px;
+            color: #94a3b8;
+        }
+        footer .brand-line { margin-bottom: 8px; }
         @media (prefers-reduced-motion: reduce) {
             .entry { transition: none; }
             .entry:hover { transform: none; }
@@ -151,7 +184,12 @@
     <p class="notice">数据保存在你自己的 GitHub Gist；请勿在公共设备记住登录；Secret Gist 不是私有仓库。</p>
 
     <footer>
-        <p>当前版本 v2.2.0 · <a href="tools/scanner-test.html">扫码测试页（调试用）</a></p>
+        <div class="brand-line" aria-label="zcfi.cn 出品">
+            <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
+            <span class="brand-bar" aria-hidden="true"></span>
+            <span class="brand-txt">出品</span>
+        </div>
+        <p>当前版本 v2.3.9 · <a href="tools/scanner-test.html">扫码测试页（调试用）</a></p>
     </footer>
 </main>
 </body>
