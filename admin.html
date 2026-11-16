@@ -48,6 +48,11 @@
             color: var(--color-gray-800);
             -webkit-font-smoothing: antialiased;
         }
+        /* v2.3.11：兜底防止手机系统字体缩放影响页面固定字号元素 */
+        html, body {
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
 
         ::-webkit-scrollbar {
             width: 6px;
@@ -1560,43 +1565,67 @@
             padding: 8px 0 24px;
             line-height: 1.7;
         }
-        /* ===== v2.3.10 品牌组合（zcfi.cn | 出品，非交互文本；页脚/顶栏/登录页共用） ===== */
+        /* ===== v2.3.11 品牌组合（zcfi.cn | 出品：可点击跳转，外观锁定，防系统字体缩放） ===== */
         .brand-line {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+            -webkit-text-size-adjust: 100% !important;
+            text-size-adjust: 100% !important;
+            font-size: 16px !important;
+            line-height: 20px !important;
+            white-space: nowrap;
         }
         .brand-logo {
-            font-weight: 700;
-            font-size: 16px;
-            color: #4a6fa5;
-            letter-spacing: 0.2px;
+            font-size: 16px !important;
+            line-height: 20px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.2px !important;
+            color: #4a6fa5 !important;
+            text-decoration: none !important;
+            cursor: pointer;
         }
-        .brand-logo span { color: #4fc3a1; }
+        .brand-logo:hover {
+            color: #4a6fa5 !important;
+            text-decoration: none !important;
+        }
+        .brand-logo span { color: #4fc3a1 !important; }
+        .brand-logo:focus-visible {
+            outline: 2px solid #4fc3a1;
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
         .brand-bar {
             width: 1px;
             height: 1.6em;
+            flex: 0 0 1px;
             background: currentColor;
             opacity: 0.25;
         }
         .brand-txt {
-            font-size: 13px;
-            font-weight: 500;
-            letter-spacing: 6px;
+            font-size: 13px !important;
+            line-height: 20px !important;
+            font-weight: 500 !important;
+            letter-spacing: 6px !important;
             margin-right: -6px;
-            color: #94a3b8;
+            color: #94a3b8 !important;
         }
         .app-footer .brand-line { margin-bottom: 7px; }
         .login-box .brand-line { margin-top: 14px; }
-        /* v2.3.10：顶栏标题与品牌同行（窄屏自动换行） */
-        .title-row {
+        /* v2.3.11：顶栏最右侧（品牌在操作按钮上方、整体右对齐） */
+        .top-right {
             display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            margin-left: auto;
         }
-        .brand-line--header { margin: 0; }
+        .brand-line--header {
+            justify-content: flex-end;
+            margin: 0;
+        }
 
         /* ===== 空状态 ===== */
         .empty-state {
@@ -1615,8 +1644,7 @@
             body { padding: 12px; }
             .top-bar { flex-direction: column; align-items: stretch; }
             .top-bar .actions { justify-content: flex-start; }
-            .title-row { gap: 8px; }
-            .brand-line--header { gap: 10px; }
+            .top-right { width: 100%; align-items: flex-end; }
             .modal { padding: 20px; }
             .print-preview-box { padding: 20px; }
             .tree-node .node-content { flex-wrap: wrap; }
@@ -1710,7 +1738,7 @@
         </div>
         <div id="login-error" role="status" aria-live="polite"></div>
         <div class="brand-line" aria-label="zcfi.cn 出品">
-            <span class="brand-logo">zcfi<span>.</span>cn</span>
+            <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
             <span class="brand-bar" aria-hidden="true"></span>
             <span class="brand-txt">出品</span>
         </div>
@@ -1736,14 +1764,7 @@
     <div class="container">
         <div class="top-bar">
             <div>
-                <div class="title-row">
-                    <h1>商品管理</h1>
-                    <span class="brand-line brand-line--header" aria-label="zcfi.cn 出品">
-                        <span class="brand-logo">zcfi<span>.</span>cn</span>
-                        <span class="brand-bar" aria-hidden="true"></span>
-                        <span class="brand-txt">出品</span>
-                    </span>
-                </div>
+                <h1>商品管理</h1>
                 <div class="sub">
                     <span id="user-status">已登录</span>
                     <span id="sync-time" class="sync-meta">最后同步：—</span>
@@ -1759,7 +1780,13 @@
                     <span class="summary-chip pending">待售 <b id="sum-pending">0</b></span>
                 </div>
             </div>
-            <div class="actions">
+            <div class="top-right">
+                <div class="brand-line brand-line--header" aria-label="zcfi.cn 出品">
+                    <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
+                    <span class="brand-bar" aria-hidden="true"></span>
+                    <span class="brand-txt">出品</span>
+                </div>
+                <div class="actions">
                 <button class="btn btn-success" id="add-root-btn">＋ 添加大类</button>
                 <button class="btn btn-secondary refresh-btn" id="refresh-btn">
                     <span class="refresh-icon">
@@ -1784,6 +1811,7 @@
                 </div>
                 <input type="file" id="import-file" accept=".json,application/json" style="display:none;" />
                 <button class="btn btn-danger" id="logout-btn">退出</button>
+                </div>
             </div>
         </div>
 
@@ -1819,7 +1847,7 @@
         </div>
         <footer class="app-footer">
             <div class="brand-line" aria-label="zcfi.cn 出品">
-                <span class="brand-logo">zcfi<span>.</span>cn</span>
+                <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
                 <span class="brand-bar" aria-hidden="true"></span>
                 <span class="brand-txt">出品</span>
             </div>
@@ -7865,8 +7893,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.10
-        setText(appVersionEl, 'R5 · v2.3.10 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.11
+        setText(appVersionEl, 'R5 · v2.3.11 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -7909,7 +7937,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.10：品牌标识放大去交互/顶栏与登录页品牌组合/树展开动画）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.11：品牌移顶栏最右/恢复跳转/锁定品牌样式防系统字体缩放）');
 </script>
 </body>
 </html>

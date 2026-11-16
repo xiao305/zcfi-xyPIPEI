@@ -149,7 +149,9 @@ const requirements = [
     ['scan.html', /brand-line/, 'scan 缺少页脚品牌组合'],
     ['index.html', /favicon\.svg/, 'index 缺少 favicon.svg 引用'],
     ['index.html', /brand-line/, 'index 缺少页脚品牌组合'],
-    ['admin.html', /title-row/, 'admin 顶栏缺少标题行容器'],
+    ['admin.html', /top-right/, 'admin 顶栏缺少右侧品牌容器'],
+    ['admin.html', /text-size-adjust/, 'admin 缺少品牌字体缩放锁定'],
+    ['admin.html', /href="https:\/\/zcfi\.cn\/"/, 'admin 品牌 logo 缺少跳转链接'],
     ['admin.html', /brand-line--header/, 'admin 顶栏缺少品牌组合'],
     ['admin.html', /login-box[\s\S]*?brand-line/, 'admin 登录页缺少品牌组合'],
     ['scan.html', /login-box[\s\S]*?brand-line/, 'scan 登录页缺少品牌组合'],
@@ -179,16 +181,16 @@ console.log('== 4. 版本一致性 ==');
 const versionFiles = ['README.md', 'CHANGELOG.md', 'docs/ARCHITECTURE.md', 'docs/RELEASE-CHECKLIST.md'];
 for (const rel of versionFiles) {
     if (!exists(rel)) { bad(`${rel} 不存在`); continue; }
-    check(/2\.3\.10/.test(read(rel)), `${rel} 未提及 v2.3.10`);
+    check(/2\.3\.11/.test(read(rel)), `${rel} 未提及 v2.3.11`);
 }
 check(/2\.2\.0/.test(read('js/core.js')) || /2\.3\.0/.test(read('js/core.js')), 'core 未标记 2.3.0');
 {
     const cspMeta = (read('admin.html').match(/Content-Security-Policy" content="([^"]*)"/) || [null, ''])[1];
     check(!/unsafe-eval/.test(cspMeta), 'admin CSP 不应放开 unsafe-eval');
 }
-check(/R5 · v2\.3\.10/.test(read('admin.html')), 'admin 未标记 R5 · v2.3.10');
-check(/R3 · v2\.3\.10/.test(read('scan.html')), 'scan 未标记 R3 · v2.3.10');
-check(/\[2\.3\.10\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.3.10] 条目');
+check(/R5 · v2\.3\.11/.test(read('admin.html')), 'admin 未标记 R5 · v2.3.11');
+check(/R3 · v2\.3\.11/.test(read('scan.html')), 'scan 未标记 R3 · v2.3.11');
+check(/\[2\.3\.11\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.3.11] 条目');
 
 console.log('== 5. 文件结构与存在性 ==');
 check(!exists('CLodopFuncs.js'), 'CLodopFuncs.js 仍被提交（应删除，运行时加载）');

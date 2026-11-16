@@ -3,6 +3,23 @@
 本项目的页面/数据层均随 GitHub Pages 发布，版本按「核心（js/core.js）+ 功能轮次」记录。
 日期格式：`YYYY-MM-DD`。
 
+## [2.3.11] - 2026-11-16
+
+品牌标识定稿：顶栏最右、恢复跳转、样式冻结。页面版本 **R5 · v2.3.11**（core v2.3.0 不变）。
+
+### 变更
+
+- **后台顶栏品牌位置**：从「商品管理」标题旁移除，移到顶栏**最右侧**（`.top-right`：品牌在上、操作按钮在下、右对齐）；清理 `.title-row` 及其 CSS/移动端规则；≤768px 自动铺满、右对齐、不溢出。
+- **恢复点击跳转**：三页所有品牌 logo 恢复为 `<a href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">`（admin 3 处 / scan 2 处 / index 1 处），点击新窗口跳转；hover 显式锁定原样式（`color:#4a6fa5; text-decoration:none`），不变蓝/不下划线；仅键盘 `:focus-visible` 保留绿色 outline。
+- **品牌样式冻结（防系统字体缩放）**：`.brand-line` 固定字体栈（PingFang SC / Microsoft YaHei 等）、`font-size:16px/line-height:20px`、`white-space:nowrap`、`-webkit-text-size-adjust:100% !important; text-size-adjust:100% !important`；logo（16px/700/0.2px）、出品（13px/500/6px）、竖线（1px/1.6em/opacity .25）关键属性全部 px + `!important`；三页 `html,body` 增加 text-size-adjust 兜底。
+- 三页版本同步 v2.3.11（admin `R5 · v2.3.11` / scan `R3 · v2.3.11` / index `v2.3.11`）。
+
+### 验证
+
+- 三页内联脚本 `node --check` 全过（3 页 / 9062 行）；
+- `local_dev/_fix-ui/smoke.mjs`：**84/84**（原 79 项无回归；新增：三页 logo 均为 `a` 且 href/target/rel 正确、admin 无 `.title-row`、品牌位于 `.top-right` 且右对齐（内容区 1px）、hover 前后 computed color/text-decoration 一致、样式冻结（16/20/13px、nowrap、text-size-adjust 声明）、焦点轮廓、版本号）；
+- `fix-smoke` 34/34。
+
 ## [2.3.10] - 2026-11-15
 
 「zcfi.cn | 出品」品牌标识优化。页面版本 **R5 · v2.3.10**（core v2.3.0 不变）。

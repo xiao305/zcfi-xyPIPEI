@@ -6,7 +6,7 @@
 - 站点入口：`https://xypipei.zcfi.cn/`（导航页，选择下面两个入口）
 - 管理后台：`https://xypipei.zcfi.cn/admin`（商品树、库存、回收站、数据工具、标签打印）
 - 智能扫码：`https://xypipei.zcfi.cn/scan`（手机端连续扫码、关联快递/订单/链接、标记售出）
-- 当前版本：**v2.3.10**（核心 `js/core.js` v2.3.0 / 管理后台 **R5** / 扫码端 **R3**），文档更新日期 **2026-11-15**；v2.3.10 优化「zcfi.cn | 出品」品牌标识（整体放大、去除 hover 变蓝/下划线、改为非交互文本、移入后台顶栏与登录页）；v2.3.9 树展开动画 + 全站 favicon + 页脚品牌。
+- 当前版本：**v2.3.11**（核心 `js/core.js` v2.3.0 / 管理后台 **R5** / 扫码端 **R3**），文档更新日期 **2026-11-16**；v2.3.11 品牌标识细化：后台顶栏品牌移到最右侧、恢复点击跳转 zcfi.cn（hover 样式不变）、锁定全部品牌样式防止手机系统字体缩放；v2.3.10 品牌放大/去交互/登录页。
 
 > ## ⚠️ 使用前必读：Secret Gist 不是私有仓库
 >
@@ -324,6 +324,7 @@ GitHub Gist 的 data.json（你自己的 Gist —— Secret 也只是「不公�
 - **v2.3.8 节点树交互**：展开图标改为线性 chevron（收起指右、展开 `rotate(90deg)` 指下，`transition: transform .2s cubic-bezier(.4,0,.2,1)`）；整行 hover 浅灰底 + `cursor:pointer`，点击标题区（名称/编码/状态/统计/空白）即可展开收起，图标/名称点击有轻微 scale 反馈；层级引导线改为 **1px solid `#e2e8f0`**、每级固定 **24px** 缩进；图标/名称/状态/统计/操作按钮 flex 垂直居中；节点汇总统计降为辅助信息（`#94a3b8` / 11px），名称与状态仍是视觉第一层级。
 - **v2.3.9 展开动画与全站品牌**：节点展开/收起改为 `grid-template-rows 0fr→1fr` 的 0.25s 平滑高度动画（含淡入；`prefers-reduced-motion` 时关闭；收起内容不可聚焦）；三页（`/`、`/admin`、`/scan`）统一 favicon `/favicon.svg`，页脚加入「zcfi.cn | 出品」品牌组合（1px 竖线分隔、克制灰色）。
 - **v2.3.10 品牌细化**：品牌整体放大（logo 16px / 出品 13px / 竖线 1.6em）；移除 hover/focus 变蓝与下划线，改为**非交互文本**；admin 顶栏「商品管理」旁显示品牌（并去掉原 📦 图标），admin/scan 登录页底部也显示品牌。
+- **v2.3.11 品牌定稿**：品牌从「商品管理」旁移到后台顶栏**最右侧**（按钮上方、右对齐）；恢复可点击跳转 https://zcfi.cn/（新窗口，hover 样式保持不变、无下划线）；品牌全部样式冻结（显式字体栈、px 字号/行高、`text-size-adjust:100%`、`!important`），不再受手机系统字体缩放影响。
 
 ### 编辑 / 复制 / 批量新增 / 跨节点批量
 
@@ -661,7 +662,7 @@ git checkout backup-r1-core21 -- js/core.js
 
 ## 版本与路线图
 
-- 当前（2026-11-15）：**v2.3.10** = `core v2.3.0` + `admin R5` + `scan R3` + 站点/文档；v2.3.10 品牌标识放大/去交互/移入顶栏与登录页；v2.3.9 树展开动画 + favicon + 页脚品牌；v2.3.8 节点树图标/悬浮/引导线精修。
+- 当前（2026-11-16）：**v2.3.11** = `core v2.3.0` + `admin R5` + `scan R3` + 站点/文档；v2.3.11 品牌移顶栏最右/恢复跳转/样式冻结防系统字体缩放；v2.3.10 品牌放大/登录页；v2.3.9 树展开动画 + favicon + 页脚品牌。
 - 本版本已完成：
   - **安全**：移除硬编码默认 Gist ID；扫码库本地化（`js/vendor/html5-qrcode.min.js`）；新增 CSP/referrer；Secret Gist 文案全面修正；`CLodopFuncs.js` 不再入库。
   - **打印**：运行时加载本机 C-Lodop、打印结果真实反馈（`On_Return`）、打印机取本机实时列表、批量 strict、null 健壮性。
@@ -669,10 +670,10 @@ git checkout backup-r1-core21 -- js/core.js
   - **管理后台 R4**：筛选/汇总修复、快照隔离、恢复前远端备份、IME、确认弹窗、竞态、a11y。
   - **扫码端 R3**：错误分类、多标签页、逐字段冲突、历史隔离、启动取消、扫码枪、卸载兜底。
   - **站点**：根路径导航页、`tools/scanner-test.html`、删除废弃示例目录。
-  - **文档**：README/CHANGELOG/docs 全量同步到 v2.3.10。
+  - **文档**：README/CHANGELOG/docs 全量同步到 v2.3.11。
 - 历史轮次：R2a（数据菜单/回收站）、R2b（搜索/排序/汇总/复制/响应式）、R3 打印 v2（并入本版本基线）、scan R2 与一致性修复。
 - 后续方向（未承诺）：外置内联脚本以收紧 CSP、`schemaVersion` 迁移框架、后台列表字段可见性增强、PWA/Service Worker、多用户权限模型。
 
-> 文档与一致性审查已同步到 v2.3.10 最终代码；后续改动请继续更新本 README 与 [CHANGELOG](CHANGELOG.md)。
+> 文档与一致性审查已同步到 v2.3.11 最终代码；后续改动请继续更新本 README 与 [CHANGELOG](CHANGELOG.md)。
 
 变更记录见 [CHANGELOG.md](CHANGELOG.md)。
