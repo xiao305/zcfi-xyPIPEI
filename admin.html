@@ -80,10 +80,9 @@
             position: relative;
             z-index: 900;
             display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
-            align-items: center;
-            justify-content: space-between;
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
             background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
@@ -92,6 +91,14 @@
             box-shadow: var(--shadow-card);
             margin-bottom: 28px;
             border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        /* v2.3.12：标题区与品牌同一行（品牌在最右、与 h1 中线对齐），按钮行另起一行右对齐 */
+        .top-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            width: 100%;
         }
         .top-bar h1 {
             font-size: 22px;
@@ -132,6 +139,8 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+            width: 100%;
+            justify-content: flex-end;
         }
 
         /* ===== 按钮系统 ===== */
@@ -1614,17 +1623,11 @@
         }
         .app-footer .brand-line { margin-bottom: 7px; }
         .login-box .brand-line { margin-top: 14px; }
-        /* v2.3.11：顶栏最右侧（品牌在操作按钮上方、整体右对齐） */
-        .top-right {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 10px;
-            margin-left: auto;
-        }
+        /* v2.3.12：顶栏品牌与 h1 同一行、靠最右（margin-top 3px 使 20px 品牌与 22px 标题视觉中线对齐） */
         .brand-line--header {
             justify-content: flex-end;
-            margin: 0;
+            align-self: flex-start;
+            margin: 3px 0 0 auto;
         }
 
         /* ===== 空状态 ===== */
@@ -1644,7 +1647,7 @@
             body { padding: 12px; }
             .top-bar { flex-direction: column; align-items: stretch; }
             .top-bar .actions { justify-content: flex-start; }
-            .top-right { width: 100%; align-items: flex-end; }
+            .top-main { flex-wrap: wrap; gap: 8px; }
             .modal { padding: 20px; }
             .print-preview-box { padding: 20px; }
             .tree-node .node-content { flex-wrap: wrap; }
@@ -1763,6 +1766,7 @@
 <div id="app-container" style="display:none;">
     <div class="container">
         <div class="top-bar">
+            <div class="top-main">
             <div>
                 <h1>商品管理</h1>
                 <div class="sub">
@@ -1780,13 +1784,13 @@
                     <span class="summary-chip pending">待售 <b id="sum-pending">0</b></span>
                 </div>
             </div>
-            <div class="top-right">
-                <div class="brand-line brand-line--header" aria-label="zcfi.cn 出品">
-                    <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
-                    <span class="brand-bar" aria-hidden="true"></span>
-                    <span class="brand-txt">出品</span>
-                </div>
-                <div class="actions">
+            <div class="brand-line brand-line--header" aria-label="zcfi.cn 出品">
+                <a class="brand-logo" href="https://zcfi.cn/" target="_blank" rel="noopener noreferrer">zcfi<span>.</span>cn</a>
+                <span class="brand-bar" aria-hidden="true"></span>
+                <span class="brand-txt">出品</span>
+            </div>
+            </div>
+            <div class="actions">
                 <button class="btn btn-success" id="add-root-btn">＋ 添加大类</button>
                 <button class="btn btn-secondary refresh-btn" id="refresh-btn">
                     <span class="refresh-icon">
@@ -1812,7 +1816,6 @@
                 <input type="file" id="import-file" accept=".json,application/json" style="display:none;" />
                 <button class="btn btn-danger" id="logout-btn">退出</button>
                 </div>
-            </div>
         </div>
 
         <div class="card">
@@ -7119,18 +7122,20 @@ window.openBatchStatus = openBatchStatus;
     // 同时 C-Lodop 预览把 PDF417 从对象框左边界开始绘制（框内左对齐），把对象框直接居中会让墨迹偏左。
     // 解决：按“对象框宽 W ≈ 实际墨迹宽 ink(W)”选 W（保证预览左对齐/真机填框两种渲染下墨迹都居中），
     // 再把对象框居中：left = (paperWidth - W) / 2，W ≤ paperWidth - 4（左右各 ≥2mm 安全区）。
-    // v2.3.6：细粒度长度标定——每个条码高度存一组“编码长度 → W”锚点（实测真实 C-Lodop 预览墨迹），
-    // 运行时按最近长度锚点取 W；超过最大锚点用最长锚点（饱和）。标定见 local_dev/_fix-print/v236-calibU*.mjs。
-    // 关键点：用户实测 18 字符编码居中正常、29 字符编码错位——29 字符在 h14 的墨迹约 45mm，
-    // 必须用 W=46（旧版 W=39 会让墨迹 45mm 超出 39mm 对象框 → 真机裁切/重锚定导致错位）。
+    // v2.3.12：密集长度标定——每个条码高度存“编码长度 1..60 → 对象宽 W”的实测表（真实 C-Lodop 预览 + 像素量测，
+    // 标定见 local_dev/_fix-print-v2312/）。选择原则：W 取“对象框宽 ≈ 实际墨迹宽 ink(W)”的档位，保证 C-Lodop 预览
+    // 左对齐与真机填框两种渲染下墨迹都居中；无法兼顾时取 W ≥ ink 上界（防真机裁切优先，该长度左右留白略不对称）。
+    // 超过 60 字符饱和到纸宽-4（50mm 纸 46 / 40mm 纸 36）；36-60 的奇数档未逐一实测，运行时取相邻档较大值+1 作为安全近似。
+    // 40mm 纸（h=8.5）W ≤ 36：长编码会被 PDF417 折行压缩，建议编码长度 ≤30 字符以保证可读性。
     var BARCODE_WIDTH_ANCHORS = {
-        '8.5': [[4, 26], [18, 31], [29, 35], [48, 36]],
-        '9.5': [[4, 39], [18, 46], [29, 32], [48, 39]],
-        '12': [[4, 39], [18, 46], [29, 46], [48, 35]],
-        '13': [[4, 39], [18, 39], [29, 46], [48, 35]],
-        '14': [[4, 39], [18, 39], [29, 46], [48, 32]],
-        '17': [[4, 33], [18, 39], [29, 39], [48, 31]]
+        '8.5': { paperWidth: 40, cap: 36, w: [0,27,27,27,27,27,27,27,27,31,27,31,16,31,16,31,16,31,35,35,35,35,35,35,35,35,35,35,35,35,35,35,16,16,16,16,16,17,16,17,16,19,18,21,20,21,18,19,18,24,23,24,18,22,21,22,20,22,21,22,20] },
+        '9.5': { paperWidth: 50, cap: 46, w: [0,40,40,40,46,46,46,46,46,46,46,46,46,46,35,31,35,31,35,31,35,31,35,35,35,35,35,35,35,35,35,35,35,40,40,40,40,41,40,41,40,41,40,45,44,45,44,45,18,19,18,19,18,22,21,22,18,22,21,22,20] },
+        '12': { paperWidth: 50, cap: 46, w: [0,40,40,40,40,40,40,40,46,46,46,46,46,46,46,46,46,46,46,46,46,46,35,31,35,31,35,31,35,31,35,31,35,35,35,35,35,36,35,36,35,36,35,41,40,41,40,45,44,45,44,45,44,45,44,45,44,45,44,45,44] },
+        '13': { paperWidth: 50, cap: 46, w: [0,40,40,40,40,40,40,40,40,40,40,46,46,46,46,46,46,46,46,46,46,46,46,31,35,31,35,31,35,31,35,31,35,31,35,31,35,36,35,36,35,36,35,36,35,36,35,41,40,41,40,41,40,45,44,45,44,45,44,45,44] },
+        '14': { paperWidth: 50, cap: 46, w: [0,33,40,40,40,40,40,40,40,40,40,46,46,46,46,46,46,46,46,46,46,46,46,46,46,46,46,46,46,31,35,31,35,31,35,31,35,36,31,36,35,36,35,36,35,36,35,41,40,41,40,41,40,41,40,41,40,41,40,45,44] },
+        '17': { paperWidth: 50, cap: 46, w: [0,44,33,33,40,40,40,40,40,40,40,40,40,40,40,40,40,40,46,46,46,46,46,46,46,46,46,46,46,46,46,46,46,46,46,46,35,36,31,36,35,36,31,36,35,36,31,36,35,36,35,36,35,36,35,36,35,36,35,41,40] },
     };
+    var BARCODE_ANCHOR_MAX_LEN = 60;
     function barcodeAnchorsForHeight(heightMm) {
         var hKey = String(Math.round((Number(heightMm) || 0) * 10) / 10);
         if (BARCODE_WIDTH_ANCHORS[hKey]) return BARCODE_WIDTH_ANCHORS[hKey];
@@ -7144,7 +7149,23 @@ window.openBatchStatus = openBatchStatus;
         });
         return BARCODE_WIDTH_ANCHORS[String(best)];
     }
-    /** 按编码长度在锚点中取最近档位的 W（长度越大墨迹列数会跳变，需分档） */
+    /** 按编码长度查密集标定表：精确长度优先；未标定长度取相邻档较大值+1；超过 60 字符饱和到纸宽-4 */
+    function barcodeWidthForLength(span, length) {
+        if (!span || !span.w) return 0;
+        var arr = span.w;
+        var cap = Number(span.cap) || 0;
+        var len = parseInt(length, 10);
+        if (!isFinite(len) || len <= 0) return cap;
+        if (len < arr.length && arr[len] > 0) return Math.min(cap, arr[len]);
+        if (len >= arr.length) return cap;
+        var prev = 0, next = 0;
+        for (var i = len - 1; i >= 0; i--) { if (arr[i] > 0) { prev = arr[i]; break; } }
+        for (var j = len + 1; j < arr.length; j++) { if (arr[j] > 0) { next = arr[j]; break; } }
+        var base = Math.max(prev, next);
+        if (!(base > 0)) return cap;
+        return Math.min(cap, base + 1);
+    }
+    /** 按编码长度在密集表中取 W（显式 barcodeBoxWidthMm 优先） */
     function resolveBarcodeBoxWidth(template, el, value) {
         var pw = (template && template.paperWidth > 0) ? template.paperWidth : 50;
         var maxW = Math.max(2, pw - PRINT_SAFE_MARGIN_MM * 2);
@@ -7152,14 +7173,11 @@ window.openBatchStatus = openBatchStatus;
         var w = explicit;
         if (!(w > 0)) {
             var len = String(value == null ? '' : value).length;
-            var anchors = barcodeAnchorsForHeight(el && el.height);
-            var bestAnchor = anchors[0];
-            var bestDist = Infinity;
-            anchors.forEach(function (a) {
-                var d = Math.abs(a[0] - len);
-                if (d < bestDist || (d === bestDist && a[0] < bestAnchor[0])) { bestDist = d; bestAnchor = a; }
-            });
-            w = bestAnchor[1];
+            var span = barcodeAnchorsForHeight(el && el.height);
+            var cap = Math.min(maxW, Number(span && span.cap) || maxW);
+            w = barcodeWidthForLength(span, len);
+            if (!(w > 0)) w = cap;
+            w = Math.min(w, cap);
         }
         if (!(w > 0)) w = Number(el.width) || maxW;
         return Math.max(2, Math.min(w, maxW));
@@ -7893,8 +7911,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.11
-        setText(appVersionEl, 'R5 · v2.3.11 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.12
+        setText(appVersionEl, 'R5 · v2.3.12 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -7937,7 +7955,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.11：品牌移顶栏最右/恢复跳转/锁定品牌样式防系统字体缩放）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.12：顶栏品牌与标题同行最右/条码 1..60 字符密集宽度标定）');
 </script>
 </body>
 </html>
