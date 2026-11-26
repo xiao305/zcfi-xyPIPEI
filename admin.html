@@ -965,11 +965,15 @@
             transition: transform 0.4s ease;
         }
         .refresh-btn.loading .refresh-icon svg {
-            animation: spin-arrow 0.9s linear infinite;
+            /* v2.3.13：顺时针 0.8s 匀速旋转，方向与 rotate-cw 图标箭头一致 */
+            animation: spin-arrow 0.8s linear infinite;
         }
         @keyframes spin-arrow {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .refresh-btn.loading .refresh-icon svg { animation: none; }
         }
 
         .spinner {
@@ -1370,6 +1374,39 @@
             gap: 6px;
             flex-wrap: wrap;
         }
+        /* v2.3.13：回收站批量操作条 + 行复选框 */
+        .recycle-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            margin: 4px 0 2px;
+            border: 1px dashed var(--color-gray-200);
+            border-radius: 10px;
+            background: var(--color-gray-50);
+            font-size: 12px;
+            color: var(--color-gray-600);
+        }
+        .recycle-toolbar .recycle-select-all {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+            color: var(--color-gray-700);
+            cursor: pointer;
+            user-select: none;
+        }
+        .recycle-toolbar .recycle-select-all input,
+        .data-row .recycle-check input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--color-primary, #4f8cff);
+        }
+        .recycle-toolbar .recycle-selected { margin-right: auto; }
+        .recycle-toolbar .btn { padding: 5px 10px; font-size: 12px; }
+        .data-row .recycle-check { display: flex; align-items: center; }
         .data-list .issue {
             font-size: 12px;
             line-height: 1.7;
@@ -1794,9 +1831,10 @@
                 <button class="btn btn-success" id="add-root-btn">＋ 添加大类</button>
                 <button class="btn btn-secondary refresh-btn" id="refresh-btn">
                     <span class="refresh-icon">
+                        <!-- v2.3.13：Lucide rotate-cw 顺时针刷新图标（箭头方向与旋转动画一致） -->
                         <svg viewBox="0 0 24 24">
-                            <path d="M1 4v6h6" />
-                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                            <polyline points="21 3 21 9 15 9" />
                         </svg>
                     </span>
                     刷新
@@ -2587,15 +2625,25 @@ var selectedTemplateIndex = 0;
 // ============================================================
 // 状态词表与统一展示
 // ============================================================
-function fillStatusSelect(select, selected) {
+function fillStatusSelect(select, selected, allowAuto) {
     if (!select) return;
     while (select.firstChild) select.removeChild(select.firstChild);
+    if (allowAuto) {
+        var autoOpt = document.createElement('option');
+        autoOpt.value = '';
+        autoOpt.textContent = '自动识别（由库存汇总）';
+        select.appendChild(autoOpt);
+    }
     STATUS_LIST.forEach(function (s) {
         var opt = document.createElement('option');
         opt.value = s;
         opt.textContent = s;
         select.appendChild(opt);
     });
+    if (allowAuto && (selected === undefined || selected === null || selected === '')) {
+        select.value = '';
+        return;
+    }
     var value = Z.normalizeStatus(selected === undefined || selected === null ? STATUS.ON_SALE : selected);
     if (STATUS_LIST.indexOf(value) === -1) {
         var legacy = document.createElement('option');
@@ -3944,7 +3992,7 @@ function collectRecycleEntries() {
     var nodes = [];
     var items = [];
     var products = gistData.products || {};
-    function visit(container, parentCode) {
+    function visit(container, parentCode, depth) {
         Object.keys(container).sort().forEach(function (code) {
             var node = container[code];
             if (!node || typeof node !== 'object') return;
@@ -3953,6 +4001,7 @@ function collectRecycleEntries() {
                     type: 'node',
                     code: code,
                     parentCode: parentCode || null,
+                    depth: depth || 0,
                     name: node.name || '',
                     deletedAt: node.deletedAt,
                     active: countNodeContents(node, false),
@@ -3967,17 +4016,269 @@ function collectRecycleEntries() {
                             type: 'item',
                             parentCode: code,
                             code: item.code || '',
+                            depth: (depth || 0) + 1,
                             name: item.name || node.name || '',
                             deletedAt: item.deletedAt
                         });
                     }
                 });
             }
-            if (node.children && typeof node.children === 'object') visit(node.children, code);
+            if (node.children && typeof node.children === 'object') visit(node.children, code, (depth || 0) + 1);
         });
     }
-    visit(products, null);
+    visit(products, null, 0);
     return { nodes: nodes, items: items };
+}
+/** v2.3.13：在回收站（节点/库存，忽略大小写）中查找编码冲突 */
+function findRecycleConflict(code) {
+    if (!code) return null;
+    var entries = collectRecycleEntries();
+    var list = entries.nodes.concat(entries.items);
+    for (var i = 0; i < list.length; i++) {
+        if (Z.sameCode(list[i].code, code)) return list[i];
+    }
+    return null;
+}
+/** v2.3.13：查找某个编码当前是否已被“在用”（未删除）记录占用，返回 {type, code, parentCode} */
+function findActiveCodeOwner(code) {
+    if (!code) return null;
+    var found = null;
+    function visit(container) {
+        if (found) return;
+        Object.keys(container).sort().forEach(function (key) {
+            if (found) return;
+            var node = container[key];
+            if (!node || typeof node !== 'object' || Z.isDeleted(node)) return;
+            if (Z.sameCode(key, code)) { found = { type: 'node', code: key, parentCode: null }; return; }
+            if (Array.isArray(node.items)) {
+                node.items.forEach(function (item) {
+                    if (!found && item && !Z.isDeleted(item) && Z.sameCode(item.code, code)) {
+                        found = { type: 'item', code: item.code, parentCode: key };
+                    }
+                });
+            }
+            if (!found && node.children && typeof node.children === 'object') visit(node.children);
+        });
+    }
+    visit(gistData.products || {});
+    return found;
+}
+function recycleEntryTypeLabel(entry) {
+    return entry && entry.type === 'node' ? '节点' : '库存';
+}
+function recycleConflictMessage(hit) {
+    return '该编码「' + hit.code + '」在回收站中（' + recycleEntryTypeLabel(hit) + ' · 删除时间 '
+        + (hit.deletedAt ? Z.formatDateTime(hit.deletedAt) : '未知')
+        + '），请先在回收站恢复或彻底删除后再使用。';
+}
+/** 新增/改名撞到回收站记录时的确认框：去回收站处理 / 取消 */
+function showRecycleConflictDialog(hit, onGoRecycle) {
+    if (!hit) return;
+    showConfirm({
+        title: '编码在回收站中',
+        message: recycleConflictMessage(hit) + '\n\n可点击“去回收站处理”打开回收站，或取消后自行处理。',
+        confirmText: '去回收站处理',
+        danger: false,
+        onConfirm: function () {
+            if (typeof onGoRecycle === 'function') onGoRecycle();
+            return true;
+        }
+    });
+}
+/** 回收站条目恢复时与在用编码冲突：取消 / 彻底删除回收站项 */
+function showRestoreConflictDialog(entry, active) {
+    var activeLabel = active && active.type === 'node' ? '节点' : '库存';
+    showConfirm({
+        title: '恢复冲突',
+        message: '回收站条目「' + entry.code + '」与在用' + activeLabel + '编码相同，无法恢复。\n可选择“彻底删除回收站项”释放该编码，或取消后手动处理。',
+        confirmText: '彻底删除回收站项',
+        danger: true,
+        onConfirm: function () {
+            return purgeRecycleEntryDirect(entry).then(function (ok) {
+                refreshRecycleModal();
+                return !!ok;
+            });
+        }
+    });
+}
+function refreshRecycleModal() {
+    updateRecycleCount();
+    if (dataModalOverlay && dataModalOverlay.classList.contains('active')) openRecycleModal();
+}
+function showRecycleBatchResult(action, successCount, failures) {
+    failures = failures || [];
+    if (!failures.length) {
+        toast(action + '完成：成功 ' + successCount + ' 项', 'success');
+        return;
+    }
+    var reasons = Object.create(null);
+    failures.forEach(function (f) {
+        var reason = f.reason || '未知原因';
+        reasons[reason] = (reasons[reason] || 0) + 1;
+    });
+    var reasonText = Object.keys(reasons).map(function (reason) { return reason + ' ×' + reasons[reason]; }).join('；');
+    toast(action + '完成：成功 ' + successCount + ' / 失败 ' + failures.length + '（' + reasonText + '）',
+        { type: successCount ? 'warn' : 'error', duration: 10000 });
+}
+/** 批量恢复：父级优先（节点按深度升序），再恢复库存；返回可执行 ops 与失败列表 */
+function prepareRecycleRestore(entries) {
+    var ordered = (entries || []).slice().sort(function (a, b) {
+        if (a.type !== b.type) return a.type === 'node' ? -1 : 1;
+        if (a.type === 'node') return (a.depth || 0) - (b.depth || 0) || String(a.code).localeCompare(String(b.code));
+        return String(a.code).localeCompare(String(b.code));
+    });
+    var ops = [];
+    var failures = [];
+    var restoredNodeCodes = Object.create(null);
+    ordered.forEach(function (entry) {
+        if (!entry || !entry.code) return;
+        if (entry.type === 'node') {
+            var activeOwner = findActiveCodeOwner(entry.code);
+            if (activeOwner) {
+                failures.push({ entry: entry, reason: '编码与在用' + (activeOwner.type === 'node' ? '节点' : '库存') + '冲突' });
+                return;
+            }
+            var ancestor = null;
+            var parentCode = entry.parentCode;
+            var guard = 0;
+            while (parentCode && guard < 100) {
+                guard += 1;
+                var parentNode = Z.findNodeByCode(gistData.products, parentCode);
+                if (parentNode && Z.isDeleted(parentNode) && !restoredNodeCodes[parentCode]) { ancestor = parentCode; break; }
+                var parentEntry = findNodeEntry(parentCode);
+                parentCode = parentEntry ? parentEntry.parentCode : null;
+            }
+            if (ancestor) { failures.push({ entry: entry, reason: '上级节点「' + ancestor + '」仍在回收站' }); return; }
+            var baseNode = Z.findNodeByCode(baseDoc.products, entry.code);
+            if (!baseNode) { failures.push({ entry: entry, reason: '基准数据中找不到该节点，请刷新后重试' }); return; }
+            ops.push({
+                type: 'node.upsert',
+                code: entry.code,
+                originalCode: entry.code,
+                parentCode: null,
+                baseNode: Z.clone(baseNode),
+                fields: { deletedAt: undefined }
+            });
+            restoredNodeCodes[entry.code] = true;
+        } else {
+            var parent = Z.findNodeByCode(gistData.products, entry.parentCode);
+            var parentDeleted = !parent || Z.isDeleted(parent);
+            if (parentDeleted && !restoredNodeCodes[entry.parentCode]) {
+                failures.push({ entry: entry, reason: '父节点「' + (entry.parentCode || '未知') + '」仍在回收站' });
+                return;
+            }
+            var activeItem = findActiveCodeOwner(entry.code);
+            if (activeItem) { failures.push({ entry: entry, reason: '编码与在用记录冲突' }); return; }
+            var baseItem = baseItemOf(entry.parentCode, entry.code);
+            if (!baseItem) { failures.push({ entry: entry, reason: '基准数据中找不到该库存，请刷新后重试' }); return; }
+            ops.push({
+                type: 'item.upsert',
+                parentCode: entry.parentCode,
+                code: entry.code,
+                originalCode: entry.code,
+                baseItem: Z.clone(baseItem),
+                fields: { deletedAt: undefined }
+            });
+        }
+    });
+    return { ops: ops, failures: failures };
+}
+/** 批量彻底删除：被选中祖先节点覆盖的子项不重复发 op，但仍计入成功 */
+function prepareRecyclePurge(entries) {
+    var selectedNodeCodes = Object.create(null);
+    (entries || []).forEach(function (entry) {
+        if (entry && entry.type === 'node') selectedNodeCodes[entry.code] = true;
+    });
+    var ops = [];
+    var failures = [];
+    var covered = 0;
+    (entries || []).forEach(function (entry) {
+        if (!entry || !entry.code) return;
+        if (entry.type === 'node') {
+            var parentCode = entry.parentCode;
+            var coveredByAncestor = false;
+            var guard = 0;
+            while (parentCode && guard < 100) {
+                guard += 1;
+                if (selectedNodeCodes[parentCode]) { coveredByAncestor = true; break; }
+                var parentEntry = findNodeEntry(parentCode);
+                parentCode = parentEntry ? parentEntry.parentCode : null;
+            }
+            if (coveredByAncestor) { covered += 1; return; }
+            var rawNode = Z.findNodeByCode(gistData.products, entry.code);
+            if (!rawNode) { failures.push({ entry: entry, reason: '节点不存在或已被删除' }); return; }
+            var baseNode = Z.findNodeByCode(baseDoc.products, entry.code) || rawNode;
+            ops.push({ type: 'node.delete', code: entry.code, baseNode: Z.clone(baseNode) });
+        } else {
+            if (selectedNodeCodes[entry.parentCode]) { covered += 1; return; }
+            var parent = Z.findNodeByCode(gistData.products, entry.parentCode);
+            if (!parent) { failures.push({ entry: entry, reason: '父节点不存在' }); return; }
+            var rawItem = Z.findItem(parent, entry.code);
+            if (!rawItem) { failures.push({ entry: entry, reason: '库存不存在或已被删除' }); return; }
+            var baseItem = baseItemOf(entry.parentCode, entry.code) || rawItem;
+            ops.push({ type: 'item.delete', parentCode: entry.parentCode, code: entry.code, baseItem: Z.clone(baseItem) });
+        }
+    });
+    return { ops: ops, failures: failures, covered: covered };
+}
+/** 直接彻底删除单个回收站条目（不弹二次确认，供恢复冲突“彻底删除”与单条确认复用） */
+function purgeRecycleEntryDirect(entry) {
+    if (readOnly) { toast('当前为只读保护状态，无法删除', 'error'); return Promise.resolve(false); }
+    var op = null;
+    if (entry.type === 'node') {
+        var rawNode = Z.findNodeByCode(gistData.products, entry.code);
+        if (!rawNode) { toast('节点不存在或已被删除', 'error'); return Promise.resolve(false); }
+        var baseNode = Z.findNodeByCode(baseDoc.products, entry.code) || rawNode;
+        op = { type: 'node.delete', code: entry.code, baseNode: Z.clone(baseNode) };
+    } else {
+        var parent = Z.findNodeByCode(gistData.products, entry.parentCode);
+        if (!parent) { toast('父节点不存在', 'error'); return Promise.resolve(false); }
+        var rawItem = Z.findItem(parent, entry.code);
+        if (!rawItem) { toast('库存不存在或已被删除', 'error'); return Promise.resolve(false); }
+        var baseItem = baseItemOf(entry.parentCode, entry.code) || rawItem;
+        op = { type: 'item.delete', parentCode: entry.parentCode, code: entry.code, baseItem: Z.clone(baseItem) };
+    }
+    return saveWithOps([op], { successMessage: '已彻底删除 ' + recycleEntryTypeLabel(entry) + ' ' + entry.code }).then(function (result) {
+        if (result) updateRecycleCount();
+        return !!result;
+    });
+}
+function runRecycleRestore(entries) {
+    if (readOnly) { toast('当前为只读保护状态，无法恢复', 'error'); return Promise.resolve(false); }
+    entries = (entries || []).filter(Boolean);
+    if (!entries.length) { toast('请先勾选要恢复的项', 'warn'); return Promise.resolve(false); }
+    var plan = prepareRecycleRestore(entries);
+    if (!plan.ops.length) {
+        showRecycleBatchResult('恢复', 0, plan.failures);
+        refreshRecycleModal();
+        return Promise.resolve(false);
+    }
+    return saveWithOps(plan.ops, { successMessage: '已从回收站恢复 ' + plan.ops.length + ' 项' }).then(function (result) {
+        var failures = plan.failures.slice();
+        if (!result) failures.push({ entry: { type: 'node', code: '（批量）' }, reason: '保存失败，请重试' });
+        showRecycleBatchResult('恢复', result ? plan.ops.length : 0, failures);
+        refreshRecycleModal();
+        return !!result;
+    });
+}
+function runRecyclePurge(entries) {
+    if (readOnly) { toast('当前为只读保护状态，无法删除', 'error'); return Promise.resolve(false); }
+    entries = (entries || []).filter(Boolean);
+    if (!entries.length) { toast('请先勾选要删除的项', 'warn'); return Promise.resolve(false); }
+    var plan = prepareRecyclePurge(entries);
+    if (!plan.ops.length) {
+        showRecycleBatchResult('彻底删除', plan.covered, plan.failures);
+        refreshRecycleModal();
+        return Promise.resolve(false);
+    }
+    return saveWithOps(plan.ops, { successMessage: '已彻底删除 ' + plan.ops.length + ' 项' }).then(function (result) {
+        var success = result ? plan.ops.length + plan.covered : 0;
+        var failures = plan.failures.slice();
+        if (!result && plan.ops.length) failures.push({ entry: { type: 'node', code: '（批量）' }, reason: '保存失败，请重试' });
+        showRecycleBatchResult('彻底删除', success, failures);
+        refreshRecycleModal();
+        return !!result;
+    });
 }
 function updateRecycleCount() {
     if (!recycleCount) return;
@@ -4006,97 +4307,163 @@ function ancestorsDeleted(code) {
 }
 function openRecycleModal() {
     var entries = collectRecycleEntries();
+    var all = entries.nodes.concat(entries.items);
     openDataModal({
-        title: '回收站（' + (entries.nodes.length + entries.items.length) + ' 项）',
+        title: '回收站（' + all.length + ' 项）',
         build: function (body) {
             body.appendChild(el('p', 'data-note', '删除会先移入回收站（数据仍在 Gist 中，但树、搜索、打印与扫码端都不再显示）。可在此恢复，或彻底删除（永久移除，无法恢复）。'));
-            if (!entries.nodes.length && !entries.items.length) {
+
+            // v2.3.13：批量操作条（全选 / 已选 / 批量恢复 / 批量删除 / 全部恢复 / 全部删除）
+            var toolbar = el('div', 'recycle-toolbar');
+            var selectAllLabel = el('label', 'recycle-select-all');
+            var selectAll = document.createElement('input');
+            selectAll.type = 'checkbox';
+            selectAll.id = 'recycle-select-all';
+            selectAll.setAttribute('aria-label', '全选回收站条目');
+            selectAllLabel.appendChild(selectAll);
+            selectAllLabel.appendChild(document.createTextNode('全选'));
+            var selectedText = el('span', 'recycle-selected', '已选 0 项');
+            var batchRestoreBtn = el('button', 'btn btn-primary btn-sm', '批量恢复');
+            batchRestoreBtn.type = 'button';
+            var batchDeleteBtn = el('button', 'btn btn-danger btn-sm', '批量删除');
+            batchDeleteBtn.type = 'button';
+            var allRestoreBtn = el('button', 'btn btn-secondary btn-sm', '全部恢复');
+            allRestoreBtn.type = 'button';
+            var allDeleteBtn = el('button', 'btn btn-danger btn-sm', '全部删除');
+            allDeleteBtn.type = 'button';
+            toolbar.appendChild(selectAllLabel);
+            toolbar.appendChild(selectedText);
+            toolbar.appendChild(batchRestoreBtn);
+            toolbar.appendChild(batchDeleteBtn);
+            toolbar.appendChild(allRestoreBtn);
+            toolbar.appendChild(allDeleteBtn);
+            body.appendChild(toolbar);
+
+            if (!all.length) {
                 body.appendChild(el('p', 'data-empty', '回收站为空'));
+                [selectAll, batchRestoreBtn, batchDeleteBtn, allRestoreBtn, allDeleteBtn].forEach(function (ctrl) { ctrl.disabled = true; });
                 return;
             }
+
             var dataList = createDataList(body);
-            entries.nodes.forEach(function (entry) {
+            var checkboxes = [];
+            all.forEach(function (entry, index) {
                 var row = el('div', 'data-row');
+                var checkWrap = el('div', 'recycle-check');
+                var check = document.createElement('input');
+                check.type = 'checkbox';
+                check.className = 'recycle-item-check';
+                check.setAttribute('data-index', String(index));
+                check.setAttribute('aria-label', '选择' + recycleEntryTypeLabel(entry) + ' ' + entry.code);
+                checkWrap.appendChild(check);
+                checkboxes.push(check);
+                row.appendChild(checkWrap);
+
                 var main = el('div', 'row-main');
-                main.appendChild(el('div', 'row-title', '节点 · ' + entry.code + (entry.name ? ' · ' + entry.name : '')));
-                main.appendChild(el('div', 'row-sub', '删除时间：' + (entry.deletedAt ? Z.formatDateTime(entry.deletedAt) : '未知') +
-                    ' · 恢复后可见：' + entry.active.children + ' 个子类 / ' + entry.active.items + ' 个库存'));
+                if (entry.type === 'node') {
+                    main.appendChild(el('div', 'row-title', '节点 · ' + entry.code + (entry.name ? ' · ' + entry.name : '')));
+                    main.appendChild(el('div', 'row-sub', '删除时间：' + (entry.deletedAt ? Z.formatDateTime(entry.deletedAt) : '未知') +
+                        ' · 恢复后可见：' + entry.active.children + ' 个子类 / ' + entry.active.items + ' 个库存'));
+                } else {
+                    main.appendChild(el('div', 'row-title', '库存 · ' + entry.code + (entry.name ? ' · ' + entry.name : '')));
+                    main.appendChild(el('div', 'row-sub', '父节点：' + entry.parentCode + ' · 删除时间：' + (entry.deletedAt ? Z.formatDateTime(entry.deletedAt) : '未知')));
+                }
                 row.appendChild(main);
+
                 var actions = el('div', 'row-actions');
                 var restoreBtn = el('button', 'btn btn-primary btn-sm', '恢复');
                 restoreBtn.type = 'button';
-                restoreBtn.addEventListener('click', function () { restoreRecycleNode(entry); });
+                restoreBtn.addEventListener('click', function () {
+                    if (entry.type === 'node') restoreRecycleNode(entry); else restoreRecycleItem(entry);
+                });
                 var purgeBtn = el('button', 'btn btn-danger btn-sm', '彻底删除');
                 purgeBtn.type = 'button';
-                purgeBtn.addEventListener('click', function () { purgeRecycleNode(entry); });
+                purgeBtn.addEventListener('click', function () {
+                    if (entry.type === 'node') purgeRecycleNode(entry); else purgeRecycleItem(entry);
+                });
                 actions.appendChild(restoreBtn);
                 actions.appendChild(purgeBtn);
                 row.appendChild(actions);
                 dataList.appendChild(row);
             });
-            entries.items.forEach(function (entry) {
-                var row = el('div', 'data-row');
-                var main = el('div', 'row-main');
-                main.appendChild(el('div', 'row-title', '库存 · ' + entry.code + (entry.name ? ' · ' + entry.name : '')));
-                main.appendChild(el('div', 'row-sub', '父节点：' + entry.parentCode + ' · 删除时间：' + (entry.deletedAt ? Z.formatDateTime(entry.deletedAt) : '未知')));
-                row.appendChild(main);
-                var actions = el('div', 'row-actions');
-                var restoreBtn = el('button', 'btn btn-primary btn-sm', '恢复');
-                restoreBtn.type = 'button';
-                restoreBtn.addEventListener('click', function () { restoreRecycleItem(entry); });
-                var purgeBtn = el('button', 'btn btn-danger btn-sm', '彻底删除');
-                purgeBtn.type = 'button';
-                purgeBtn.addEventListener('click', function () { purgeRecycleItem(entry); });
-                actions.appendChild(restoreBtn);
-                actions.appendChild(purgeBtn);
-                row.appendChild(actions);
-                dataList.appendChild(row);
+
+            function selectedEntries() {
+                return all.filter(function (entry, index) { return checkboxes[index] && checkboxes[index].checked; });
+            }
+            function updateToolbar() {
+                var count = selectedEntries().length;
+                setText(selectedText, '已选 ' + count + ' 项');
+                var none = count === 0;
+                batchRestoreBtn.disabled = none;
+                batchDeleteBtn.disabled = none;
+                selectAll.checked = count > 0 && count === all.length;
+                selectAll.indeterminate = count > 0 && count < all.length;
+                if (readOnly) {
+                    batchRestoreBtn.disabled = true;
+                    batchDeleteBtn.disabled = true;
+                    allRestoreBtn.disabled = true;
+                    allDeleteBtn.disabled = true;
+                }
+            }
+            function selectedCounts(selected) {
+                var n = 0, i = 0;
+                selected.forEach(function (e) { if (e.type === 'node') n += 1; else i += 1; });
+                return { nodes: n, items: i };
+            }
+            function confirmPurge(selected, titlePrefix) {
+                var counts = selectedCounts(selected);
+                showConfirm({
+                    title: titlePrefix,
+                    message: '将永久删除选中的 ' + selected.length + ' 项（节点 ' + counts.nodes + ' / 库存 ' + counts.items + '）。\n此操作不可恢复，Gist 中将不再保留该数据。',
+                    confirmText: '彻底删除 ' + selected.length + ' 项',
+                    danger: true,
+                    onConfirm: function () { return runRecyclePurge(selected); }
+                });
+            }
+            checkboxes.forEach(function (cb) { cb.addEventListener('change', updateToolbar); });
+            selectAll.addEventListener('change', function () {
+                checkboxes.forEach(function (cb) { cb.checked = !!selectAll.checked; });
+                updateToolbar();
             });
+            batchRestoreBtn.addEventListener('click', function () { runRecycleRestore(selectedEntries()); });
+            batchDeleteBtn.addEventListener('click', function () {
+                var selected = selectedEntries();
+                if (!selected.length) { toast('请先勾选要删除的项', 'warn'); return; }
+                confirmPurge(selected, '批量彻底删除');
+            });
+            allRestoreBtn.addEventListener('click', function () {
+                if (!all.length) return;
+                runRecycleRestore(all.slice());
+            });
+            allDeleteBtn.addEventListener('click', function () {
+                if (!all.length) return;
+                confirmPurge(all.slice(), '全部彻底删除');
+            });
+            updateToolbar();
         },
         actions: [{ label: '关闭', onClick: closeDataModal }]
     });
 }
 function restoreRecycleNode(entry) {
     if (readOnly) { toast('当前为只读保护状态，无法恢复', 'error'); return; }
-
+    var activeOwner = findActiveCodeOwner(entry.code);
+    if (activeOwner) { showRestoreConflictDialog(entry, activeOwner); return; }
     var ancestor = ancestorsDeleted(entry.code);
     if (ancestor) { toast('上级节点「' + ancestor + '」仍在回收站，请先恢复上级节点', 'warn'); return; }
-    var baseNode = Z.findNodeByCode(baseDoc.products, entry.code);
-    if (!baseNode) { toast('基准数据中找不到该节点，请刷新后重试', 'error'); return; }
-    saveWithOps([{
-        type: 'node.upsert',
-        code: entry.code,
-        originalCode: entry.code,
-        parentCode: null,
-        baseNode: Z.clone(baseNode),
-        fields: { deletedAt: undefined }
-    }], { successMessage: '已从回收站恢复节点 ' + entry.code }).then(function (result) {
-        if (result) { updateRecycleCount(); openRecycleModal(); }
-    });
+    runRecycleRestore([entry]);
 }
 function restoreRecycleItem(entry) {
     if (readOnly) { toast('当前为只读保护状态，无法恢复', 'error'); return; }
-
+    var activeOwner = findActiveCodeOwner(entry.code);
+    if (activeOwner) { showRestoreConflictDialog(entry, activeOwner); return; }
     var parent = Z.findNodeByCode(gistData.products, entry.parentCode);
     if (!parent || Z.isDeleted(parent)) { toast('父节点仍在回收站，请先恢复父节点', 'warn'); return; }
-    var baseItem = baseItemOf(entry.parentCode, entry.code);
-    if (!baseItem) { toast('基准数据中找不到该库存，请刷新后重试', 'error'); return; }
-    saveWithOps([{
-        type: 'item.upsert',
-        parentCode: entry.parentCode,
-        code: entry.code,
-        originalCode: entry.code,
-        baseItem: Z.clone(baseItem),
-        fields: { deletedAt: undefined }
-    }], { successMessage: '已从回收站恢复库存 ' + entry.code }).then(function (result) {
-        if (result) { updateRecycleCount(); openRecycleModal(); }
-    });
+    runRecycleRestore([entry]);
 }
 function purgeRecycleNode(entry) {
     if (readOnly) { toast('当前为只读保护状态，无法删除', 'error'); return; }
     var rawNode = Z.findNodeByCode(gistData.products, entry.code);
     if (!rawNode) { toast('节点不存在或已被删除', 'error'); return; }
-    var baseNode = Z.findNodeByCode(baseDoc.products, entry.code) || rawNode;
     var counts = countNodeContents(rawNode, true);
     showDeleteConfirm({
         title: '彻底删除节点',
@@ -4104,11 +4471,8 @@ function purgeRecycleNode(entry) {
         message: '将永久删除节点「' + entry.code + '」及其下 ' + counts.children + ' 个子类、' + counts.items + ' 个库存。\n此操作不可恢复，Gist 中将不再保留该数据。',
         onConfirm: function () {
             deleteConfirmStatus.textContent = '删除中…';
-            return saveWithOps([{ type: 'node.delete', code: entry.code, baseNode: Z.clone(baseNode) }], {
-                successMessage: '已彻底删除节点 ' + entry.code,
-                onError: function (err, tip) { deleteConfirmStatus.textContent = '删除失败：' + tip; }
-            }).then(function (result) {
-                if (result) { updateRecycleCount(); openRecycleModal(); }
+            return purgeRecycleEntryDirect(entry).then(function (result) {
+                if (result) openRecycleModal();
                 return !!result;
             });
         }
@@ -4120,23 +4484,14 @@ function purgeRecycleItem(entry) {
     if (!parent) { toast('父节点不存在', 'error'); return; }
     var rawItem = Z.findItem(parent, entry.code);
     if (!rawItem) { toast('库存不存在或已被删除', 'error'); return; }
-    var baseItem = baseItemOf(entry.parentCode, entry.code) || rawItem;
     showDeleteConfirm({
         title: '彻底删除库存',
         code: entry.code,
         message: '将永久删除库存「' + entry.code + '」。\n此操作不可恢复，Gist 中将不再保留该数据。',
         onConfirm: function () {
             deleteConfirmStatus.textContent = '删除中…';
-            return saveWithOps([{
-                type: 'item.delete',
-                parentCode: entry.parentCode,
-                code: entry.code,
-                baseItem: Z.clone(baseItem)
-            }], {
-                successMessage: '已彻底删除库存 ' + entry.code,
-                onError: function (err, tip) { deleteConfirmStatus.textContent = '删除失败：' + tip; }
-            }).then(function (result) {
-                if (result) { updateRecycleCount(); openRecycleModal(); }
+            return purgeRecycleEntryDirect(entry).then(function (result) {
+                if (result) openRecycleModal();
                 return !!result;
             });
         }
@@ -4564,8 +4919,8 @@ function nodeMatchesTerm(node, code, term) {
     if (includesTerm(node.orderNumber, term) || includesTerm(node.trackingNumber, term) || includesTerm(node.remark, term)) return true;
     if (includesTerm(Z.normalizeStatus(node.status), term)) return true;
     if (Array.isArray(node.qrLinks) && node.qrLinks.some(function (link) { return includesTerm(link, term); })) return true;
-    // R5：类目条码节点搜索时把“自动汇总状态”也纳入匹配（如搜“部分在售”）
-    if (node.unified !== false && typeof Z.aggregateItemStatus === 'function') {
+    // v2.3.13：所有节点搜索时都把“自动汇总状态”纳入匹配（如搜“部分在售”“无库存”）
+    if (typeof Z.aggregateItemStatus === 'function') {
         var aggregated = Z.aggregateItemStatus(node);
         if (includesTerm(aggregated.label, term)) return true;
     }
@@ -4610,7 +4965,7 @@ function buildItemRowHtml(code, item, term) {
         + '<td>' + highlightText(item.trackingNumber || '', term) + '</td>'
         + '<td>' + highlightText(item.orderNumber || '', term) + '</td>'
         + '<td><span class="status-badge ' + Z.statusClass(itemStatus) + '">' + esc(itemStatus) + '</span></td>'
-        + '<td class="item-remark">' + (remarkHtml ? '📝 ' + remarkHtml : '') + '</td>'
+        + '<td class="item-remark">' + (remarkHtml || '') + '</td>'
         + '<td>' + linksHtml + '</td>'
         + '<td class="actions">' + actionsHtml + '</td></tr>';
 }
@@ -4684,13 +5039,13 @@ function buildNodeHtml(code, node, depth, term, ctx) {
         if (statsCache) statsCache.set(code, stats);
     }
     var unified = node.unified !== false;
-    // R5：类目条码节点的状态由类目下商品自动汇总；单件条码节点仍展示自身状态
-    var aggregatedStatus = unified ? Z.aggregateItemStatus(node) : null;
-    var nodeStatus = aggregatedStatus ? aggregatedStatus.label : Z.normalizeStatus(node.status);
-    var nodeStatusClass = aggregatedStatus ? aggregatedStatus.cls : Z.statusClass(nodeStatus);
-    var nodeStatusTitle = aggregatedStatus
+    // v2.3.13：所有节点（含类目条码=否的单件节点）状态都按子树库存自动汇总；无库存显示「无库存」
+    var aggregatedStatus = (Z.aggregateItemStatus) ? Z.aggregateItemStatus(node) : { total: 0, counts: { '待售': 0, '在售': 0, '售出': 0 }, label: '无库存', cls: 'status-unknown' };
+    var nodeStatus = aggregatedStatus.label;
+    var nodeStatusClass = aggregatedStatus.cls;
+    var nodeStatusTitle = aggregatedStatus.total
         ? ('在售 ' + aggregatedStatus.counts['在售'] + ' / 售出 ' + aggregatedStatus.counts['售出'] + ' / 待售 ' + aggregatedStatus.counts['待售'] + '（共 ' + aggregatedStatus.total + ' 件）')
-        : '';
+        : '该节点子树下暂无库存';
     var hasToggle = childResults.length > 0 || allItems.length > 0;
 
     var toggleIcon = hasToggle
@@ -4720,11 +5075,8 @@ function buildNodeHtml(code, node, depth, term, ctx) {
     }
 
     var hiddenClass = visible ? '' : ' tree-node-hidden';
-    // v2.3.7：降噪——类目/单件徽章、订单号徽章、以及“无库存”状态都不再渲染
-    var showStatusBadge = !(aggregatedStatus && aggregatedStatus.total === 0);
-    var statusBadgeHtml = showStatusBadge
-        ? '<span class="status-badge ' + nodeStatusClass + '"' + (nodeStatusTitle ? ' title="' + esc(nodeStatusTitle) + '"' : '') + '>' + esc(nodeStatus) + '</span>'
-        : '';
+    // v2.3.13：状态徽标始终渲染（无库存也显示「无库存」，不再隐藏）
+    var statusBadgeHtml = '<span class="status-badge ' + nodeStatusClass + '"' + (nodeStatusTitle ? ' title="' + esc(nodeStatusTitle) + '"' : '') + '>' + esc(nodeStatus) + '</span>';
     var html = '<div class="tree-node' + (expanded ? ' expanded' : '') + hiddenClass + '" data-code="' + esc(code) + '" data-depth="' + depth + '">'
         + '<div class="node-content">'
         + toggleIcon
@@ -5278,7 +5630,8 @@ function collectNodeFormValues() {
             orderNumber: trimOrUndefined(modalNodeOrder.value),
             qrLinks: parseLinks(modalNodeQrlinks.value),
             remark: trimOrUndefined(modalNodeRemark.value),
-            status: Z.normalizeStatus(modalNodeStatus.value)
+            // v2.3.13：非类目条码节点状态留空 = 自动识别（由库存汇总），不写入 status
+            status: modalNodeStatus.value ? Z.normalizeStatus(modalNodeStatus.value) : undefined
         }
     };
 }
@@ -5311,7 +5664,8 @@ function openNodeModal(mode, code, parentCode) {
         modalNodeQrlinks.value = '';
         modalNodeRemark.value = '';
         modalNodeOriginalCode.value = '';
-        fillStatusSelect(modalNodeStatus, STATUS.ON_SALE);
+        // v2.3.13：单件节点默认「自动识别（由库存汇总）」
+        fillStatusSelect(modalNodeStatus, '', true);
     } else {
         var node = findNodeByCode(code);
         if (!node || Z.isDeleted(node)) { toast('节点不存在或已在回收站', 'error'); return; }
@@ -5336,7 +5690,8 @@ function openNodeModal(mode, code, parentCode) {
         modalNodeOrder.value = node.orderNumber || '';
         modalNodeQrlinks.value = (Array.isArray(node.qrLinks) && node.qrLinks.length) ? node.qrLinks.join(', ') : '';
         modalNodeRemark.value = node.remark || '';
-        fillStatusSelect(modalNodeStatus, node.status);
+        // v2.3.13：非类目条码节点不再强制默认在售；历史 status 仅兼容、不参与展示/回填
+        fillStatusSelect(modalNodeStatus, '', true);
     }
     updateNodeCodeUI();
     updateUnifiedFieldsUI();
@@ -5425,6 +5780,12 @@ function saveNode() {
     }
     if (mode === 'add') {
         if (findCodeCollision(code, null)) {
+            // v2.3.13：若冲突记录在回收站，明确提示并可直接去回收站处理；在用记录仍禁止创建
+            var addRecycleHit = findRecycleConflict(code);
+            if (addRecycleHit) {
+                showRecycleConflictDialog(addRecycleHit, function () { closeNodeModal(); openRecycleModal(); });
+                return;
+            }
             toast('编码已被占用（节点与库存编码全局唯一）：' + code, { type: 'error', duration: 7000 });
             return;
         }
@@ -5433,6 +5794,11 @@ function saveNode() {
         if (!currentNode) { toast('节点不存在或已被删除', 'error'); return; }
         var renameCollision = findNodeRenameCollision(code, originalCode, currentNode);
         if (renameCollision) {
+            var renameRecycleHit = findRecycleConflict(renameCollision);
+            if (renameRecycleHit) {
+                showRecycleConflictDialog(renameRecycleHit, function () { closeNodeModal(); openRecycleModal(); });
+                return;
+            }
             toast('改名后的编码与现有记录冲突：' + renameCollision, { type: 'error', duration: 7000 });
             return;
         }
@@ -5604,6 +5970,12 @@ function saveItem() {
         var formatError = validateItemCodeFormat(code, parentCode);
         if (formatError) { toast(formatError, { type: 'error', duration: 7000 }); modalItemCode.focus(); return; }
         if (findCodeCollision(code, originalCode)) {
+            // v2.3.13：回收站同码明确提示，可去回收站处理；在用记录仍禁止创建
+            var itemRecycleHit = findRecycleConflict(code);
+            if (itemRecycleHit) {
+                showRecycleConflictDialog(itemRecycleHit, function () { closeItemModal(); openRecycleModal(); });
+                return;
+            }
             toast('编码已被占用（节点与库存编码全局唯一）：' + code, { type: 'error', duration: 7000 });
             return;
         }
@@ -5612,6 +5984,16 @@ function saveItem() {
         code = itemContext.autoCode || (itemContext.itemMode === 'add' ? generateItemCode(parentCode) : originalCode);
         if (!code) return;
         modalItemCode.value = codeSegmentOf(code);
+    }
+    // v2.3.13：自动编码若与回收站记录撞码，同样明确提示（在用记录仍禁止创建）
+    if (itemContext.itemMode === 'add' && findCodeCollision(code, originalCode)) {
+        var autoRecycleHit = findRecycleConflict(code);
+        if (autoRecycleHit) {
+            showRecycleConflictDialog(autoRecycleHit, function () { closeItemModal(); openRecycleModal(); });
+            return;
+        }
+        toast('编码已被占用（节点与库存编码全局唯一）：' + code, { type: 'error', duration: 7000 });
+        return;
     }
     var itemForm = collectItemFormValues();
     if (!itemForm.ok) {
@@ -5632,6 +6014,14 @@ function saveItem() {
             if (codes.length !== qty) {
                 toast('可用库存编码不足（最多到 999），请减少数量或先整理编码', { type: 'error', duration: 7000 });
                 return;
+            }
+            // v2.3.13：批量自动编码若与回收站记录撞码，先提示去回收站处理
+            for (var batchIndex = 0; batchIndex < codes.length; batchIndex++) {
+                var batchRecycleHit = findRecycleConflict(codes[batchIndex]);
+                if (batchRecycleHit) {
+                    showRecycleConflictDialog(batchRecycleHit, function () { closeItemModal(); openRecycleModal(); });
+                    return;
+                }
             }
             var batchOps = codes.map(function (newCode) {
                 return {
@@ -7911,8 +8301,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.12
-        setText(appVersionEl, 'R5 · v2.3.12 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.3.13
+        setText(appVersionEl, 'R5 · v2.3.13 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -7926,7 +8316,7 @@ window.openBatchStatus = openBatchStatus;
 
         fillStatusSelect(modalItemStatus, STATUS.ON_SALE);
         fillStatusSelect(batchStatusSelect, STATUS.ON_SALE);
-        fillStatusSelect(modalNodeStatus, STATUS.ON_SALE);
+        fillStatusSelect(modalNodeStatus, '', true);
         if (itemQtyRow) itemQtyRow.style.display = 'none';
         updateSyncMeta();
         updateRecycleCount();
@@ -7955,7 +8345,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.12：顶栏品牌与标题同行最右/条码 1..60 字符密集宽度标定）');
+    console.log('管理后台已加载（ZCFI R5 · v2.3.13：回收站批量恢复/删除 + 编码回收站冲突提示 + 节点状态自动汇总 + 刷新图标顺时针动画）');
 </script>
 </body>
 </html>
