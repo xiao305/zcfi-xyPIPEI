@@ -27,6 +27,9 @@ jobs:
       - name: Unit tests (core.js)
         run: node tools/test-core.mjs
 
+      - name: Unit tests (合单视图渲染)
+        run: node tools/test-merge-render.mjs
+
       - name: Unit tests (C-Lodop loader)
         run: node tools/test-lodop-loader.mjs
 

@@ -111,7 +111,7 @@ const requirements = [
     ['scan.html', /Content-Security-Policy/, 'scan 缺少 CSP meta'],
     ['scan.html', /js\/vendor\/html5-qrcode\.min\.js/, 'scan 未使用本地扫码库'],
     ['index.html', /Content-Security-Policy/, 'index 缺少 CSP meta'],
-    ['js/core.js', /VERSION = '2\.3\.0'/, 'core 版本不是 2.3.0'],
+    ['js/core.js', /VERSION = '2\.4\.0'/, 'core 版本不是 2.4.0'],
     ['js/core.js', /cache = 'no-store'/, 'core 未禁用 HTTP 缓存'],
     ['js/core.js', /credentials/, 'core 缺少 credentials 统一凭据'],
     ['js/core.js', /SCHEMA_VERSION/, 'core 缺少 schemaVersion'],
@@ -185,16 +185,16 @@ console.log('== 4. 版本一致性 ==');
 const versionFiles = ['README.md', 'CHANGELOG.md', 'docs/ARCHITECTURE.md', 'docs/RELEASE-CHECKLIST.md'];
 for (const rel of versionFiles) {
     if (!exists(rel)) { bad(`${rel} 不存在`); continue; }
-    check(/2\.3\.13/.test(read(rel)), `${rel} 未提及 v2.3.13`);
+    check(/2\.4\.0/.test(read(rel)), `${rel} 未提及 v2.4.0`);
 }
-check(/2\.2\.0/.test(read('js/core.js')) || /2\.3\.0/.test(read('js/core.js')), 'core 未标记 2.3.0');
+check(/2\.4\.0/.test(read('js/core.js')), 'core 未标记 2.4.0');
 {
     const cspMeta = (read('admin.html').match(/Content-Security-Policy" content="([^"]*)"/) || [null, ''])[1];
     check(!/unsafe-eval/.test(cspMeta), 'admin CSP 不应放开 unsafe-eval');
 }
-check(/R5 · v2\.3\.13/.test(read('admin.html')), 'admin 未标记 R5 · v2.3.13');
-check(/R3 · v2\.3\.13/.test(read('scan.html')), 'scan 未标记 R3 · v2.3.13');
-check(/\[2\.3\.13\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.3.13] 条目');
+check(/R5 · v2\.4\.0/.test(read('admin.html')), 'admin 未标记 R5 · v2.4.0');
+check(/R3 · v2\.4\.0/.test(read('scan.html')), 'scan 未标记 R3 · v2.4.0');
+check(/\[2\.4\.0\]/.test(read('CHANGELOG.md')), 'CHANGELOG 缺少 [2.4.0] 条目');
 
 console.log('== 5. 文件结构与存在性 ==');
 check(!exists('CLodopFuncs.js'), 'CLodopFuncs.js 仍被提交（应删除，运行时加载）');
@@ -204,6 +204,7 @@ check(exists('js/vendor/README.md'), '缺少 vendor 依赖说明 js/vendor/READM
 check(exists('tools/scanner-test.html'), '缺少 tools/scanner-test.html（调试页）');
 check(exists('tools/test-core.mjs'), '缺少 tools/test-core.mjs（core 单元测试）');
 check(exists('tools/test-lodop-loader.mjs'), '缺少 tools/test-lodop-loader.mjs（C-Lodop loader 单元测试）');
+check(exists('tools/test-merge-render.mjs'), '缺少 tools/test-merge-render.mjs（合单视图渲染单元测试）');
 check(exists('.github/workflows/ci.yml'), '缺少 CI 配置 .github/workflows/ci.yml');
 
 for (const rel of ['admin.html', 'scan.html', 'index.html']) {

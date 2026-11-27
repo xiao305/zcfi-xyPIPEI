@@ -30,7 +30,7 @@
 (function (global) {
     'use strict';
 
-    var VERSION = '2.3.0';
+    var VERSION = '2.4.0';
     /** 数据文件结构版本；根级 schemaVersion 缺失视为 0/未标记，保存时补写当前版本 */
     var SCHEMA_VERSION = 1;
     var API_ROOT = 'https://api.github.com';
@@ -1300,6 +1300,197 @@
     }
 
     /* ============================================================
+     * 七点六、合单分组（包裹 / 订单）
+     *
+     * 语义（v2.4.0）：
+     *  - 快递单号相同 = 同一个包裹；订单号相同 = 同一个订单。
+     *  - 订单号与快递单号互不约束，不做交叉校验，不要求相等。
+     *  - 空值不参与分组（空快递单号 = 未分配包裹；空订单号 = 未归属订单）。
+     *  - 已删除项（含祖先节点删除）不计入任何分组；恢复后字段原样带回，自动回到原组。
+     *  - 只读视图：完全由现有 trackingNumber / orderNumber 字段实时聚合，不改数据结构。
+     * ============================================================ */
+
+    /** 分组键归一：去零宽/空白、转大写；空值返回 ''（不参与分组） */
+    function groupKeyOf(value) {
+        var code = normalizeCode(value);
+        return code ? code.toUpperCase() : '';
+    }
+
+    /** 分组显示值：去零宽、首尾 trim，保留原大小写与内部空格 */
+    function groupLabelOf(value) {
+        if (value === null || value === undefined) return '';
+        return String(value).replace(INVISIBLE_RE, '').trim();
+    }
+
+    /**
+     * 收集所有「有效库存项」（排除软删除项与已删除祖先）。
+     * 返回 [{ parentCode, nodeName, code, name, status, trackingNumber, orderNumber, trackingKey, orderKey }]
+     */
+    function collectMergeItems(docOrProducts) {
+        var products = getProducts(docOrProducts);
+        var rows = [];
+        function visit(container, inheritedDeleted) {
+            if (!isPlainObject(container)) return;
+            for (var key in container) {
+                if (!Object.prototype.hasOwnProperty.call(container, key)) continue;
+                var node = container[key];
+                if (!node || typeof node !== 'object') continue;
+                var nodeDeleted = inheritedDeleted || isDeleted(node);
+                var items = Array.isArray(node.items) ? node.items : [];
+                for (var i = 0; i < items.length; i++) {
+                    var item = items[i];
+                    if (!item || typeof item !== 'object') continue;
+                    if (nodeDeleted || isDeleted(item)) continue;
+                    var tracking = groupLabelOf(item.trackingNumber);
+                    var order = groupLabelOf(item.orderNumber);
+                    rows.push({
+                        parentCode: String(key),
+                        nodeName: node.name ? String(node.name) : String(key),
+                        code: item.code === undefined || item.code === null ? '' : String(item.code),
+                        name: item.name ? String(item.name) : (node.name ? String(node.name) : String(key)),
+                        status: normalizeStatus(item.status),
+                        trackingNumber: tracking,
+                        orderNumber: order,
+                        trackingKey: groupKeyOf(tracking),
+                        orderKey: groupKeyOf(order)
+                    });
+                }
+                if (isPlainObject(node.children)) visit(node.children, nodeDeleted);
+            }
+        }
+        visit(products, false);
+        return rows;
+    }
+
+    /** 按 key 聚合到分组列表（保持首次出现顺序） */
+    function bucketByKey(rows, keyField, labelField, map, order) {
+        for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            var key = row[keyField];
+            if (!key) continue;
+            var group = map[key];
+            if (!group) {
+                group = { key: key, label: row[labelField], count: 0, items: [] };
+                map[key] = group;
+                order.push(key);
+            }
+            group.items.push(row);
+            group.count = group.items.length;
+        }
+    }
+
+    /**
+     * 生成合单索引（纯函数、只读）。
+     * 返回：
+     * {
+     *   items, total,
+     *   trackingGroups: [{ key, label, count, crossOrder, orders:[{key,label,count,items}] }],
+     *   orderGroups:    [{ key, label, count, packages:[{key,label,count,items}] }],
+     *   pendingGroups:  [{ key, label, count, items }]    // 有订单号、无快递单号（待打包）
+     *   untracked: [row]      // 无快递单号（含无订单号的孤立项）
+     *   unassigned: [row]     // 无订单号
+     *   trackingByKey, orderByKey
+     * }
+     */
+    function buildMergeIndex(docOrProducts) {
+        var rows = collectMergeItems(docOrProducts);
+        var trackingByKey = Object.create(null);
+        var orderByKey = Object.create(null);
+        var trackingOrder = [];
+        var orderOrder = [];
+        bucketByKey(rows, 'trackingKey', 'trackingNumber', trackingByKey, trackingOrder);
+        bucketByKey(rows, 'orderKey', 'orderNumber', orderByKey, orderOrder);
+
+        var trackingGroups = trackingOrder.map(function (key) {
+            var group = trackingByKey[key];
+            var orderMap = Object.create(null);
+            var orderKeys = [];
+            group.items.forEach(function (row) {
+                if (!row.orderKey) return;
+                if (!orderMap[row.orderKey]) {
+                    orderMap[row.orderKey] = { key: row.orderKey, label: row.orderNumber, count: 0, items: [] };
+                    orderKeys.push(row.orderKey);
+                }
+                orderMap[row.orderKey].items.push(row);
+                orderMap[row.orderKey].count = orderMap[row.orderKey].items.length;
+            });
+            return {
+                key: group.key,
+                label: group.label,
+                count: group.count,
+                orders: orderKeys.map(function (k) { return orderMap[k]; }),
+                crossOrder: orderKeys.length >= 2,
+                items: group.items
+            };
+        });
+
+        var orderGroups = orderOrder.map(function (key) {
+            var group = orderByKey[key];
+            var trackMap = Object.create(null);
+            var trackKeys = [];
+            var noPackageCount = 0;
+            group.items.forEach(function (row) {
+                if (!row.trackingKey) { noPackageCount++; return; }
+                if (!trackMap[row.trackingKey]) {
+                    trackMap[row.trackingKey] = { key: row.trackingKey, label: row.trackingNumber, count: 0, items: [] };
+                    trackKeys.push(row.trackingKey);
+                }
+                trackMap[row.trackingKey].items.push(row);
+                trackMap[row.trackingKey].count = trackMap[row.trackingKey].items.length;
+            });
+            var packages = trackKeys.map(function (k) { return trackMap[k]; });
+            return {
+                key: group.key,
+                label: group.label,
+                count: group.count,
+                packages: packages,
+                packageCount: packages.length,
+                noPackageCount: noPackageCount,
+                items: group.items
+            };
+        });
+
+        // 待打包：有订单号、无快递单号，按订单聚合
+        var pendingMap = Object.create(null);
+        var pendingKeys = [];
+        var untracked = [];
+        var unassigned = [];
+        rows.forEach(function (row) {
+            if (!row.trackingKey) untracked.push(row);
+            if (!row.orderKey) unassigned.push(row);
+            if (row.trackingKey || !row.orderKey) return;
+            if (!pendingMap[row.orderKey]) {
+                pendingMap[row.orderKey] = { key: row.orderKey, label: row.orderNumber, count: 0, items: [] };
+                pendingKeys.push(row.orderKey);
+            }
+            pendingMap[row.orderKey].items.push(row);
+            pendingMap[row.orderKey].count = pendingMap[row.orderKey].items.length;
+        });
+
+        return {
+            items: rows,
+            total: rows.length,
+            trackingGroups: trackingGroups,
+            orderGroups: orderGroups,
+            pendingGroups: pendingKeys.map(function (k) { return pendingMap[k]; }),
+            untracked: untracked,
+            unassigned: unassigned,
+            trackingByKey: trackingByKey,
+            orderByKey: orderByKey
+        };
+    }
+
+    /** 查某条库存所在分组的条数（无单号返回 0） */
+    function groupCountOf(index, field, value) {
+        if (!index) return 0;
+        var key = groupKeyOf(value);
+        if (!key) return 0;
+        var map = field === 'orderNumber' ? index.orderByKey : index.trackingByKey;
+        var group = map && map[key];
+        return group ? group.count : 0;
+    }
+
+    /* ============================================================
      * 八、导出
      * ============================================================ */
     global.ZCFI = {
@@ -1343,6 +1534,11 @@
         walk: walk,
         countDescendants: countDescendants,
         aggregateItemStatus: aggregateItemStatus,
+        groupKeyOf: groupKeyOf,
+        groupLabelOf: groupLabelOf,
+        collectMergeItems: collectMergeItems,
+        buildMergeIndex: buildMergeIndex,
+        groupCountOf: groupCountOf,
         validateDoc: validateDoc,
         validateDocDeep: validateDocDeep,
         migrateDoc: migrateDoc,

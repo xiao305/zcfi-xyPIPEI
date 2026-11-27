@@ -1478,6 +1478,126 @@
         }
         .confirm-require { margin-top: 12px; }
 
+        /* ===== 合单（包裹/订单分组）视图 v2.4.0 ===== */
+        .merge-badge {
+            display: inline-block;
+            margin-left: 4px;
+            padding: 0 6px;
+            border-radius: 9px;
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 16px;
+            cursor: pointer;
+            border: 1px solid #bfdbfe;
+            vertical-align: baseline;
+        }
+        .merge-badge.single-order { background: #d1fae5; color: #047857; border-color: #a7f3d0; }
+        .merge-badge:hover { filter: brightness(0.95); }
+        #merge-overlay .modal { max-width: 900px; }
+        /* 合单视图是“覆盖层里的只读视图”：层级必须低于其它 modal-overlay，
+           否则从合单视图点“编辑”打开的商品弹窗会被压在后面（看不到/点不到）。 */
+        #merge-overlay { z-index: 950; }
+        .merge-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin: 6px 0 10px;
+        }
+        .merge-tabs { display: inline-flex; border: 1px solid var(--color-gray-200); border-radius: 8px; overflow: hidden; }
+        .merge-tab {
+            border: 0;
+            background: #fff;
+            padding: 6px 14px;
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--color-gray-600);
+            min-height: 32px;
+        }
+        .merge-tab.active { background: var(--color-primary, #2563eb); color: #fff; }
+        #merge-search { flex: 1 1 160px; min-width: 140px; }
+        #merge-summary {
+            font-size: 12px;
+            color: var(--color-gray-600);
+            background: var(--color-gray-100);
+            border-radius: 8px;
+            padding: 6px 10px;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        #merge-body {
+            max-height: 56vh;
+            overflow: auto;
+            border: 1px solid var(--color-gray-200);
+            border-radius: 10px;
+            padding: 8px 10px;
+            font-size: 13px;
+        }
+        .merge-section {
+            border-left: 2px solid #e2e8f0;
+            margin: 4px 0 4px 2px;
+            padding-left: 8px;
+        }
+        .merge-section--root { border-left: 0; margin-left: 0; padding-left: 0; }
+        .merge-section.collapsed > .merge-children { display: none; }
+        .merge-head {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 2px;
+            flex-wrap: wrap;
+        }
+        .merge-toggle {
+            border: 0;
+            background: transparent;
+            cursor: pointer;
+            padding: 2px;
+            color: var(--color-gray-500, #64748b);
+            display: inline-flex;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: rotate(90deg);
+        }
+        .merge-section.collapsed .merge-toggle { transform: rotate(0deg); }
+        .merge-label { font-weight: 600; color: var(--color-gray-900, #0f172a); word-break: break-all; }
+        .merge-label .merge-prefix { color: var(--color-gray-500, #64748b); font-weight: 500; }
+        .merge-count { color: var(--color-gray-600, #475569); font-size: 12px; }
+        .merge-tag {
+            font-size: 11px;
+            border-radius: 8px;
+            padding: 1px 8px;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+        .merge-tag.single { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+        .merge-tag.pending { background: #e2e8f0; color: #334155; border-color: #cbd5e1; }
+        .merge-children { padding-left: 14px; }
+        .merge-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 3px 4px;
+            border-radius: 6px;
+            flex-wrap: wrap;
+        }
+        .merge-item:hover { background: var(--color-gray-100, #f1f5f9); }
+        .merge-item .merge-code { font-family: ui-monospace, Consolas, monospace; color: var(--color-gray-600, #475569); word-break: break-all; }
+        .merge-item .merge-name { color: var(--color-gray-900, #0f172a); }
+        .merge-empty {
+            color: var(--color-gray-500, #64748b);
+            font-size: 12px;
+            padding: 6px 4px;
+        }
+        .merge-section-title {
+            margin: 10px 0 4px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--color-gray-600, #475569);
+            letter-spacing: 0.02em;
+        }
+
         /* ===== 搜索高亮 ===== */
         #tree-container mark {
             background: #fef08a;
@@ -1711,6 +1831,13 @@
                 min-height: 44px;
                 min-width: 44px;
             }
+            /* v2.4.0：窄屏下合单计数徽标保持小尺寸（不套用 44px 触摸目标） */
+            #tree-container [data-action="open-merge"] {
+                display: inline-block;
+                min-height: 0;
+                min-width: 0;
+                padding: 0 6px;
+            }
             .tree-node .node-content .toggle {
                 width: 44px;
                 height: 44px;
@@ -1871,6 +1998,7 @@
                 <button class="btn btn-secondary" id="clear-search-btn">清除</button>
                 <button class="btn btn-secondary" id="expand-all-btn" type="button">全部展开</button>
                 <button class="btn btn-secondary" id="collapse-all-btn" type="button">全部折叠</button>
+                <button class="btn btn-secondary" id="merge-view-btn" type="button" title="按包裹/订单查看合单分组">📦 合单视图</button>
             </div>
             <div class="batch-bar" id="batch-bar">
                 <label class="global-select"><input type="checkbox" id="global-select-all" /> 全选当前筛选结果</label>
@@ -2053,6 +2181,30 @@
         <div class="btn-group">
             <button type="button" class="btn btn-secondary" id="confirm-cancel">取消</button>
             <button type="button" class="btn btn-danger" id="confirm-ok">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- 合单视图（按包裹 / 按订单） -->
+<div class="modal-overlay" id="merge-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="merge-title">
+        <h3 id="merge-title">合单视图</h3>
+        <div class="merge-toolbar">
+            <div class="merge-tabs" role="tablist" aria-label="分组方式">
+                <button type="button" class="merge-tab active" data-merge-tab="package" role="tab" aria-selected="true">按包裹</button>
+                <button type="button" class="merge-tab" data-merge-tab="order" role="tab" aria-selected="false">按订单</button>
+            </div>
+            <input type="text" id="merge-search" placeholder="筛选单号/编码/名称…" aria-label="筛选合单分组" />
+            <button type="button" class="btn btn-secondary" id="merge-expand-all">全部展开</button>
+            <button type="button" class="btn btn-secondary" id="merge-collapse-all">全部折叠</button>
+        </div>
+        <div id="merge-summary"></div>
+        <div id="merge-body"></div>
+        <div class="btn-group">
+            <div class="save-status" id="merge-status" role="status" aria-live="polite"></div>
+            <div>
+                <button type="button" class="btn btn-secondary" id="merge-close">关闭</button>
+            </div>
         </div>
     </div>
 </div>
@@ -2497,6 +2649,21 @@ var summaryPendingEl = $('sum-pending');
 var nodeSortSelect = $('node-sort-select');
 var expandAllBtn = $('expand-all-btn');
 var collapseAllBtn = $('collapse-all-btn');
+// v2.4.0：合单视图（按包裹 / 按订单）
+var mergeViewBtn = $('merge-view-btn');
+var mergeOverlay = $('merge-overlay');
+var mergeSearchInput = $('merge-search');
+var mergeBody = $('merge-body');
+var mergeSummary = $('merge-summary');
+var mergeCloseBtn = $('merge-close');
+var mergeStatusEl = $('merge-status');
+var mergeTabs = mergeOverlay ? mergeOverlay.querySelectorAll('[data-merge-tab]') : [];
+var mergeExpandAllBtn = $('merge-expand-all');
+var mergeCollapseAllBtn = $('merge-collapse-all');
+var mergeState = {
+    tab: 'package',
+    collapsed: Object.create(null)
+};
 var globalSelectAllEl = $('global-select-all');
 var globalSelectedCount = $('global-selected-count');
 var globalBatchStatusBtn = $('global-batch-status-btn');
@@ -4936,7 +5103,19 @@ function itemMatchesTerm(item, term) {
     return false;
 }
 
-function buildItemRowHtml(code, item, term) {
+/** v2.4.0：单号后的合单计数徽标（同包裹/同订单 ≥2 件才显示，点击打开合单视图） */
+function buildMergeBadgeHtml(field, value, mergeIndex) {
+    if (!value) return '';
+    var count = Z.groupCountOf(mergeIndex, field, value);
+    if (count < 2) return '';
+    var label = field === 'orderNumber' ? '同订单' : '同包裹';
+    var cls = field === 'orderNumber' ? ' merge-badge single-order' : ' merge-badge';
+    return '<span class="' + cls.trim() + '" data-action="open-merge" data-merge-field="' + esc(field) + '"'
+        + ' data-merge-value="' + esc(value) + '"'
+        + ' title="' + esc(label + '共 ' + count + ' 件，点击查看') + '">×' + count + '</span>';
+}
+
+function buildItemRowHtml(code, item, term, mergeIndex) {
     var itemCode = item.code === undefined || item.code === null ? '' : String(item.code);
     var itemStatus = Z.normalizeStatus(item.status);
     var costText = (item.cost === undefined || item.cost === null || item.cost === '') ? '' : esc(item.cost);
@@ -4962,8 +5141,8 @@ function buildItemRowHtml(code, item, term) {
         + '<td>' + highlightText(itemCode, term) + '</td>'
         + '<td>' + highlightText(item.name || '', term) + '</td>'
         + '<td>' + costText + '</td>'
-        + '<td>' + highlightText(item.trackingNumber || '', term) + '</td>'
-        + '<td>' + highlightText(item.orderNumber || '', term) + '</td>'
+        + '<td>' + highlightText(item.trackingNumber || '', term) + buildMergeBadgeHtml('trackingNumber', item.trackingNumber, mergeIndex) + '</td>'
+        + '<td>' + highlightText(item.orderNumber || '', term) + buildMergeBadgeHtml('orderNumber', item.orderNumber, mergeIndex) + '</td>'
         + '<td><span class="status-badge ' + Z.statusClass(itemStatus) + '">' + esc(itemStatus) + '</span></td>'
         + '<td class="item-remark">' + (remarkHtml || '') + '</td>'
         + '<td>' + linksHtml + '</td>'
@@ -5064,7 +5243,7 @@ function buildNodeHtml(code, node, depth, term, ctx) {
 
     var itemsHtml = '';
     if (displayItems.length) {
-        var rows = displayItems.map(function (item) { return buildItemRowHtml(code, item, term); }).join('');
+        var rows = displayItems.map(function (item) { return buildItemRowHtml(code, item, term, ctx.mergeIndex); }).join('');
         itemsHtml = '<div class="batch-actions">'
             + '<button type="button" class="btn btn-sm btn-text" data-action="batch-print" data-parent="' + esc(code) + '">批量打印</button>'
             + '<button type="button" class="btn btn-sm btn-text" data-action="batch-status" data-parent="' + esc(code) + '">批量修改状态</button>'
@@ -5093,6 +5272,301 @@ function buildNodeHtml(code, node, depth, term, ctx) {
     return { html: html, visible: visible };
 }
 
+// ============================================================
+// v2.4.0 合单视图（按包裹 / 按订单）
+// 规则：快递单号相同=同一包裹；订单号相同=同一订单；空值不建组；
+//       已删除项不计入；两字段互不校验；批次只做筛选不参与分组。
+// ============================================================
+var mergeIndexCache = { doc: null, index: null };
+
+/** 取当前数据的合单索引（同一 gistData 引用内复用，保存后自动失效） */
+function getMergeIndex() {
+    if (!gistData || !gistData.products) return Z.buildMergeIndex({});
+    if (mergeIndexCache.doc === gistData) return mergeIndexCache.index;
+    mergeIndexCache.doc = gistData;
+    mergeIndexCache.index = Z.buildMergeIndex(gistData);
+    return mergeIndexCache.index;
+}
+
+function mergeFilterItems(items, term) {
+    if (!term) return items;
+    return items.filter(function (row) {
+        return includesTerm(row.code, term) || includesTerm(row.name, term)
+            || includesTerm(row.parentCode, term) || includesTerm(row.trackingNumber, term)
+            || includesTerm(row.orderNumber, term) || includesTerm(row.status, term);
+    });
+}
+
+function mergeItemHtml(row, term) {
+    return '<div class="merge-item">'
+        + '<span class="merge-code">' + highlightText(row.code, term) + '</span>'
+        + '<span class="merge-name">' + highlightText(row.name, term) + '</span>'
+        + '<span class="merge-count">' + highlightText(row.parentCode, term) + '</span>'
+        + '<span class="status-badge ' + Z.statusClass(row.status) + '">' + esc(row.status) + '</span>'
+        + '<button type="button" class="btn btn-sm btn-text" data-action="edit-item"'
+        + ' data-parent="' + esc(row.parentCode) + '" data-item="' + esc(row.code) + '">编辑</button>'
+        + '</div>';
+}
+
+function mergeItemsHtml(items, term) {
+    var rows = mergeFilterItems(items, term);
+    if (!rows.length) return '<div class="merge-empty">（无匹配项）</div>';
+    return rows.map(function (row) { return mergeItemHtml(row, term); }).join('');
+}
+
+function mergeIsCollapsed(key) {
+    return !!mergeState.collapsed[key];
+}
+
+function mergeSectionHtml(key, headHtml, childrenHtml, isRoot) {
+    var collapsed = mergeIsCollapsed(key);
+    return '<div class="merge-section' + (isRoot ? ' merge-section--root' : '') + (collapsed ? ' collapsed' : '')
+        + '" data-merge-section="' + esc(key) + '">'
+        + '<div class="merge-head">'
+        + '<button type="button" class="merge-toggle" data-merge-toggle="' + esc(key) + '"'
+        + ' aria-label="展开或收起" aria-expanded="' + (collapsed ? 'false' : 'true') + '">' + TREE_TOGGLE_SVG + '</button>'
+        + headHtml
+        + '</div>'
+        + '<div class="merge-children">' + childrenHtml + '</div>'
+        + '</div>';
+}
+
+/** 按包裹视图：包裹 → 订单 → 库存 */
+function renderMergePackageView(index, term) {
+    var parts = [];
+    var shown = 0;
+    var totalItems = 0;
+    index.trackingGroups.forEach(function (group) {
+        var labelHit = term && includesTerm(group.label, term);
+        var hits = mergeFilterItems(group.items, term);
+        if (term && !labelHit && !hits.length) return;
+        var itemTerm = labelHit ? '' : term;
+        var children = '';
+        var loose = group.items.filter(function (row) { return !row.orderKey; });
+        if (itemTerm) loose = mergeFilterItems(loose, itemTerm);
+        var orderList = group.orders.filter(function (order) {
+            if (!itemTerm) return true;
+            return includesTerm(order.label, itemTerm) || mergeFilterItems(order.items, itemTerm).length > 0;
+        });
+        if (orderList.length) {
+            orderList.forEach(function (order) {
+                children += mergeSectionHtml('pkg-o:' + group.key + '|' + order.key,
+                    '<span class="merge-label"><span class="merge-prefix">订单 </span>' + highlightText(order.label, term) + '</span>'
+                    + '<span class="merge-count">共 ' + order.count + ' 件</span>',
+                    mergeItemsHtml(order.items, itemTerm));
+            });
+        }
+        if (loose.length) {
+            children += mergeSectionHtml('pkg-loose:' + group.key,
+                '<span class="merge-label"><span class="merge-prefix">未填订单号</span></span>'
+                + '<span class="merge-count">共 ' + loose.length + ' 件</span>',
+                mergeItemsHtml(loose, itemTerm));
+        }
+        parts.push(mergeSectionHtml('pkg:' + group.key,
+            '<span class="merge-label"><span class="merge-prefix">包裹 </span>' + highlightText(group.label, term) + '</span>'
+            + '<span class="merge-count">共 ' + group.count + ' 件</span>'
+            + (group.crossOrder
+                ? '<span class="merge-tag">跨订单合包</span>'
+                : '<span class="merge-tag single">单订单</span>'),
+            children));
+        shown += 1;
+        totalItems += group.count;
+    });
+
+    var pendingHtml = '';
+    var pendingShown = 0;
+    index.pendingGroups.forEach(function (group) {
+        var rows = mergeFilterItems(group.items, term);
+        if (term && !rows.length && !includesTerm(group.label, term)) return;
+        pendingHtml += mergeSectionHtml('pending:' + group.key,
+            '<span class="merge-label"><span class="merge-prefix">订单 </span>' + highlightText(group.label, term) + '</span>'
+            + '<span class="merge-count">共 ' + group.count + ' 件</span>'
+            + '<span class="merge-tag pending">待打包</span>',
+            mergeItemsHtml(group.items, term));
+        pendingShown += 1;
+    });
+
+    var body = parts.length ? parts.join('') : '<div class="merge-empty">暂无已分配快递单号的包裹</div>';
+    if (pendingShown) {
+        body += '<div class="merge-section-title">待打包（有订单号、未分配快递单号）</div>' + pendingHtml;
+    }
+    var unassignedRows = mergeFilterItems(index.unassigned, term);
+    if (unassignedRows.length) {
+        body += '<div class="merge-section-title">未填订单号的库存</div>'
+            + '<div class="merge-section merge-section--root">' + mergeItemsHtml(index.unassigned, term) + '</div>';
+    }
+    return { html: body, shown: shown, totalItems: totalItems };
+}
+
+/** 按订单视图：订单 → 包裹 → 库存 */
+function renderMergeOrderView(index, term) {
+    var parts = [];
+    var shown = 0;
+    var totalItems = 0;
+    index.orderGroups.forEach(function (group) {
+        var labelHit = term && includesTerm(group.label, term);
+        if (term && !labelHit && !mergeFilterItems(group.items, term).length) return;
+        var itemTerm = labelHit ? '' : term;
+        var children = '';
+        var pkgList = group.packages.filter(function (pkg) {
+            if (!itemTerm) return true;
+            return includesTerm(pkg.label, itemTerm) || mergeFilterItems(pkg.items, itemTerm).length > 0;
+        });
+        pkgList.forEach(function (pkg) {
+            children += mergeSectionHtml('ord-p:' + group.key + '|' + pkg.key,
+                '<span class="merge-label"><span class="merge-prefix">包裹 </span>' + highlightText(pkg.label, term) + '</span>'
+                + '<span class="merge-count">共 ' + pkg.count + ' 件</span>',
+                mergeItemsHtml(pkg.items, itemTerm));
+        });
+        var noPkg = group.items.filter(function (row) { return !row.trackingKey; });
+        if (itemTerm) noPkg = mergeFilterItems(noPkg, itemTerm);
+        if (noPkg.length) {
+            children += mergeSectionHtml('ord-nopkg:' + group.key,
+                '<span class="merge-label"><span class="merge-prefix">未分配快递</span></span>'
+                + '<span class="merge-count">共 ' + noPkg.length + ' 件</span>'
+                + '<span class="merge-tag pending">待打包</span>',
+                mergeItemsHtml(noPkg, itemTerm));
+        }
+        parts.push(mergeSectionHtml('ord:' + group.key,
+            '<span class="merge-label"><span class="merge-prefix">订单 </span>' + highlightText(group.label, term) + '</span>'
+            + '<span class="merge-count">共 ' + group.count + ' 件</span>'
+            + '<span class="merge-tag' + (group.packageCount > 1 ? '' : ' single') + '">'
+            + (group.packageCount > 1 ? '一单多包 ' + group.packageCount + ' 个包裹' : '单包裹')
+            + '</span>',
+            children));
+        shown += 1;
+        totalItems += group.count;
+    });
+    var body = parts.length ? parts.join('') : '<div class="merge-empty">暂无已填订单号的库存</div>';
+    var unassignedRows = mergeFilterItems(index.unassigned, term);
+    if (unassignedRows.length) {
+        body += '<div class="merge-section-title">未填订单号的库存</div>'
+            + '<div class="merge-section merge-section--root">' + mergeItemsHtml(index.unassigned, term) + '</div>';
+    }
+    return { html: body, shown: shown, totalItems: totalItems };
+}
+
+function renderMergeView() {
+    if (!mergeBody) return;
+    var index = getMergeIndex();
+    var term = Z.normalizeQuery(mergeSearchInput ? mergeSearchInput.value : '');
+    var result = mergeState.tab === 'order'
+        ? renderMergeOrderView(index, term)
+        : renderMergePackageView(index, term);
+    mergeBody.innerHTML = result.html;
+
+    var crossCount = index.trackingGroups.filter(function (g) { return g.crossOrder; }).length;
+    var multiPkgOrders = index.orderGroups.filter(function (g) { return g.packageCount > 1; }).length;
+    if (mergeSummary) {
+        mergeSummary.innerHTML = '有效件数 <b>' + index.total + '</b> ｜ 包裹 <b>' + index.trackingGroups.length + '</b> 个'
+            + '（跨订单合包 ' + crossCount + ' 个）｜ 订单 <b>' + index.orderGroups.length + '</b> 个'
+            + '（一单多包 ' + multiPkgOrders + ' 个）｜ 待打包 <b>' + index.untracked.length + '</b> 件'
+            + (term ? '　<span style="color:#b45309;">筛选：' + esc(mergeSearchInput.value.trim()) + '</span>' : '');
+    }
+    if (mergeStatusEl) mergeStatusEl.textContent = '显示 ' + result.shown + ' 个分组';
+}
+
+function syncMergeTabs() {
+    Array.prototype.forEach.call(mergeTabs, function (btn) {
+        var active = btn.getAttribute('data-merge-tab') === mergeState.tab;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+}
+
+function openMergeView(field, value) {
+    if (!gistData || !gistData.products) { toast('数据尚未加载，无法查看合单分组', 'error'); return; }
+    if (!mergeOverlay) return;
+    mergeState.tab = field === 'orderNumber' ? 'order' : 'package';
+    mergeState.collapsed = Object.create(null);
+    if (mergeSearchInput) mergeSearchInput.value = value ? String(value) : '';
+    syncMergeTabs();
+    renderMergeView();
+    mergeOverlay.classList.add('active');
+    if (mergeSearchInput) mergeSearchInput.focus();
+}
+
+function closeMergeView() {
+    if (mergeOverlay) mergeOverlay.classList.remove('active');
+}
+
+/** 合单视图内的展开/收起（不重渲染，只切 class，保留滚动位置） */
+function toggleMergeSection(key) {
+    if (!mergeBody || !key) return;
+    mergeState.collapsed[key] = !mergeState.collapsed[key];
+    var sections = mergeBody.querySelectorAll('[data-merge-section]');
+    Array.prototype.forEach.call(sections, function (section) {
+        if (section.getAttribute('data-merge-section') !== key) return;
+        section.classList.toggle('collapsed', !!mergeState.collapsed[key]);
+        var toggle = section.querySelector('.merge-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', mergeState.collapsed[key] ? 'false' : 'true');
+    });
+}
+
+function setAllMergeCollapsed(collapsed) {
+    mergeState.collapsed = Object.create(null);
+    if (collapsed && mergeBody) {
+        Array.prototype.forEach.call(mergeBody.querySelectorAll('[data-merge-section]'), function (section) {
+            mergeState.collapsed[section.getAttribute('data-merge-section')] = true;
+        });
+    }
+    renderMergeView();
+}
+
+if (mergeViewBtn) {
+    mergeViewBtn.addEventListener('click', function () { openMergeView('', ''); });
+}
+if (mergeCloseBtn) {
+    mergeCloseBtn.addEventListener('click', closeMergeView);
+}
+if (mergeOverlay) {
+    mergeOverlay.addEventListener('click', function (event) {
+        if (event.target === mergeOverlay) closeMergeView();
+    });
+}
+Array.prototype.forEach.call(mergeTabs, function (btn) {
+    btn.addEventListener('click', function () {
+        mergeState.tab = btn.getAttribute('data-merge-tab') === 'order' ? 'order' : 'package';
+        syncMergeTabs();
+        renderMergeView();
+    });
+});
+if (mergeSearchInput) {
+    var mergeSearchTimer = null;
+    mergeSearchInput.addEventListener('input', function () {
+        if (mergeSearchTimer) clearTimeout(mergeSearchTimer);
+        mergeSearchTimer = setTimeout(renderMergeView, 160);
+    });
+}
+if (mergeExpandAllBtn) {
+    mergeExpandAllBtn.addEventListener('click', function () { setAllMergeCollapsed(false); });
+}
+if (mergeCollapseAllBtn) {
+    mergeCollapseAllBtn.addEventListener('click', function () { setAllMergeCollapsed(true); });
+}
+if (mergeBody) {
+    mergeBody.addEventListener('click', function (event) {
+        var target = event.target;
+        if (!target || !target.closest) return;
+        var toggleBtn = target.closest('[data-merge-toggle]');
+        if (toggleBtn) {
+            toggleMergeSection(toggleBtn.getAttribute('data-merge-toggle'));
+            return;
+        }
+        var el = target.closest('[data-action]');
+        if (el) {
+            runTreeAction(el.getAttribute('data-action'), el.getAttribute('data-code'),
+                el.getAttribute('data-parent'), el.getAttribute('data-item'), el);
+            return;
+        }
+        var head = target.closest('.merge-head');
+        if (head) {
+            var section = head.closest('[data-merge-section]');
+            if (section) toggleMergeSection(section.getAttribute('data-merge-section'));
+        }
+    });
+}
+
 function renderTree() {
     closeActionMenu(false); // v2.3.7：重新渲染时关闭 ⋮ 浮层，避免菜单与旧 DOM 脱节
     var products = gistData.products || {};
@@ -5102,10 +5576,12 @@ function renderTree() {
     var parts = [];
     var visibleCount = 0;
     var subtreeStatsCache = new Map(); // L-16：本轮渲染的子树统计缓存
+    // v2.4.0：本轮渲染的合单索引（包裹/订单各一组），用于单号后的 ×N 徽标
+    var mergeIndex = getMergeIndex();
     roots.forEach(function (code) {
         var node = products[code];
         if (!node || typeof node !== 'object') return;
-        var result = buildNodeHtml(code, node, 0, term, { filterRoot: filter !== 'all' ? filter : null, statsCache: subtreeStatsCache });
+        var result = buildNodeHtml(code, node, 0, term, { filterRoot: filter !== 'all' ? filter : null, statsCache: subtreeStatsCache, mergeIndex: mergeIndex });
         if (result.html) {
             parts.push(result.html);
             if (result.visible) visibleCount += 1;
@@ -5124,6 +5600,14 @@ function renderTree() {
     if (scrollY) window.scrollTo(0, scrollY);
     updateSummaryBar();
     updateGlobalSelection();
+    // v2.4.0 修复：合单视图打开时，编辑/保存等操作会触发 renderTree；
+    // 这里同步刷新合单视图（getMergeIndex 会因 gistData 引用变化自动重建），
+    // 并保留原滚动位置，避免用户看到旧数据或跳回顶部。
+    if (mergeOverlay && mergeOverlay.classList.contains('active') && typeof renderMergeView === 'function') {
+        var mergeScrollTop = mergeBody ? mergeBody.scrollTop : 0;
+        renderMergeView();
+        if (mergeBody) mergeBody.scrollTop = mergeScrollTop;
+    }
 }
 
 function findTreeEl(code) {
@@ -5294,6 +5778,12 @@ function runTreeAction(action, code, parent, itemCode, trigger) {
         case 'print-node-items': window.printNodeItems(code); break;
         case 'delete-node': deleteNode(code); break;
         case 'edit-item': openItemModal('edit', parent, itemCode); break;
+        case 'open-merge': {
+            // v2.4.0：点击单号后的 ×N 徽标 → 打开合单视图并按该单号筛选
+            openMergeView(trigger ? trigger.getAttribute('data-merge-field') : '',
+                trigger ? trigger.getAttribute('data-merge-value') : '');
+            break;
+        }
         case 'copy-item': requestCopyItem(parent, itemCode); break;
         case 'copy-code': copyCodeToClipboard(code); break;
         case 'print-item': {
@@ -8301,8 +8791,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.3.13
-        setText(appVersionEl, 'R5 · v2.3.13 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.4.0
+        setText(appVersionEl, 'R5 · v2.4.0 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -8345,7 +8835,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.3.13：回收站批量恢复/删除 + 编码回收站冲突提示 + 节点状态自动汇总 + 刷新图标顺时针动画）');
+    console.log('管理后台已加载（ZCFI R5 · v2.4.0：回收站批量恢复/删除 + 编码回收站冲突提示 + 节点状态自动汇总 + 刷新图标顺时针动画）');
 </script>
 </body>
 </html>

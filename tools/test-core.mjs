@@ -73,7 +73,7 @@ function resp(data, status = 200, headers = {}) {
 {
     const ctx = createCtx(mkFetch(async () => resp({})));
     const Z = ctx.ZCFI;
-    eq(Z.VERSION, '2.3.0', 'VERSION = 2.3.0');
+    eq(Z.VERSION, '2.4.0', 'VERSION = 2.4.0');
     eq(Z.SCHEMA_VERSION, 1, 'SCHEMA_VERSION = 1');
 
     const nested = Z.findNodeEntry(FIXTURE.products, 'A001/B001/001');
@@ -250,6 +250,85 @@ function resp(data, status = 200, headers = {}) {
     Z.applyOps(work, [{ type: 'node.upsert', code: 'A002', originalCode: 'A002', fields: { remark: 'optimistic' } }], JSON.parse(JSON.stringify(FIXTURE)), null, []);
     eq(work.products.A002.remark, 'optimistic', 'ZCFI.applyOps 可在本地应用 ops');
     ok(typeof Z.applyOps === 'function', 'ZCFI.applyOps 已导出');
+}
+
+// ---------- 7. 合单分组 buildMergeIndex（v2.4.0） ----------
+{
+    const ctx = createCtx(mkFetch(async () => resp({})));
+    const Z = ctx.ZCFI;
+    const doc = {
+        products: {
+            A: {
+                name: '大类A',
+                children: {
+                    'A/B': {
+                        name: '子B',
+                        items: [
+                            { code: 'A/B/001', name: 'b1', status: '在售', trackingNumber: 'SF123', orderNumber: 'O001' },
+                            { code: 'A/B/002', name: 'b2', status: '在售', trackingNumber: 'sf123 ', orderNumber: 'O001' },
+                            { code: 'A/B/003', name: 'b3', status: '待售', trackingNumber: 'SF123', orderNumber: 'O002' },
+                            { code: 'A/B/004', name: 'b4', status: '在售', orderNumber: 'O001' },
+                            { code: 'A/B/005', name: 'b5', status: '在售', trackingNumber: 'SF456' },
+                            { code: 'A/B/006', name: 'b6', status: '在售', trackingNumber: 'SF456', orderNumber: 'O002', deletedAt: '2026-01-01T00:00:00Z' },
+                        ],
+                    },
+                    'A/C': {
+                        name: '子C',
+                        deletedAt: '2026-01-02T00:00:00Z',
+                        items: [
+                            { code: 'A/C/001', name: 'c1', status: '在售', trackingNumber: 'SF123', orderNumber: 'O001' },
+                        ],
+                    },
+                },
+            },
+        },
+    };
+
+    const index = Z.buildMergeIndex(doc);
+    eq(index.total, 5, '合单：排除已删除库存与已删除祖先子树');
+    eq(index.items.length, 5, '合单：有效库存行数');
+
+    // trim + 大小写不敏感归并到同一包裹
+    eq(index.trackingGroups.length, 2, '合单：包裹分组数（SF123 / SF456）');
+    const sf123 = index.trackingGroups[0];
+    eq(sf123.key, 'SF123', '合单：包裹键归一大写');
+    eq(sf123.count, 3, '合单：SF123 共 3 件');
+    eq(sf123.crossOrder, true, '合单：SF123 跨订单合包标记');
+    eq(sf123.orders.map((o) => o.label), ['O001', 'O002'], '合单：包裹内按订单二次分组');
+    eq(sf123.orders[0].count, 2, '合单：O001 在 SF123 里 2 件');
+
+    const sf456 = index.trackingGroups[1];
+    eq(sf456.crossOrder, false, '合单：SF456 单订单包裹');
+    eq(sf456.orders.length, 0, '合单：SF456 内商品均无订单号（渲染层归入「未填订单号」）');
+    eq(sf456.items.length, 1, '合单：SF456 仅 1 件');
+
+    // 订单视图
+    eq(index.orderGroups.length, 2, '合单：订单分组数（O001 / O002）');
+    const o001 = index.orderGroups[0];
+    eq(o001.count, 3, '合单：O001 共 3 件（含 1 件未分配快递）');
+    eq(o001.packageCount, 1, '合单：O001 只有 1 个包裹');
+    eq(o001.noPackageCount, 1, '合单：O001 待打包 1 件');
+    eq(index.orderGroups[1].packageCount, 1, '合单：O002 只有 1 个包裹（SF123）');
+
+    // 空值不参与分组
+    eq(index.untracked.length, 1, '合单：无快递单号不计入包裹');
+    eq(index.pendingGroups.length, 1, '合单：待打包按订单聚合');
+    eq(index.pendingGroups[0].items[0].code, 'A/B/004', '合单：待打包项订单号正确');
+    eq(index.unassigned.map((r) => r.code), ['A/B/005'], '合单：无订单号单独归类');
+
+    // 计数查询
+    eq(Z.groupCountOf(index, 'trackingNumber', 'sf123'), 3, '合单：groupCountOf 大小写不敏感');
+    eq(Z.groupCountOf(index, 'orderNumber', 'O999'), 0, '合单：未存在的订单号计数为 0');
+    eq(Z.groupCountOf(index, 'trackingNumber', '   '), 0, '合单：空白单号计数为 0');
+
+    // 恢复（清除 deletedAt）后自动回归原分组，不需要额外迁移
+    const restored = JSON.parse(JSON.stringify(doc));
+    delete restored.products.A.children['A/B'].items[5].deletedAt;
+    const index2 = Z.buildMergeIndex(restored);
+    eq(index2.total, 6, '合单：库存恢复后重新计入');
+    eq(index2.trackingByKey['SF456'].count, 2, '合单：恢复后自动回到原包裹 SF456');
+    eq(Z.groupKeyOf(' ab 12 '), 'AB12', '合单：groupKeyOf 去空白转大写');
+    eq(Z.groupKeyOf(''), '', '合单：groupKeyOf 空值返回空串');
 }
 
 const failed = results.filter((r) => !r.ok);
