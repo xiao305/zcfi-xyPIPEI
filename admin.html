@@ -1541,7 +1541,17 @@
             padding-left: 8px;
         }
         .merge-section--root { border-left: 0; margin-left: 0; padding-left: 0; }
-        .merge-section.collapsed > .merge-children { display: none; }
+        /* v2.4.1：展开/收起用 grid 高度动画（与库存树一致），不再瞬间 display 切换 */
+        .merge-children {
+            display: grid;
+            grid-template-rows: 1fr;
+            transition: grid-template-rows 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .merge-children > .merge-children-inner { overflow: hidden; min-height: 0; }
+        .merge-section.collapsed > .merge-children { grid-template-rows: 0fr; }
+        @media (prefers-reduced-motion: reduce) {
+            .merge-children { transition: none; }
+        }
         .merge-head {
             display: flex;
             align-items: center;
@@ -3026,7 +3036,18 @@ function setExpandedAll(expand) {
         });
     }
     saveViewState();
-    renderTree();
+    // v2.4.1：直接切换现有 DOM 的 expanded 类以触发 children 高度过渡，
+    // 不再 renderTree()（整树重建会丢失动画，表现为“瞬间展/收”）。
+    if (treeContainer) {
+        Array.prototype.forEach.call(treeContainer.querySelectorAll('.tree-node[data-code]'), function (el) {
+            var code = el.getAttribute('data-code');
+            var shouldExpand = !!expandedSet[code];
+            el.classList.toggle('expanded', shouldExpand);
+            var toggle = el.querySelector('.node-content .toggle');
+            if (toggle) toggle.setAttribute('aria-expanded', shouldExpand ? 'true' : 'false');
+        });
+    }
+    if (typeof closeActionMenu === 'function') closeActionMenu(false);
     updateGlobalSelection();
 }
 
@@ -5327,7 +5348,7 @@ function mergeSectionHtml(key, headHtml, childrenHtml, isRoot) {
         + ' aria-label="展开或收起" aria-expanded="' + (collapsed ? 'false' : 'true') + '">' + TREE_TOGGLE_SVG + '</button>'
         + headHtml
         + '</div>'
-        + '<div class="merge-children">' + childrenHtml + '</div>'
+        + '<div class="merge-children"><div class="merge-children-inner">' + childrenHtml + '</div></div>'
         + '</div>';
 }
 
@@ -5504,13 +5525,16 @@ function toggleMergeSection(key) {
 }
 
 function setAllMergeCollapsed(collapsed) {
+    if (!mergeBody) return;
     mergeState.collapsed = Object.create(null);
-    if (collapsed && mergeBody) {
-        Array.prototype.forEach.call(mergeBody.querySelectorAll('[data-merge-section]'), function (section) {
-            mergeState.collapsed[section.getAttribute('data-merge-section')] = true;
-        });
-    }
-    renderMergeView();
+    // v2.4.1：只切 class，让 CSS grid 高度过渡生效（不要 renderMergeView，重建 DOM 会丢失动画）
+    Array.prototype.forEach.call(mergeBody.querySelectorAll('[data-merge-section]'), function (section) {
+        var key = section.getAttribute('data-merge-section');
+        if (collapsed) mergeState.collapsed[key] = true;
+        section.classList.toggle('collapsed', !!collapsed);
+        var toggle = section.querySelector('.merge-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
 }
 
 if (mergeViewBtn) {
@@ -5548,19 +5572,23 @@ if (mergeBody) {
     mergeBody.addEventListener('click', function (event) {
         var target = event.target;
         if (!target || !target.closest) return;
+        var gestureBlocked = consumeToggleGestureBlock();
         var toggleBtn = target.closest('[data-merge-toggle]');
         if (toggleBtn) {
+            if (gestureBlocked) return;
             toggleMergeSection(toggleBtn.getAttribute('data-merge-toggle'));
             return;
         }
         var el = target.closest('[data-action]');
         if (el) {
+            if (gestureBlocked && el.getAttribute('data-action') === 'toggle') return;
             runTreeAction(el.getAttribute('data-action'), el.getAttribute('data-code'),
                 el.getAttribute('data-parent'), el.getAttribute('data-item'), el);
             return;
         }
         var head = target.closest('.merge-head');
         if (head) {
+            if (gestureBlocked) return;
             var section = head.closest('[data-merge-section]');
             if (section) toggleMergeSection(section.getAttribute('data-merge-section'));
         }
@@ -5799,9 +5827,50 @@ function runTreeAction(action, code, parent, itemCode, trigger) {
     }
 }
 
+// ============================================================
+// v2.4.1：长按 / 拖选文本保护
+// 目的：用户长按或拖选编码、订单号、快递单号准备复制时，不应触发展开/收起。
+// 判定：① 点击时存在非折叠文本选区；② 本次按下到抬起超过 450ms 且未移动（长按）。
+// 只拦截展开/收起类动作，编辑/打印等按钮动作不受影响。
+// ============================================================
+var pressGuard = { downAt: 0, x: 0, y: 0, moved: false, longPress: false };
+(function initPressGuard() {
+    if (typeof document === 'undefined' || !document.addEventListener) return;
+    document.addEventListener('pointerdown', function (e) {
+        pressGuard.downAt = Date.now();
+        pressGuard.x = e.clientX;
+        pressGuard.y = e.clientY;
+        pressGuard.moved = false;
+        pressGuard.longPress = false;
+    }, true);
+    document.addEventListener('pointermove', function (e) {
+        if (!pressGuard.downAt) return;
+        if (Math.abs(e.clientX - pressGuard.x) > 8 || Math.abs(e.clientY - pressGuard.y) > 8) pressGuard.moved = true;
+    }, true);
+    document.addEventListener('pointerup', function () {
+        if (pressGuard.downAt && !pressGuard.moved && Date.now() - pressGuard.downAt > 450) pressGuard.longPress = true;
+    }, true);
+    document.addEventListener('pointercancel', function () {
+        pressGuard.downAt = 0;
+        pressGuard.longPress = false;
+    }, true);
+})();
+function consumeToggleGestureBlock() {
+    var longPress = pressGuard.longPress;
+    pressGuard.longPress = false;
+    pressGuard.downAt = 0;
+    if (longPress) return true;
+    try {
+        var sel = window.getSelection ? window.getSelection() : null;
+        if (sel && !sel.isCollapsed && String(sel).length) return true;
+    } catch (e) { /* ignore */ }
+    return false;
+}
+
 function onTreeClick(event) {
     var target = event.target;
     if (!target || !target.closest) return;
+    var gestureBlocked = consumeToggleGestureBlock();
     var th = target.closest('th[data-sort]');
     if (th && treeContainer.contains(th)) {
         toggleTableSort(th.getAttribute('data-sort'));
@@ -5810,12 +5879,14 @@ function onTreeClick(event) {
     // 行内按钮 / ⋮ / toggle / name 等带 data-action 的元素走原动作分发，避免与行点击重复 toggle
     var el = target.closest('[data-action]');
     if (el && treeContainer.contains(el)) {
+        if (gestureBlocked && el.getAttribute('data-action') === 'toggle') return;
         runTreeAction(el.getAttribute('data-action'), el.getAttribute('data-code'), el.getAttribute('data-parent'), el.getAttribute('data-item'), el);
         return;
     }
     // v2.3.8：点击标题区（code/状态/统计/行内空白）切换展开收起；按钮/菜单/表单控件/复选框除外。
     // 双击编辑（onTreeDblClick，仅库存行）不受影响。
     if (target.closest('button, input, select, textarea, a, label, .actions')) return;
+    if (gestureBlocked) return;
     var content = target.closest('.node-content');
     if (!content || !treeContainer.contains(content)) return;
     var nodeEl = content.closest('.tree-node');
@@ -8791,8 +8862,8 @@ window.openBatchStatus = openBatchStatus;
         loadViewState();
         if (searchInput) searchInput.value = viewState.search || '';
         if (nodeSortSelect) nodeSortSelect.value = viewState.nodeSort || 'code-asc';
-        // 版本号统一为 R5 · v2.4.0
-        setText(appVersionEl, 'R5 · v2.4.0 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
+        // 版本号统一为 R5 · v2.4.1
+        setText(appVersionEl, 'R5 · v2.4.1 · 构建 ' + BUILD_DATE + ' · 数据仅保存在本机与你的 Gist');
         // v2.3.4：启动时做一次模板几何自检（所有打印项必须在纸张 2mm 安全区内）
         try {
             var geometryIssues = validateAllTemplatesGeometry();
@@ -8835,7 +8906,7 @@ window.openBatchStatus = openBatchStatus;
         }, 4000);
     })();
 
-    console.log('管理后台已加载（ZCFI R5 · v2.4.0：回收站批量恢复/删除 + 编码回收站冲突提示 + 节点状态自动汇总 + 刷新图标顺时针动画）');
+    console.log('管理后台已加载（ZCFI R5 · v2.4.1：合单视图 + 展开/收起动画 + 长按/框选保护）');
 </script>
 </body>
 </html>

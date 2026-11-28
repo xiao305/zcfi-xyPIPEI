@@ -177,6 +177,15 @@ const TOGGLE_SVG = '<svg viewBox="0 0 24 24" width="14" height="14"><polyline po
 contains(ADMIN_SRC, '#merge-overlay { z-index: 950; }', 'admin 合单视图层级低于普通弹窗（编辑弹窗可置顶）');
 contains(ADMIN_SRC, '合单视图打开时，编辑/保存等操作会触发', 'admin 合单视图在保存后自动刷新');
 
+// v2.4.1 动画 / 长按保护契约
+contains(ADMIN_SRC, 'merge-children-inner', 'admin 合单视图分组有动画内层');
+contains(ADMIN_SRC, 'grid-template-rows 0.24s', 'admin 合单视图分组高度动画');
+contains(ADMIN_SRC, 'consumeToggleGestureBlock', 'admin 长按/框选不触发折叠');
+contains(ADMIN_SRC, "el.classList.toggle('expanded', shouldExpand)", 'admin 全部展开/折叠走 class 切换（保留动画）');
+contains(SCAN_SRC, 'group-children-inner', 'scan 分组视图有动画内层');
+contains(SCAN_SRC, 'grid-template-rows 0.24s', 'scan 分组视图高度动画');
+contains(SCAN_SRC, 'consumeToggleGestureBlock', 'scan 长按/框选不触发折叠');
+
 const failed = results.filter((r) => !r.ok);
 console.log(`\n结果：${results.length - failed.length}/${results.length} 通过，${failed.length} 失败`);
 if (failed.length) process.exit(1);
